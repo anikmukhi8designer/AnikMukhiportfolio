@@ -143,12 +143,6 @@ const AppContent: React.FC = () => {
             <p>&copy; {new Date().getFullYear()} Mukhi Anik. All rights reserved.</p>
             <div className="flex gap-4">
                 <p>Designed & Built with React + Tailwind.</p>
-                <button 
-                  onClick={() => setIsAdminMode(true)} 
-                  className="opacity-50 hover:opacity-100 transition-opacity hover:text-white cursor-pointer"
-                >
-                  CMS
-                </button>
             </div>
           </div>
         </div>

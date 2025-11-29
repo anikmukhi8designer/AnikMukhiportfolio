@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Lock } from 'lucide-react';
 
 interface AdminLoginProps {
@@ -9,14 +9,28 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [usingDefaults, setUsingDefaults] = useState(true);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('cms_credentials');
+    if (stored) {
+        setUsingDefaults(false);
+    }
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulated authentication
-    if (email === 'admin@newgenre.studio' && password === 'password') {
+    
+    // Get stored credentials or use defaults
+    const storedCreds = localStorage.getItem('cms_credentials');
+    const { email: validEmail, password: validPassword } = storedCreds 
+      ? JSON.parse(storedCreds) 
+      : { email: 'admin@newgenre.studio', password: 'password' };
+
+    if (email === validEmail && password === validPassword) {
       onLogin();
     } else {
-      setError('Invalid credentials. Try admin@newgenre.studio / password');
+      setError('Invalid credentials.');
     }
   };
 
@@ -40,7 +54,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
               className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-neutral-900 focus:outline-none"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@newgenre.studio"
+              placeholder="Enter email"
             />
           </div>
           <div>
@@ -64,6 +78,15 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
             Access Dashboard
           </button>
         </form>
+        
+        {usingDefaults && (
+            <div className="mt-6 text-center p-4 bg-neutral-50 rounded-lg border border-neutral-100">
+                <p className="text-xs text-neutral-500 mb-1">Default Credentials:</p>
+                <p className="text-xs font-mono text-neutral-700">admin@newgenre.studio</p>
+                <p className="text-xs font-mono text-neutral-700">password</p>
+            </div>
+        )}
+
         <div className="mt-6 text-center">
             <a href="#" className="text-xs text-neutral-400 hover:text-neutral-600 transition-colors">
                 Return to Portfolio
