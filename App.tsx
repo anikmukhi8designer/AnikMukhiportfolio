@@ -10,38 +10,73 @@ import { SOCIALS } from './data';
 import { ArrowDown } from 'lucide-react';
 
 // CMS Imports
-import { DataProvider } from './contexts/DataContext';
+import { DataProvider, useData } from './contexts/DataContext';
 import AdminLogin from './components/admin/AdminLogin';
 import Dashboard from './components/admin/Dashboard';
+import BlockEditor from './components/admin/BlockEditor';
+
+const AdminRoute = () => {
+    const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+    const [currentView, setCurrentView] = useState<'dashboard' | 'editor'>('dashboard');
+    const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+    const { projects, updateProject } = useData();
+
+    if (!isAdminLoggedIn) {
+        return <AdminLogin onLogin={() => setIsAdminLoggedIn(true)} />;
+    }
+
+    if (currentView === 'editor' && editingProjectId) {
+        const projectToEdit = projects.find(p => p.id === editingProjectId);
+        if (projectToEdit) {
+            return (
+                <BlockEditor 
+                    project={projectToEdit} 
+                    onSave={(updated) => {
+                        updateProject(updated.id, updated);
+                        // Optional: stay on page or go back
+                    }}
+                    onBack={() => {
+                        setEditingProjectId(null);
+                        setCurrentView('dashboard');
+                    }}
+                />
+            );
+        }
+    }
+
+    return (
+        <Dashboard 
+            onLogout={() => { 
+                setIsAdminLoggedIn(false); 
+                window.location.hash = '';
+                window.location.reload();
+            }}
+            onEditProject={(id) => {
+                setEditingProjectId(id);
+                setCurrentView('editor');
+            }}
+        />
+    );
+};
 
 const AppContent: React.FC = () => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  
-  // State-based routing to prevent preview environment errors
-  const [currentView, setCurrentView] = useState<'home' | 'admin'>('home');
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [isAdminMode, setIsAdminMode] = useState(false);
 
-  // Check for hash on initial load only
   useEffect(() => {
     if (window.location.hash === '#admin') {
-      setCurrentView('admin');
+      setIsAdminMode(true);
     }
+    const handleHashChange = () => {
+        if (window.location.hash === '#admin') setIsAdminMode(true);
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // Admin Routes
-  if (currentView === 'admin') {
-    if (!isAdminLoggedIn) {
-        return <AdminLogin onLogin={() => setIsAdminLoggedIn(true)} />;
-    }
-    return <Dashboard onLogout={() => { 
-      setIsAdminLoggedIn(false); 
-      setCurrentView('home');
-      // Optional: Clean up URL without page reload
-      if (window.history.pushState) {
-          window.history.pushState(null, '', window.location.pathname);
-      }
-    }} />;
+  if (isAdminMode) {
+      return <AdminRoute />;
   }
   
   // Public Portfolio Route
@@ -109,7 +144,7 @@ const AppContent: React.FC = () => {
             <div className="flex gap-4">
                 <p>Designed & Built with React + Tailwind.</p>
                 <button 
-                  onClick={() => setCurrentView('admin')} 
+                  onClick={() => setIsAdminMode(true)} 
                   className="opacity-50 hover:opacity-100 transition-opacity hover:text-white cursor-pointer"
                 >
                   CMS

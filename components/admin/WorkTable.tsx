@@ -1,13 +1,17 @@
 import React from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Edit2, Trash2, Eye, EyeOff, Plus } from 'lucide-react';
+import { Edit2, Trash2, Plus } from 'lucide-react';
 
-const WorkTable: React.FC = () => {
+interface WorkTableProps {
+  onEdit?: (projectId: string) => void;
+}
+
+const WorkTable: React.FC<WorkTableProps> = ({ onEdit }) => {
   const { projects, updateProject, deleteProject, addProject } = useData();
 
   const handleAddNew = () => {
     const newId = `project-${Date.now()}`;
-    addProject({
+    const newProject = {
       id: newId,
       title: "New Project",
       client: "Client Name",
@@ -18,8 +22,12 @@ const WorkTable: React.FC = () => {
       thumb: "https://picsum.photos/800/600",
       tags: ["Tag 1"],
       published: false,
-      images: []
-    });
+      images: [],
+      content: []
+    };
+    addProject(newProject);
+    // Immediately open editor for new project
+    if (onEdit) onEdit(newId);
   };
 
   return (
@@ -43,7 +51,6 @@ const WorkTable: React.FC = () => {
                 <th className="px-6 py-4 font-semibold">Project Title</th>
                 <th className="px-6 py-4 font-semibold">Client</th>
                 <th className="px-6 py-4 font-semibold">Year</th>
-                <th className="px-6 py-4 font-semibold">Role</th>
                 <th className="px-6 py-4 font-semibold text-right">Actions</th>
               </tr>
             </thead>
@@ -63,37 +70,23 @@ const WorkTable: React.FC = () => {
                     </button>
                   </td>
                   <td className="px-6 py-4">
-                    <input 
-                      className="bg-transparent border-none p-0 font-medium text-neutral-900 w-full focus:ring-0"
-                      value={project.title}
-                      onChange={(e) => updateProject(project.id, { title: e.target.value })}
-                    />
+                    <span className="font-medium text-neutral-900">{project.title}</span>
                   </td>
-                  <td className="px-6 py-4">
-                     <input 
-                      className="bg-transparent border-none p-0 text-neutral-600 w-full focus:ring-0"
-                      value={project.client}
-                      onChange={(e) => updateProject(project.id, { client: e.target.value })}
-                    />
+                  <td className="px-6 py-4 text-neutral-600">
+                     {project.client}
                   </td>
-                  <td className="px-6 py-4">
-                    <input 
-                      className="bg-transparent border-none p-0 text-neutral-600 w-16 focus:ring-0"
-                      value={project.year}
-                      type="number"
-                      onChange={(e) => updateProject(project.id, { year: parseInt(e.target.value) })}
-                    />
-                  </td>
-                   <td className="px-6 py-4">
-                    <input 
-                      className="bg-transparent border-none p-0 text-neutral-600 w-full focus:ring-0"
-                      value={project.roles.join(', ')}
-                      onChange={(e) => updateProject(project.id, { roles: e.target.value.split(',').map(s => s.trim()) })}
-                    />
+                  <td className="px-6 py-4 text-neutral-600">
+                    {project.year}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-3 text-neutral-400">
-                      <button className="hover:text-neutral-900"><Edit2 className="w-4 h-4" /></button>
+                      <button 
+                        onClick={() => onEdit && onEdit(project.id)}
+                        className="hover:text-neutral-900 flex items-center gap-1"
+                        title="Open Editor"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
                       <button 
                         onClick={() => deleteProject(project.id)}
                         className="hover:text-red-600"

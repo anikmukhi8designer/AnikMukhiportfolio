@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowUpRight } from 'lucide-react';
 import { Project } from '../types';
+import ContentRenderer from './ContentRenderer';
 
 interface ModalProps {
   project: Project | null;
@@ -79,26 +80,27 @@ const Modal: React.FC<ModalProps> = ({ project, onClose }) => {
                     </div>
 
                     <div className="p-8 sm:p-12 grid grid-cols-1 lg:grid-cols-3 gap-12">
-                        <div className="lg:col-span-2 space-y-8">
-                            <div>
-                                <h3 className="text-xl font-bold mb-4">About the project</h3>
-                                <p className="text-lg text-neutral-600 leading-relaxed">
-                                    {project.description}
-                                </p>
-                                <p className="mt-4 text-neutral-600 leading-relaxed">
-                                    This case study demonstrates the process of discovery, definition, and delivery. 
-                                    (Placeholder extended text would go here, describing the challenges and solutions in depth).
-                                </p>
-                            </div>
-                            
-                            {/* Additional Images Grid */}
-                            {project.images && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8">
-                                    {project.images.map((img, idx) => (
-                                        <img key={idx} src={img} alt="" className="w-full h-64 object-cover rounded-lg bg-neutral-100" />
-                                    ))}
+                        <div className="lg:col-span-2">
+                           {/* If block content exists, render it. Otherwise fall back to description + images array */}
+                           {project.content && project.content.length > 0 ? (
+                             <ContentRenderer blocks={project.content} />
+                           ) : (
+                             <div className="space-y-8">
+                                <div>
+                                    <h3 className="text-xl font-bold mb-4">About the project</h3>
+                                    <p className="text-lg text-neutral-600 leading-relaxed">
+                                        {project.description}
+                                    </p>
                                 </div>
-                            )}
+                                {project.images && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8">
+                                        {project.images.map((img, idx) => (
+                                            <img key={idx} src={img} alt="" className="w-full h-64 object-cover rounded-lg bg-neutral-100" />
+                                        ))}
+                                    </div>
+                                )}
+                             </div>
+                           )}
                         </div>
 
                         <div className="lg:col-span-1 space-y-8">

@@ -6,9 +6,10 @@ import { useData } from '../../contexts/DataContext';
 
 interface DashboardProps {
   onLogout: () => void;
+  onEditProject: (projectId: string) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
+const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   const [activeTab, setActiveTab] = useState<'work' | 'experience'>('work');
   const { resetData } = useData();
   const [isPublishing, setIsPublishing] = useState(false);
@@ -79,7 +80,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         </div>
 
         {/* Tab Content */}
-        {activeTab === 'work' ? <WorkTable /> : <ExperienceTable />}
+        {activeTab === 'work' ? (
+          <WorkTable onEdit={onEditProject} />
+        ) : (
+          <ExperienceTable />
+        )}
 
         {/* Footer Actions */}
         <div className="mt-12 pt-8 border-t border-neutral-200 flex justify-between items-center text-sm text-neutral-500">
