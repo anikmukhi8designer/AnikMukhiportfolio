@@ -45,12 +45,6 @@ export const PROJECTS: Project[] = [
         "content": "Create a simple, luxurious, and intuitive tablet app that empowers guests to control everything inside their suite without needing staff intervention — enhancing speed, comfort, and overall hospitality."
       },
       {
-        "id": "6",
-        "type": "image",
-        "content": "https://picsum.photos/id/3/800/600",
-        "caption": "Final UI screens"
-      },
-      {
         "id": "7",
         "type": "quote",
         "content": "The new dashboard has completely transformed how our users interact with their finances."
