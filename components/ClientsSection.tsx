@@ -17,9 +17,8 @@ const ClientLogo: React.FC<{ client: Client }> = ({ client }) => {
   const styleIndex = client.name.length % fontStyles.length;
 
   return (
-    <div className="w-full h-full flex items-center justify-center p-8 group-hover:scale-105 transition-transform duration-500 ease-out">
-        {/* If we had an image, we'd render it here. For now, we use high-end typography. */}
-        <span className={`text-xl md:text-2xl text-neutral-400 group-hover:text-neutral-900 transition-colors duration-300 ${fontStyles[styleIndex]}`}>
+    <div className="w-full h-full flex items-center justify-center p-8 transition-transform duration-500 ease-out whitespace-nowrap">
+        <span className={`text-3xl md:text-4xl text-neutral-300 hover:text-neutral-900 transition-colors duration-300 ${fontStyles[styleIndex]}`}>
             {client.name}
         </span>
     </div>
@@ -27,11 +26,14 @@ const ClientLogo: React.FC<{ client: Client }> = ({ client }) => {
 };
 
 const ClientsSection: React.FC = () => {
+  // Triple the clients list to ensure seamless looping on large screens
+  const marqueeClients = [...CLIENTS, ...CLIENTS, ...CLIENTS];
+
   return (
-    <section className="py-24 bg-neutral-50 border-t border-neutral-200">
-      <div className="max-w-screen-xl mx-auto px-4 md:px-8">
-        {/* Minimal Section Header */}
-        <div className="flex flex-col md:flex-row md:items-baseline justify-between mb-12 gap-4">
+    <section className="py-24 bg-neutral-50 border-t border-neutral-200 overflow-hidden">
+      <div className="w-full">
+        {/* Minimal Section Header - Centered for the marquee style */}
+        <div className="max-w-screen-xl mx-auto px-4 md:px-8 mb-16 flex flex-col md:flex-row md:items-baseline justify-between gap-4">
           <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-400">
             Clients & Collaborations
           </h2>
@@ -40,27 +42,33 @@ const ClientsSection: React.FC = () => {
           </span>
         </div>
 
-        {/* 
-            Grid Layout:
-            - Desktop: 4 columns
-            - Tablet: 3 columns
-            - Mobile: 2 columns
-            - Borders: Using Tailwind's 'divide' utilities isn't enough for a grid, 
-              so we use individual borders with negative margins to overlap them cleanly.
-        */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 border-l border-t border-neutral-200">
-          {CLIENTS.map((client, index) => (
-            <motion.div
-              key={client.id}
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ delay: index * 0.05, duration: 0.5 }}
-              className="group relative h-32 md:h-40 border-r border-b border-neutral-200 bg-transparent hover:bg-white transition-colors duration-300 cursor-default"
+        {/* Marquee Container */}
+        <div className="relative w-full flex overflow-hidden">
+            {/* 
+                Gradient Masks for smooth fade in/out at edges 
+            */}
+            <div className="absolute left-0 top-0 bottom-0 w-24 md:w-48 bg-gradient-to-r from-neutral-50 to-transparent z-10 pointer-events-none" />
+            <div className="absolute right-0 top-0 bottom-0 w-24 md:w-48 bg-gradient-to-l from-neutral-50 to-transparent z-10 pointer-events-none" />
+
+            {/* Moving Track */}
+            <motion.div 
+                className="flex items-center gap-8 md:gap-16 w-max"
+                animate={{ x: ["0%", "-33.33%"] }}
+                transition={{ 
+                    ease: "linear", 
+                    duration: 40, // Adjust speed: higher = slower
+                    repeat: Infinity 
+                }}
             >
-              <ClientLogo client={client} />
+                {marqueeClients.map((client, index) => (
+                    <div 
+                        key={`${client.id}-${index}`} 
+                        className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity duration-300"
+                    >
+                        <ClientLogo client={client} />
+                    </div>
+                ))}
             </motion.div>
-          ))}
         </div>
       </div>
     </section>

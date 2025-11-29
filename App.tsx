@@ -118,11 +118,11 @@ const AppContent: React.FC = () => {
           </div>
         </section>
 
+        {/* Clients Section - Moved Here */}
+        <ClientsSection />
+
         {/* Work Section */}
         <WorkSection onProjectClick={setSelectedProject} />
-
-        {/* Clients Section */}
-        <ClientsSection />
 
         {/* Experience Section */}
         <div id="experience">
