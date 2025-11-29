@@ -1,4 +1,3 @@
-/// <reference types="vite/client" />
 import React, { useState, useEffect, useRef } from 'react';
 import { Project, ContentBlock, BlockType } from '../../types';
 import { 
@@ -6,6 +5,18 @@ import {
   Type, Heading1, Heading2, Code, Quote, ArrowUp, ArrowDown, Minus,
   Upload, Loader2
 } from 'lucide-react';
+
+// Manually define Vite env types since vite/client is missing
+declare global {
+  interface ImportMetaEnv {
+    VITE_GITHUB_OWNER?: string;
+    VITE_GITHUB_REPO?: string;
+    VITE_GITHUB_TOKEN?: string;
+  }
+  interface ImportMeta {
+    readonly env: ImportMetaEnv;
+  }
+}
 
 interface BlockEditorProps {
   project: Project;

@@ -3,6 +3,7 @@ import { Project } from './types';
 import WorkSection from './components/WorkSection';
 import ExperienceSection from './components/ExperienceSection';
 import ClientsSection from './components/ClientsSection';
+import SkillsSection from './components/SkillsSection';
 import Modal from './components/Modal';
 import NavBar from './components/NavBar';
 import SplitNavPanel from './components/SplitNavPanel';
@@ -119,6 +120,10 @@ const AppContent: React.FC = () => {
         <div id="experience">
           <ExperienceSection />
         </div>
+
+        {/* Skills Section */}
+        <SkillsSection />
+
       </main>
 
       {/* Footer */}

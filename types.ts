@@ -42,6 +42,12 @@ export interface Client {
   url?: string;
 }
 
+export interface SkillCategory {
+  id: string;
+  title: string; // e.g., "Design", "Development"
+  items: string[]; // e.g., ["Figma", "React", "TypeScript"]
+}
+
 export interface SocialLink {
   platform: string;
   url: string;
