@@ -44,7 +44,8 @@ export interface Client {
 
 export interface SkillItem {
   name: string;
-  icon: string;
+  icon?: string;
+  image?: string; // URL for custom PNG/SVG
 }
 
 export interface SkillCategory {

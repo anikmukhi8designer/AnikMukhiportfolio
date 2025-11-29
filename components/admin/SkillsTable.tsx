@@ -1,7 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Trash2, Plus, X, Check } from 'lucide-react';
+import { Trash2, Plus, X, Check, Upload, Loader2, Image as ImageIcon } from 'lucide-react';
 import { ICON_KEYS, SkillIcon } from '../SkillIcons';
+
+// Manually define Vite env types since vite/client is missing
+declare global {
+  interface ImportMetaEnv {
+    VITE_GITHUB_OWNER?: string;
+    VITE_GITHUB_REPO?: string;
+    VITE_GITHUB_TOKEN?: string;
+  }
+  interface ImportMeta {
+    readonly env: ImportMetaEnv;
+  }
+}
 
 const SkillsTable: React.FC = () => {
   const { skills, updateSkill, deleteSkill, addSkill } = useData();
@@ -9,7 +21,12 @@ const SkillsTable: React.FC = () => {
   // State for the "Add Item" form
   const [addingToId, setAddingToId] = useState<string | null>(null);
   const [newItemName, setNewItemName] = useState('');
-  const [newItemIcon, setNewItemIcon] = useState('Default');
+  const [newItemIcon, setNewItemIcon] = useState('Default'); // Fallback icon
+  const [newItemImage, setNewItemImage] = useState(''); // Uploaded image URL
+
+  // Upload State
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleAddNewCategory = () => {
     const newId = `skill-${Date.now()}`;
@@ -25,12 +42,17 @@ const SkillsTable: React.FC = () => {
     const category = skills.find(s => s.id === categoryId);
     if (!category) return;
 
-    const updatedItems = [...category.items, { name: newItemName, icon: newItemIcon }];
+    const updatedItems = [...category.items, { 
+        name: newItemName, 
+        icon: newItemImage ? undefined : newItemIcon, 
+        image: newItemImage 
+    }];
     updateSkill(categoryId, { items: updatedItems });
     
     // Reset form
     setNewItemName('');
     setNewItemIcon('Default');
+    setNewItemImage('');
     setAddingToId(null);
   };
 
@@ -41,8 +63,97 @@ const SkillsTable: React.FC = () => {
      updateSkill(categoryId, { items: updatedItems });
   };
 
+  const triggerUpload = () => {
+    fileInputRef.current?.click();
+  };
+
+  const processUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    
+    try {
+        const storedGit = localStorage.getItem('cms_git_config');
+        let gitConfig = storedGit ? JSON.parse(storedGit) : null;
+        
+        if (!gitConfig && import.meta.env.VITE_GITHUB_TOKEN) {
+            gitConfig = {
+                owner: import.meta.env.VITE_GITHUB_OWNER,
+                repo: import.meta.env.VITE_GITHUB_REPO,
+                token: import.meta.env.VITE_GITHUB_TOKEN
+            };
+        }
+
+        let finalUrl = '';
+
+        if (gitConfig && gitConfig.owner && gitConfig.repo && gitConfig.token) {
+            try {
+                const { owner, repo, token } = gitConfig;
+                const reader = new FileReader();
+                await new Promise<void>((resolve, reject) => {
+                    reader.onload = async () => {
+                        try {
+                            const base64Content = (reader.result as string).split(',')[1];
+                            const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '');
+                            const filename = `skill-${Date.now()}-${cleanName}`;
+                            const path = `public/uploads/skills/${filename}`;
+                            
+                            const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+                                method: 'PUT',
+                                headers: {
+                                    'Authorization': `token ${token}`,
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    message: `CMS Skill Upload: ${cleanName}`,
+                                    content: base64Content
+                                })
+                            });
+
+                            if (res.ok) {
+                                finalUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${path}`;
+                            }
+                            resolve();
+                        } catch (err) {
+                            reject(err);
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                });
+            } catch (err) {
+                console.warn("GitHub upload failed, falling back to Base64", err);
+            }
+        }
+
+        if (!finalUrl) {
+            const reader = new FileReader();
+            finalUrl = await new Promise((resolve) => {
+                reader.onload = () => resolve(reader.result as string);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        setNewItemImage(finalUrl);
+    } catch (error) {
+        console.error("Upload error", error);
+        alert("Failed to upload image.");
+    } finally {
+        setIsUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="space-y-6">
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        className="hidden" 
+        accept="image/png,image/svg+xml"
+        onChange={processUpload}
+      />
+
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">Skills & Tools ({skills.length} Categories)</h3>
         <button 
@@ -78,8 +189,12 @@ const SkillsTable: React.FC = () => {
                      <div className="flex flex-wrap gap-2 mb-2">
                         {skill.items.map((item, idx) => (
                             <div key={idx} className="flex items-center gap-2 bg-neutral-100 px-3 py-1.5 rounded-full border border-neutral-200 group">
-                                <div className="w-4 h-4 text-neutral-500">
-                                    <SkillIcon icon={item.icon || 'Default'} className="w-full h-full" />
+                                <div className="w-4 h-4 text-neutral-500 flex items-center justify-center overflow-hidden rounded-full">
+                                    {item.image ? (
+                                        <img src={item.image} alt="" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <SkillIcon icon={item.icon || 'Default'} className="w-full h-full" />
+                                    )}
                                 </div>
                                 <span className="text-neutral-700 font-medium">{item.name}</span>
                                 <button 
@@ -95,13 +210,35 @@ const SkillsTable: React.FC = () => {
                      {/* Add Item Interface */}
                      {addingToId === skill.id ? (
                         <div className="flex items-center gap-2 mt-2 bg-white border border-neutral-300 rounded-lg p-1 w-fit animate-in fade-in slide-in-from-left-4 duration-200">
-                            <select 
-                                value={newItemIcon}
-                                onChange={(e) => setNewItemIcon(e.target.value)}
-                                className="text-xs bg-neutral-50 border-none rounded focus:ring-0 py-1.5"
+                            
+                            {/* Upload Button */}
+                            <button 
+                                onClick={triggerUpload}
+                                disabled={isUploading}
+                                className="w-8 h-8 flex items-center justify-center bg-neutral-100 hover:bg-neutral-200 rounded text-neutral-500 transition-colors overflow-hidden border border-neutral-200"
+                                title="Upload PNG/SVG"
                             >
-                                {ICON_KEYS.map(key => <option key={key} value={key}>{key}</option>)}
-                            </select>
+                                {isUploading ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : newItemImage ? (
+                                    <img src={newItemImage} className="w-full h-full object-cover" alt="preview" />
+                                ) : (
+                                    <Upload className="w-4 h-4" />
+                                )}
+                            </button>
+
+                            {/* Fallback Icon Selector (Only shown if no image) */}
+                            {!newItemImage && (
+                                <select 
+                                    value={newItemIcon}
+                                    onChange={(e) => setNewItemIcon(e.target.value)}
+                                    className="text-xs bg-neutral-50 border-none rounded focus:ring-0 py-1.5 w-24"
+                                >
+                                    {ICON_KEYS.map(key => <option key={key} value={key}>{key}</option>)}
+                                </select>
+                            )}
+
+                            {/* Name Input */}
                             <input 
                                 autoFocus
                                 value={newItemName}
@@ -122,6 +259,7 @@ const SkillsTable: React.FC = () => {
                                 setAddingToId(skill.id);
                                 setNewItemName('');
                                 setNewItemIcon('Default');
+                                setNewItemImage('');
                             }}
                             className="flex items-center gap-1 text-xs font-bold text-neutral-400 hover:text-neutral-900 mt-2 px-2 py-1 rounded hover:bg-neutral-100 w-fit transition-colors"
                         >
