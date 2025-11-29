@@ -92,7 +92,7 @@ export const EXPERIENCE: Experience[] = [
     "company": "HelpyMoto ",
     "period": "Sept 2023- Jan 2024",
     "description": "Description of responsibilities...",
-    "published": false
+    "published": true
   },
   {
     "id": "senior-pd-2023",
