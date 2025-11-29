@@ -14,8 +14,8 @@ export const PROJECTS: Project[] = [
     ],
     "description": "",
     "year": 2024,
-    "heroImage": "https://raw.githubusercontent.com/anikmukhi8designer/AnikMukhiportfolio/main/public/uploads/1764435182750-SSOTechnologyBackgroundIT1.png",
-    "thumb": "https://raw.githubusercontent.com/anikmukhi8designer/AnikMukhiportfolio/main/public/uploads/1764435182750-SSOTechnologyBackgroundIT1.png",
+    "heroImage": "https://raw.githubusercontent.com/anikmukhi8designer/AnikMukhiportfolio/main/public/uploads/1764437123505-SSOTechnologyBackgroundIT1.png",
+    "thumb": "https://raw.githubusercontent.com/anikmukhi8designer/AnikMukhiportfolio/main/public/uploads/1764437123505-SSOTechnologyBackgroundIT1.png",
     "tags": [
       "Fintech",
       "SaaS",
@@ -27,28 +27,22 @@ export const PROJECTS: Project[] = [
       {
         "id": "1",
         "type": "h1",
-        "content": "Challenges "
+        "content": "Overview "
       },
       {
         "id": "2",
         "type": "paragraph",
-        "content": "Nova Financial needed a complete overhaul of their legacy tracking system. The goal was to reduce the time it takes for users to analyze their monthly spend by 50%."
-      },
-      {
-        "id": "3",
-        "type": "image",
-        "content": "https://raw.githubusercontent.com/anikmukhi8designer/AnikMukhiportfolio/main/public/uploads/1764434110609-SSOTechnologyBackgroundIT1.png",
-        "caption": "Initial wireframes and sketches"
+        "content": "The Baltimore Ravens wanted to elevate their VIP suite experience inside the stadium by introducing a smart tablet interface. This tablet would act as the central control system for guests — allowing them to manage entertainment, order food, request services, and enjoy a seamless premium experience during the game."
       },
       {
         "id": "4",
         "type": "h2",
-        "content": "Design System"
+        "content": "Project Goal"
       },
       {
         "id": "5",
         "type": "paragraph",
-        "content": "We established a strict 8pt grid system and a color palette inspired by Swiss typography. Typography plays a huge role in the readability of complex data sets."
+        "content": "Create a simple, luxurious, and intuitive tablet app that empowers guests to control everything inside their suite without needing staff intervention — enhancing speed, comfort, and overall hospitality."
       },
       {
         "id": "6",
@@ -60,6 +54,38 @@ export const PROJECTS: Project[] = [
         "id": "7",
         "type": "quote",
         "content": "The new dashboard has completely transformed how our users interact with their finances."
+      },
+      {
+        "id": "block-1764437431903",
+        "type": "h1",
+        "content": "Problem statment"
+      },
+      {
+        "id": "block-1764437457419",
+        "type": "paragraph",
+        "content": "Premium suite guests often rely on attendants for simple actions such as:\n\nAdjusting the TV\n\nOrdering snacks or beverages\n\nRequesting valet\n\nAsking for assistance\n\nThis leads to:\n\nSlower service\n\nInterrupted game experience\n\nHigher staff load\n\nThe Ravens wanted a unified digital interface that gives control back to the guest."
+      },
+      {
+        "id": "block-1764437472528",
+        "type": "h1",
+        "content": "Solution"
+      },
+      {
+        "id": "block-1764437517138",
+        "type": "paragraph",
+        "content": "A centralized tablet experience that allows guests to:\n\n🎬 TV & Entertainment Control\n\nLive game broadcast\n\nHighlights & replays\n\nMovies, news, and OTT content\n\nVolume, channel, and input control\n\n🍔 Food & Beverage Ordering\n\nBrowse curated menus\n\nAdd to cart and customize\n\nTrack order status\n\n🚗 Valet Parking Request\n\nRequest car delivery\n\nNotify valet upon arrival\n\n🛍️ Merchandise Shopping\n\nBrowse exclusive Ravens gear\n\nOrder directly to suite\n\n🧑‍💼 One-Tap Service Assistance\n\nNotify staff instantly\n\nTrack service status\n\nAll wrapped inside a clean, modern, stadium-themed UI."
+      },
+      {
+        "id": "block-1764437527045",
+        "type": "image",
+        "content": "https://raw.githubusercontent.com/anikmukhi8designer/AnikMukhiportfolio/main/public/uploads/1764437541325-Home.png",
+        "caption": ""
+      },
+      {
+        "id": "block-1764437566682",
+        "type": "image",
+        "content": "https://raw.githubusercontent.com/anikmukhi8designer/AnikMukhiportfolio/main/public/uploads/1764437576376-HallOfframe.png",
+        "caption": ""
       }
     ]
   }
