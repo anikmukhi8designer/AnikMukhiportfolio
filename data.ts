@@ -37,7 +37,7 @@ export const PROJECTS: Project[] = [
       {
         "id": "3",
         "type": "image",
-        "content": "https://picsum.photos/id/2/800/600",
+        "content": "https://raw.githubusercontent.com/anikmukhi8designer/AnikMukhiportfolio/main/public/uploads/1764434110609-SSOTechnologyBackgroundIT1.png",
         "caption": "Initial wireframes and sketches"
       },
       {
