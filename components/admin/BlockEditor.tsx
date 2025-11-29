@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+/// <reference types="vite/client" />
+import React, { useState, useEffect, useRef } from 'react';
 import { Project, ContentBlock, BlockType } from '../../types';
 import { 
   ArrowLeft, Save, Plus, Trash2, GripVertical, Image as ImageIcon, 
-  Type, Heading1, Heading2, Code, Quote, ArrowUp, ArrowDown, Minus 
+  Type, Heading1, Heading2, Code, Quote, ArrowUp, ArrowDown, Minus,
+  Upload, Loader2
 } from 'lucide-react';
 
 interface BlockEditorProps {
@@ -16,6 +18,11 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
   const [formData, setFormData] = useState<Project>(project);
   const [blocks, setBlocks] = useState<ContentBlock[]>(project.content || []);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  // Upload State
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [pendingUploadHandler, setPendingUploadHandler] = useState<((url: string) => void) | null>(null);
 
   // Initialize blocks if empty
   useEffect(() => {
@@ -75,8 +82,105 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
     setHasUnsavedChanges(false);
   };
 
+  // Upload Logic
+  const triggerUpload = (handler: (url: string) => void) => {
+    setPendingUploadHandler(() => handler);
+    fileInputRef.current?.click();
+  };
+
+  const processUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !pendingUploadHandler) return;
+
+    setIsUploading(true);
+    
+    try {
+        // Try GitHub upload first if configured
+        // Priority: Local Storage -> Env Vars
+        const storedGit = localStorage.getItem('cms_git_config');
+        let gitConfig = storedGit ? JSON.parse(storedGit) : null;
+        
+        if (!gitConfig && import.meta.env.VITE_GITHUB_TOKEN) {
+            gitConfig = {
+                owner: import.meta.env.VITE_GITHUB_OWNER,
+                repo: import.meta.env.VITE_GITHUB_REPO,
+                token: import.meta.env.VITE_GITHUB_TOKEN
+            };
+        }
+
+        let finalUrl = '';
+
+        if (gitConfig && gitConfig.owner && gitConfig.repo && gitConfig.token) {
+            try {
+                const { owner, repo, token } = gitConfig;
+                const reader = new FileReader();
+                await new Promise<void>((resolve, reject) => {
+                    reader.onload = async () => {
+                        try {
+                            const base64Content = (reader.result as string).split(',')[1];
+                            const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '');
+                            const filename = `${Date.now()}-${cleanName}`;
+                            const path = `public/uploads/${filename}`;
+                            
+                            const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+                                method: 'PUT',
+                                headers: {
+                                    'Authorization': `token ${token}`,
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    message: `CMS Upload: ${cleanName}`,
+                                    content: base64Content
+                                })
+                            });
+
+                            if (res.ok) {
+                                // Use Raw URL
+                                finalUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${path}`;
+                            }
+                            resolve();
+                        } catch (err) {
+                            reject(err);
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                });
+            } catch (err) {
+                console.warn("GitHub upload failed, falling back to Base64", err);
+            }
+        }
+
+        // Fallback to Base64 if GitHub failed or not configured
+        if (!finalUrl) {
+            const reader = new FileReader();
+            finalUrl = await new Promise((resolve) => {
+                reader.onload = () => resolve(reader.result as string);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        pendingUploadHandler(finalUrl);
+    } catch (error) {
+        console.error("Upload error", error);
+        alert("Failed to upload image.");
+    } finally {
+        setIsUploading(false);
+        setPendingUploadHandler(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-neutral-100 flex flex-col">
+      {/* Hidden File Input */}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        className="hidden" 
+        accept="image/*"
+        onChange={processUpload}
+      />
+
       {/* Editor Header */}
       <header className="bg-white border-b border-neutral-200 sticky top-0 z-40 px-6 h-16 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-4">
@@ -138,13 +242,24 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-neutral-900 mb-2">Hero Image URL</label>
-              <input 
-                type="text" 
-                value={formData.heroImage}
-                onChange={(e) => handleMetaChange('heroImage', e.target.value)}
-                className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-              />
+              <label className="block text-xs font-bold text-neutral-900 mb-2">Hero Image</label>
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={formData.heroImage}
+                  onChange={(e) => handleMetaChange('heroImage', e.target.value)}
+                  className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+                  placeholder="https://..."
+                />
+                <button 
+                    onClick={() => triggerUpload((url) => handleMetaChange('heroImage', url))}
+                    disabled={isUploading}
+                    className="p-2 bg-neutral-100 hover:bg-neutral-200 rounded-lg border border-neutral-200 transition-colors"
+                    title="Upload Image"
+                >
+                    {isUploading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Upload className="w-4 h-4" />}
+                </button>
+              </div>
               <img src={formData.heroImage} alt="Preview" className="mt-2 w-full h-24 object-cover rounded-md bg-neutral-100" />
             </div>
 
@@ -273,17 +388,32 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
                             {block.content ? (
                                 <img src={block.content} alt="" className="w-full rounded bg-neutral-100 max-h-64 object-cover" />
                             ) : (
-                                <div className="w-full h-32 bg-neutral-50 rounded border-2 border-dashed border-neutral-200 flex items-center justify-center text-neutral-400">
-                                    No image set
-                                </div>
+                                <button 
+                                    onClick={() => triggerUpload((url) => updateBlock(block.id, url, block.caption))}
+                                    className="w-full h-32 bg-neutral-50 rounded border-2 border-dashed border-neutral-200 flex flex-col items-center justify-center text-neutral-400 hover:border-neutral-400 hover:text-neutral-600 transition-colors gap-2"
+                                >
+                                    {isUploading ? <Loader2 className="w-6 h-6 animate-spin"/> : <Upload className="w-6 h-6" />}
+                                    <span className="text-xs font-medium">Click to Upload Image</span>
+                                </button>
                             )}
-                            <input
-                                type="text"
-                                value={block.content}
-                                onChange={(e) => updateBlock(block.id, e.target.value, block.caption)}
-                                placeholder="Paste image URL..."
-                                className="w-full text-xs px-2 py-1 bg-neutral-50 border border-neutral-200 rounded"
-                            />
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={block.content}
+                                    onChange={(e) => updateBlock(block.id, e.target.value, block.caption)}
+                                    placeholder="Paste image URL..."
+                                    className="flex-1 text-xs px-2 py-1 bg-neutral-50 border border-neutral-200 rounded"
+                                />
+                                {block.content && (
+                                    <button 
+                                        onClick={() => triggerUpload((url) => updateBlock(block.id, url, block.caption))}
+                                        className="p-1 bg-white border border-neutral-200 rounded hover:bg-neutral-50 text-neutral-500"
+                                        title="Replace Image"
+                                    >
+                                        <Upload className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </div>
                             <input
                                 type="text"
                                 value={block.caption || ''}

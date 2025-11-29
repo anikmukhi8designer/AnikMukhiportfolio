@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, Briefcase, LogOut, CheckCircle, Settings, X, Github, AlertCircle } from 'lucide-react';
 import WorkTable from './WorkTable';
@@ -18,15 +19,24 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   
   // Auth & Config State
   const [cmsCreds, setCmsCreds] = useState({ email: '', password: '' });
-  const [gitConfig, setGitConfig] = useState({ owner: '', repo: '', token: '' });
+  
+  // Initialize Git Config with Env Vars if available
+  const [gitConfig, setGitConfig] = useState({ 
+    owner: import.meta.env.VITE_GITHUB_OWNER || '', 
+    repo: import.meta.env.VITE_GITHUB_REPO || '', 
+    token: import.meta.env.VITE_GITHUB_TOKEN || '' 
+  });
 
   useEffect(() => {
-    // Load existing settings
+    // Load existing settings from LocalStorage
+    // Note: LocalStorage will override Env Vars if it exists, allowing UI overrides
     const storedCreds = localStorage.getItem('cms_credentials');
     if (storedCreds) setCmsCreds(JSON.parse(storedCreds));
 
     const storedGit = localStorage.getItem('cms_git_config');
-    if (storedGit) setGitConfig(JSON.parse(storedGit));
+    if (storedGit) {
+        setGitConfig(JSON.parse(storedGit));
+    }
   }, []);
 
   // Helper to encode string to Base64 safely with Unicode support
@@ -244,9 +254,8 @@ export const SOCIALS: SocialLink[] = ${JSON.stringify(SOCIALS, null, 2)};
                         
                         <div className="p-3 bg-blue-50 text-blue-800 text-xs rounded-lg">
                             <p className="font-bold mb-1">How to connect:</p>
-                            <p>1. Create a <strong>Personal Access Token (Classic)</strong> on GitHub.</p>
-                            <p>2. Select the <strong>"repo"</strong> scope.</p>
-                            <p>3. Enter your details below to enable the "Publish" button.</p>
+                            <p>1. Use the form below OR create a <code className="bg-blue-100 px-1 rounded">.env</code> file.</p>
+                            <p>2. Variables: <code className="bg-blue-100 px-1 rounded">VITE_GITHUB_OWNER</code>, <code className="bg-blue-100 px-1 rounded">VITE_GITHUB_REPO</code>, <code className="bg-blue-100 px-1 rounded">VITE_GITHUB_TOKEN</code>.</p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -284,7 +293,7 @@ export const SOCIALS: SocialLink[] = ${JSON.stringify(SOCIALS, null, 2)};
                                 className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
                                 placeholder="ghp_xxxxxxxxxxxx"
                             />
-                            <p className="text-[10px] text-neutral-400 mt-1">Stored locally. Used only to commit changes to data.ts.</p>
+                            <p className="text-[10px] text-neutral-400 mt-1">Token is masked. Env vars are supported.</p>
                         </div>
                     </div>
 
