@@ -87,26 +87,34 @@ export const PROJECTS: Project[] = [
 
 export const EXPERIENCE: Experience[] = [
   {
+    "id": "exp-1764437840508",
+    "role": "UI/UX Designer Intern",
+    "company": "HelpyMoto ",
+    "period": "Sept 2023- Jan 2024",
+    "description": "Description of responsibilities...",
+    "published": false
+  },
+  {
     "id": "senior-pd-2023",
-    "role": "Senior Product Designer",
-    "company": "TechFlow Systems",
-    "period": "2023 — Present",
+    "role": "Junior UI/UX Designer ",
+    "company": "MobileFirst Applications",
+    "period": "Jan 2025- Present ",
     "description": "Leading the design system team and overseeing core product UX.",
     "published": true
   },
   {
     "id": "pd-2021",
-    "role": "Product Designer",
-    "company": "Creative Studio X",
-    "period": "2021 — 2023",
+    "role": "UI/UX Designer Intern",
+    "company": "MobileFirst Applications",
+    "period": "Aug 2024- Jan 2025",
     "description": "Worked on various client projects ranging from fintech to healthcare.",
     "published": true
   },
   {
     "id": "freelance-2019",
-    "role": "Freelance Designer",
-    "company": "Self-Employed",
-    "period": "2019 — 2021",
+    "role": "UI/UX Designer ",
+    "company": "Freelance Project ",
+    "period": "Jan 2024 - Aug 2024",
     "description": "Partnered with early-stage startups to define their MVP visuals.",
     "published": true
   }
