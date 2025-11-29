@@ -18,22 +18,30 @@ const AppContent: React.FC = () => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
-  // Simple Hash Routing for CMS Simulation
-  const [route, setRoute] = useState(window.location.hash || '#home');
+  // State-based routing to prevent preview environment errors
+  const [currentView, setCurrentView] = useState<'home' | 'admin'>('home');
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
 
+  // Check for hash on initial load only
   useEffect(() => {
-    const handleHashChange = () => setRoute(window.location.hash || '#home');
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    if (window.location.hash === '#admin') {
+      setCurrentView('admin');
+    }
   }, []);
 
   // Admin Routes
-  if (route === '#admin') {
+  if (currentView === 'admin') {
     if (!isAdminLoggedIn) {
         return <AdminLogin onLogin={() => setIsAdminLoggedIn(true)} />;
     }
-    return <Dashboard onLogout={() => { setIsAdminLoggedIn(false); window.location.hash = '#home'; }} />;
+    return <Dashboard onLogout={() => { 
+      setIsAdminLoggedIn(false); 
+      setCurrentView('home');
+      // Optional: Clean up URL without page reload
+      if (window.history.pushState) {
+          window.history.pushState(null, '', window.location.pathname);
+      }
+    }} />;
   }
   
   // Public Portfolio Route
@@ -64,8 +72,6 @@ const AppContent: React.FC = () => {
               Scroll for work <ArrowDown className="w-4 h-4 animate-bounce" />
             </a>
           </div>
-
-          {/* Hidden Admin Access (Shortcut: append #admin to URL or click this footer link) */}
         </section>
 
         {/* Work Section */}
@@ -102,7 +108,12 @@ const AppContent: React.FC = () => {
             <p>&copy; {new Date().getFullYear()} Mukhi Anik. All rights reserved.</p>
             <div className="flex gap-4">
                 <p>Designed & Built with React + Tailwind.</p>
-                <a href="#admin" className="opacity-50 hover:opacity-100 transition-opacity">CMS</a>
+                <button 
+                  onClick={() => setCurrentView('admin')} 
+                  className="opacity-50 hover:opacity-100 transition-opacity hover:text-white cursor-pointer"
+                >
+                  CMS
+                </button>
             </div>
           </div>
         </div>
