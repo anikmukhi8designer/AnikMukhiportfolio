@@ -12,9 +12,9 @@ export const PROJECTS: Project[] = [
     "roles": [
       "UI Designer"
     ],
-    "description": "A comprehensive dashboard for modern financial tracking.",
+    "description": "",
     "year": 2024,
-    "heroImage": "https://raw.githubusercontent.com/anikmukhi8designer/AnikMukhiportfolio/main/public/uploads/1764434045708-SSOTechnologyBackgroundIT1.png",
+    "heroImage": "https://raw.githubusercontent.com/anikmukhi8designer/AnikMukhiportfolio/main/public/uploads/1764435182750-SSOTechnologyBackgroundIT1.png",
     "thumb": "https://raw.githubusercontent.com/anikmukhi8designer/AnikMukhiportfolio/main/public/uploads/1764435182750-SSOTechnologyBackgroundIT1.png",
     "tags": [
       "Fintech",
@@ -281,36 +281,10 @@ export const SKILLS: SkillCategory[] = [
       {
         "name": "Motion",
         "icon": "Default"
-      }
-    ]
-  },
-  {
-    "id": "s2",
-    "title": "Development",
-    "items": [
-      {
-        "name": "React",
-        "icon": "Default"
       },
       {
-        "name": "TypeScript",
-        "icon": "Default"
-      },
-      {
-        "name": "Tailwind CSS",
-        "icon": "Default"
-      },
-      {
-        "name": "Next.js",
-        "icon": "Default"
-      },
-      {
-        "name": "Framer Motion",
-        "icon": "Default"
-      },
-      {
-        "name": "Git",
-        "icon": "Default"
+        "name": "Framer ",
+        "icon": "Framer"
       }
     ]
   },
