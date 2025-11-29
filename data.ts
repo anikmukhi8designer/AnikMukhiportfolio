@@ -14,7 +14,7 @@ export const PROJECTS: Project[] = [
     ],
     "description": "A comprehensive dashboard for modern financial tracking.",
     "year": 2024,
-    "heroImage": "https://picsum.photos/id/1/1200/800",
+    "heroImage": "https://raw.githubusercontent.com/anikmukhi8designer/AnikMukhiportfolio/main/public/uploads/1764434045708-SSOTechnologyBackgroundIT1.png",
     "thumb": "https://picsum.photos/id/1/800/600",
     "tags": [
       "Fintech",
