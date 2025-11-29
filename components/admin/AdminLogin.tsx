@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock } from 'lucide-react';
+import { Lock, RotateCcw } from 'lucide-react';
 
 interface AdminLoginProps {
   onLogin: () => void;
@@ -31,6 +31,15 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
       onLogin();
     } else {
       setError('Invalid credentials.');
+    }
+  };
+
+  const handleReset = () => {
+    if (window.confirm("This will reset your login credentials to the defaults (admin@newgenre.studio / password). Continue?")) {
+        localStorage.removeItem('cms_credentials');
+        setUsingDefaults(true);
+        setError('');
+        alert("Credentials have been reset to default.");
     }
   };
 
@@ -79,11 +88,20 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
           </button>
         </form>
         
-        {usingDefaults && (
+        {usingDefaults ? (
             <div className="mt-6 text-center p-4 bg-neutral-50 rounded-lg border border-neutral-100">
                 <p className="text-xs text-neutral-500 mb-1">Default Credentials:</p>
                 <p className="text-xs font-mono text-neutral-700">admin@newgenre.studio</p>
                 <p className="text-xs font-mono text-neutral-700">password</p>
+            </div>
+        ) : (
+            <div className="mt-4 text-center">
+                <button 
+                    onClick={handleReset}
+                    className="flex items-center justify-center gap-2 w-full text-xs text-red-500 hover:text-red-700 transition-colors py-2"
+                >
+                    <RotateCcw className="w-3 h-3" /> Reset to Default Password
+                </button>
             </div>
         )}
 

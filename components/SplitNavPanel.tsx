@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useData } from '../contexts/DataContext';
 import { Project, Experience } from '../types';
 import { ArrowUpRight } from 'lucide-react';
@@ -10,13 +10,13 @@ interface SplitNavPanelProps {
   onProjectClick: (project: Project) => void;
 }
 
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { y: "-100%" },
   visible: { 
     y: "0%",
     transition: {
       duration: 0.6,
-      ease: [0.76, 0, 0.24, 1],
+      ease: [0.76, 0, 0.24, 1] as const,
       when: "beforeChildren",
       staggerChildren: 0.05
     }
@@ -25,13 +25,13 @@ const containerVariants = {
     y: "-100%",
     transition: {
       duration: 0.5,
-      ease: [0.76, 0, 0.24, 1],
+      ease: [0.76, 0, 0.24, 1] as const,
       when: "afterChildren",
     }
   }
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
   exit: { opacity: 0, y: -20, transition: { duration: 0.3 } }
