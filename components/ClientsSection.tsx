@@ -30,11 +30,12 @@ const ClientsSection: React.FC = () => {
   return (
     <section className="py-24 bg-neutral-50 border-t border-neutral-200">
       <div className="max-w-screen-xl mx-auto px-4 md:px-8">
-        <div className="flex flex-col md:flex-row md:items-baseline justify-between mb-12">
+        {/* Minimal Section Header */}
+        <div className="flex flex-col md:flex-row md:items-baseline justify-between mb-12 gap-4">
           <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-400">
             Clients & Collaborations
           </h2>
-          <span className="text-sm text-neutral-400 hidden md:block">
+          <span className="text-sm text-neutral-400 font-medium hidden md:block">
             {CLIENTS.length} Companies
           </span>
         </div>
