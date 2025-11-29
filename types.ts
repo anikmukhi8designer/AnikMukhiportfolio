@@ -42,10 +42,15 @@ export interface Client {
   url?: string;
 }
 
+export interface SkillItem {
+  name: string;
+  icon: string;
+}
+
 export interface SkillCategory {
   id: string;
   title: string; // e.g., "Design", "Development"
-  items: string[]; // e.g., ["Figma", "React", "TypeScript"]
+  items: SkillItem[]; 
 }
 
 export interface SocialLink {

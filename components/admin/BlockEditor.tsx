@@ -3,7 +3,7 @@ import { Project, ContentBlock, BlockType } from '../../types';
 import { 
   ArrowLeft, Save, Plus, Trash2, GripVertical, Image as ImageIcon, 
   Type, Heading1, Heading2, Code, Quote, ArrowUp, ArrowDown, Minus,
-  Upload, Loader2
+  Upload, Loader2, Copy
 } from 'lucide-react';
 
 // Manually define Vite env types since vite/client is missing
@@ -252,8 +252,40 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
                 />
             </div>
 
+            {/* Thumbnail Image Section */}
             <div>
-              <label className="block text-xs font-bold text-neutral-900 mb-2">Hero Image</label>
+              <label className="block text-xs font-bold text-neutral-900 mb-2">Thumbnail (Home Screen)</label>
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={formData.thumb}
+                  onChange={(e) => handleMetaChange('thumb', e.target.value)}
+                  className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+                  placeholder="https://..."
+                />
+                <button 
+                    onClick={() => triggerUpload((url) => handleMetaChange('thumb', url))}
+                    disabled={isUploading}
+                    className="p-2 bg-neutral-100 hover:bg-neutral-200 rounded-lg border border-neutral-200 transition-colors"
+                    title="Upload Image"
+                >
+                    {isUploading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Upload className="w-4 h-4" />}
+                </button>
+              </div>
+              <img src={formData.thumb} alt="Preview" className="mt-2 w-full h-24 object-cover rounded-md bg-neutral-100" />
+            </div>
+
+            {/* Hero Image Section */}
+            <div>
+              <label className="block text-xs font-bold text-neutral-900 mb-2 flex items-center justify-between">
+                <span>Hero Image (Case Study)</span>
+                <button 
+                    onClick={() => handleMetaChange('heroImage', formData.thumb)}
+                    className="text-[10px] text-blue-600 hover:underline font-normal flex items-center gap-1"
+                >
+                    <Copy className="w-3 h-3"/> Use Thumb
+                </button>
+              </label>
               <div className="flex gap-2">
                 <input 
                   type="text" 

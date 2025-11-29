@@ -1,6 +1,7 @@
 import React from 'react';
 import { useData } from '../contexts/DataContext';
 import { motion } from 'framer-motion';
+import { SkillIcon } from './SkillIcons';
 
 const SkillsSection: React.FC = () => {
   const { skills } = useData();
@@ -31,11 +32,15 @@ const SkillsSection: React.FC = () => {
                                 initial={{ opacity: 0 }}
                                 whileInView={{ opacity: 1 }}
                                 viewport={{ once: true }}
-                                transition={{ delay: idx * 0.05 }}
-                                className="group relative h-32 border-r border-b border-neutral-200 flex items-center justify-center p-6 hover:bg-neutral-50 transition-colors cursor-default"
+                                whileHover={{ scale: 1.05, zIndex: 10, backgroundColor: '#ffffff', boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }}
+                                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                                className="group relative h-36 border-r border-b border-neutral-200 flex flex-col gap-4 items-center justify-center p-6 hover:border-transparent transition-all cursor-default"
                             >
-                                <span className="text-lg md:text-xl font-semibold text-neutral-500 group-hover:text-neutral-900 transition-colors text-center">
-                                    {item}
+                                <div className="w-8 h-8 text-neutral-400 group-hover:text-neutral-900 transition-colors">
+                                    <SkillIcon icon={item.icon || 'Default'} className="w-full h-full" />
+                                </div>
+                                <span className="text-lg font-semibold text-neutral-500 group-hover:text-neutral-900 transition-colors text-center">
+                                    {item.name}
                                 </span>
                             </motion.div>
                         ))}

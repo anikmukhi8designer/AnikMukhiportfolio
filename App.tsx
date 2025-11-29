@@ -17,13 +17,20 @@ import Dashboard from './components/admin/Dashboard';
 import BlockEditor from './components/admin/BlockEditor';
 
 const AdminRoute = () => {
-    const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+    // Check localStorage for persisted session
+    const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
+        return localStorage.getItem('cms_authenticated') === 'true';
+    });
+    
     const [currentView, setCurrentView] = useState<'dashboard' | 'editor'>('dashboard');
     const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
     const { projects, updateProject } = useData();
 
     if (!isAdminLoggedIn) {
-        return <AdminLogin onLogin={() => setIsAdminLoggedIn(true)} />;
+        return <AdminLogin onLogin={() => {
+            localStorage.setItem('cms_authenticated', 'true');
+            setIsAdminLoggedIn(true);
+        }} />;
     }
 
     if (currentView === 'editor' && editingProjectId) {
@@ -48,6 +55,7 @@ const AdminRoute = () => {
     return (
         <Dashboard 
             onLogout={() => { 
+                localStorage.removeItem('cms_authenticated');
                 setIsAdminLoggedIn(false); 
                 window.location.hash = '';
                 window.location.reload();

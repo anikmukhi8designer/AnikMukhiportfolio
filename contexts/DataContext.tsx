@@ -49,7 +49,24 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const [skills, setSkills] = useState<SkillCategory[]>(() => {
     const saved = localStorage.getItem('cms_skills');
-    return saved ? JSON.parse(saved) : INITIAL_SKILLS;
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved);
+            // Migration check: check if first item of first category is a string
+            if (parsed.length > 0 && parsed[0].items.length > 0 && typeof parsed[0].items[0] === 'string') {
+                console.log("Migrating skills data...");
+                return parsed.map((cat: any) => ({
+                    ...cat,
+                    items: cat.items.map((item: string) => ({ name: item, icon: 'Default' }))
+                }));
+            }
+            return parsed;
+        } catch (e) {
+            console.error("Failed to parse skills data, resetting", e);
+            return INITIAL_SKILLS;
+        }
+    }
+    return INITIAL_SKILLS;
   });
 
   // Persistence effects
