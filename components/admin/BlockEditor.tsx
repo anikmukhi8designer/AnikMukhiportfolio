@@ -3,7 +3,7 @@ import { Project, ContentBlock, BlockType } from '../../types';
 import { 
   ArrowLeft, Save, Plus, Trash2, GripVertical, Image as ImageIcon, 
   Type, Heading1, Heading2, Code, Quote, ArrowUp, ArrowDown, Minus,
-  Upload, Loader2, Copy
+  Upload, Loader2, Copy, X, Link as LinkIcon, Calendar, Tag
 } from 'lucide-react';
 
 // Manually define Vite env types since vite/client is missing
@@ -48,6 +48,16 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
   const handleMetaChange = (field: keyof Project, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setHasUnsavedChanges(true);
+  };
+
+  const handleAddGalleryImage = (url: string) => {
+    const currentImages = formData.images || [];
+    handleMetaChange('images', [...currentImages, url]);
+  };
+
+  const handleRemoveGalleryImage = (index: number) => {
+    const currentImages = formData.images || [];
+    handleMetaChange('images', currentImages.filter((_, i) => i !== index));
   };
 
   // Block Operations
@@ -218,7 +228,7 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
       <div className="flex-grow flex overflow-hidden">
         
         {/* Sidebar: Metadata */}
-        <aside className="w-80 bg-white border-r border-neutral-200 overflow-y-auto p-6 hidden lg:block">
+        <aside className="w-96 bg-white border-r border-neutral-200 overflow-y-auto p-6 hidden lg:block">
           <h2 className="text-xs font-bold uppercase tracking-widest text-neutral-400 mb-6">Project Details</h2>
           
           <div className="space-y-6">
@@ -240,6 +250,45 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
                 onChange={(e) => handleMetaChange('client', e.target.value)}
                 className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-xs font-bold text-neutral-900 mb-2 flex items-center gap-1">
+                        <Calendar className="w-3 h-3"/> Year
+                    </label>
+                    <input 
+                        type="number" 
+                        value={formData.year}
+                        onChange={(e) => handleMetaChange('year', parseInt(e.target.value))}
+                        className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+                    />
+                </div>
+                <div>
+                    <label className="block text-xs font-bold text-neutral-900 mb-2 flex items-center gap-1">
+                        <Tag className="w-3 h-3"/> Services
+                    </label>
+                    <input 
+                        type="text" 
+                        value={formData.tags.join(', ')}
+                        onChange={(e) => handleMetaChange('tags', e.target.value.split(',').map(s => s.trim()))}
+                        className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+                        placeholder="Web, Mobile"
+                    />
+                </div>
+            </div>
+
+            <div>
+                <label className="block text-xs font-bold text-neutral-900 mb-2 flex items-center gap-1">
+                    <LinkIcon className="w-3 h-3"/> Live Site URL
+                </label>
+                <input 
+                    type="text" 
+                    value={formData.link || ''}
+                    onChange={(e) => handleMetaChange('link', e.target.value)}
+                    className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+                    placeholder="https://..."
+                />
             </div>
 
             <div>
@@ -314,6 +363,34 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
                 rows={4}
                 className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
               />
+            </div>
+
+            {/* Gallery Images Management */}
+            <div>
+                <label className="block text-xs font-bold text-neutral-900 mb-2">Gallery Images</label>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                    {formData.images?.map((img, idx) => (
+                        <div key={idx} className="relative group rounded-md overflow-hidden aspect-video bg-neutral-100">
+                            <img src={img} className="w-full h-full object-cover" alt="" />
+                            <button 
+                                onClick={() => handleRemoveGalleryImage(idx)}
+                                className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+                <div className="flex gap-2">
+                    <button 
+                        onClick={() => triggerUpload(handleAddGalleryImage)}
+                        disabled={isUploading}
+                        className="flex-1 flex items-center justify-center gap-2 py-2 bg-neutral-100 hover:bg-neutral-200 border border-neutral-200 rounded-lg text-xs font-medium transition-colors"
+                    >
+                        {isUploading ? <Loader2 className="w-3 h-3 animate-spin"/> : <Upload className="w-3 h-3" />}
+                        Upload to Gallery
+                    </button>
+                </div>
             </div>
 
             <div className="pt-6 border-t border-neutral-100">

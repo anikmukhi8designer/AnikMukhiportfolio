@@ -1,9 +1,14 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Edit2, Trash2, Plus, ArrowUp, ArrowDown } from 'lucide-react';
+import { Edit2, Trash2, Plus, GripVertical } from 'lucide-react';
 
 const ExperienceTable: React.FC = () => {
   const { experience, updateExperience, deleteExperience, addExperience, reorderExperience } = useData();
+  
+  // Drag and Drop Refs
+  const dragItem = useRef<number | null>(null);
+  const dragOverItem = useRef<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const handleAddNew = () => {
     const newId = `exp-${Date.now()}`;
@@ -17,12 +22,38 @@ const ExperienceTable: React.FC = () => {
     });
   };
 
-  const handleMove = (index: number, direction: 'up' | 'down') => {
-    if ((direction === 'up' && index === 0) || (direction === 'down' && index === experience.length - 1)) return;
-    const newItems = [...experience];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    [newItems[index], newItems[targetIndex]] = [newItems[targetIndex], newItems[index]];
-    reorderExperience(newItems);
+  const onDragStart = (e: React.DragEvent<HTMLTableRowElement>, index: number) => {
+    dragItem.current = index;
+    setIsDragging(true);
+    // Visual drag effect
+    e.dataTransfer.effectAllowed = "move";
+    // Optional: Set a drag image if needed, default ghost is usually fine
+    // e.dataTransfer.setDragImage(e.currentTarget, 0, 0);
+  };
+
+  const onDragEnter = (e: React.DragEvent<HTMLTableRowElement>, index: number) => {
+    dragOverItem.current = index;
+  };
+
+  const onDragEnd = () => {
+    const dragIndex = dragItem.current;
+    const dragOverIndex = dragOverItem.current;
+
+    if (dragIndex !== null && dragOverIndex !== null && dragIndex !== dragOverIndex) {
+        const _experience = [...experience];
+        const draggedItemContent = _experience[dragIndex];
+        
+        // Remove the dragged item
+        _experience.splice(dragIndex, 1);
+        // Insert at new position
+        _experience.splice(dragOverIndex, 0, draggedItemContent);
+        
+        reorderExperience(_experience);
+    }
+    
+    dragItem.current = null;
+    dragOverItem.current = null;
+    setIsDragging(false);
   };
 
   return (
@@ -42,7 +73,7 @@ const ExperienceTable: React.FC = () => {
           <table className="w-full text-sm text-left">
             <thead className="bg-neutral-50 border-b border-neutral-200 text-neutral-500 uppercase tracking-wider text-xs">
               <tr>
-                <th className="px-4 py-4 font-semibold w-16">Sort</th>
+                <th className="px-4 py-4 font-semibold w-12 text-center">#</th>
                 <th className="px-6 py-4 font-semibold">Status</th>
                 <th className="px-6 py-4 font-semibold w-1/4">Role & Company</th>
                 <th className="px-6 py-4 font-semibold">Period</th>
@@ -52,23 +83,21 @@ const ExperienceTable: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-neutral-100">
               {experience.map((exp, index) => (
-                <tr key={exp.id} className="hover:bg-neutral-50/50 transition-colors">
-                  <td className="px-4 py-4">
-                     <div className="flex flex-col gap-1">
-                        <button 
-                            onClick={() => handleMove(index, 'up')} 
-                            disabled={index === 0}
-                            className="p-1 hover:bg-neutral-100 rounded text-neutral-400 hover:text-neutral-900 disabled:opacity-20"
-                        >
-                            <ArrowUp className="w-3 h-3" />
-                        </button>
-                        <button 
-                            onClick={() => handleMove(index, 'down')} 
-                            disabled={index === experience.length - 1}
-                            className="p-1 hover:bg-neutral-100 rounded text-neutral-400 hover:text-neutral-900 disabled:opacity-20"
-                        >
-                            <ArrowDown className="w-3 h-3" />
-                        </button>
+                <tr 
+                    key={exp.id} 
+                    draggable
+                    onDragStart={(e) => onDragStart(e, index)}
+                    onDragEnter={(e) => onDragEnter(e, index)}
+                    onDragEnd={onDragEnd}
+                    onDragOver={(e) => e.preventDefault()}
+                    className={`transition-colors ${isDragging ? 'cursor-grabbing' : ''} hover:bg-neutral-50`}
+                >
+                  <td className="px-4 py-4 text-center">
+                     <div 
+                        className="cursor-grab active:cursor-grabbing p-2 text-neutral-300 hover:text-neutral-900 flex justify-center rounded hover:bg-neutral-200/50 transition-colors"
+                        title="Drag to reorder"
+                     >
+                        <GripVertical className="w-5 h-5" />
                      </div>
                   </td>
                   <td className="px-6 py-4 align-top">
@@ -83,20 +112,20 @@ const ExperienceTable: React.FC = () => {
                       {exp.published ? 'Live' : 'Draft'}
                     </button>
                   </td>
-                  <td className="px-6 py-4 align-top space-y-2">
+                  <td className="px-6 py-4 align-top space-y-3">
                      <div>
-                        <label className="text-xs text-neutral-400">Role</label>
+                        <label className="text-[10px] uppercase font-bold text-neutral-400 block mb-1">Role</label>
                         <input 
-                            className="bg-transparent border-none p-0 text-neutral-900 font-bold w-full focus:ring-0"
+                            className="bg-neutral-50 border border-transparent focus:bg-white focus:border-neutral-300 rounded px-2 py-1 text-neutral-900 font-bold w-full text-sm transition-colors focus:outline-none"
                             value={exp.role}
                             onChange={(e) => updateExperience(exp.id, { role: e.target.value })}
                             placeholder="e.g. Senior Designer"
                         />
                      </div>
                      <div>
-                        <label className="text-xs text-neutral-400">Company</label>
+                        <label className="text-[10px] uppercase font-bold text-neutral-400 block mb-1">Company</label>
                         <input 
-                            className="bg-transparent border-none p-0 text-neutral-700 w-full focus:ring-0"
+                            className="bg-neutral-50 border border-transparent focus:bg-white focus:border-neutral-300 rounded px-2 py-1 text-neutral-700 w-full text-sm transition-colors focus:outline-none"
                             value={exp.company}
                             onChange={(e) => updateExperience(exp.id, { company: e.target.value })}
                             placeholder="e.g. TechFlow"
@@ -105,7 +134,7 @@ const ExperienceTable: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 align-top">
                     <input 
-                      className="bg-transparent border-none p-0 text-neutral-600 w-full focus:ring-0"
+                      className="bg-neutral-50 border border-transparent focus:bg-white focus:border-neutral-300 rounded px-2 py-1 text-neutral-600 w-full text-sm transition-colors focus:outline-none"
                       value={exp.period}
                       onChange={(e) => updateExperience(exp.id, { period: e.target.value })}
                       placeholder="e.g. 2023 - Present"
@@ -113,17 +142,16 @@ const ExperienceTable: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 align-top">
                     <textarea 
-                        className="w-full bg-neutral-50 border border-transparent hover:border-neutral-200 focus:border-neutral-300 focus:bg-white rounded p-2 text-xs text-neutral-600 leading-relaxed resize-y focus:ring-0 transition-colors"
+                        className="w-full bg-neutral-50 border border-transparent hover:border-neutral-200 focus:border-neutral-300 focus:bg-white rounded p-3 text-sm text-neutral-600 leading-relaxed resize-y focus:outline-none transition-colors min-h-[100px]"
                         value={exp.description || ''}
                         onChange={(e) => updateExperience(exp.id, { description: e.target.value })}
-                        rows={3}
-                        placeholder="Brief description of responsibilities..."
+                        placeholder="Description of responsibilities..."
                     />
                   </td>
                   <td className="px-6 py-4 text-right align-top">
                     <button 
                         onClick={() => deleteExperience(exp.id)}
-                        className="text-neutral-400 hover:text-red-600 p-2"
+                        className="text-neutral-400 hover:text-red-600 p-2 rounded hover:bg-red-50 transition-colors"
                         title="Delete Experience"
                     >
                         <Trash2 className="w-4 h-4" />
