@@ -7,6 +7,73 @@ export const LAST_UPDATED = new Date().toISOString();
 
 export const PROJECTS: Project[] = [
   {
+    id: "ravens-tablet-2024",
+    title: "Stadium Suite Tablet",
+    client: "Baltimore Ravens",
+    roles: ["UX Architecture", "UI Design", "Wireframing"],
+    description: "A premium in-suite digital experience allowing guests to control the TV, order food, and request assistance.",
+    year: 2024,
+    heroImage: "https://images.unsplash.com/photo-1516280440614-6697288d5d38?q=80&w=2070&auto=format&fit=crop",
+    thumb: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070&auto=format&fit=crop",
+    tags: ["Tablet App", "Hospitality", "Sports Tech", "Fintech"],
+    link: "#",
+    published: true,
+    images: [
+        "https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=2070&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1560253023-3ec5d502959f?q=80&w=2070&auto=format&fit=crop"
+    ],
+    content: [
+      { id: '1', type: 'h2', content: 'Project Overview' },
+      { id: '2', type: 'paragraph', content: 'Baltimore Ravens approached us to enhance the premium suite experience inside their stadium. Suite guests often juggle watching the live match, ordering food, adjusting TV settings, and calling attendants — all through scattered, manual touchpoints.' },
+      { id: '3', type: 'paragraph', content: 'Our objective was to unify all these experiences into one seamless digital interface.' },
+      { id: '4', type: 'paragraph', content: 'The solution was a dedicated in-suite tablet, designed to give guests total control of their environment: media, food, services, and fan engagement features. My responsibility covered the entire UX flow — from wireframes to polished UI.' },
+      
+      { id: '5', type: 'h2', content: 'Problem & Opportunity' },
+      { id: '6', type: 'paragraph', content: 'Premium suite guests expect convenience, speed, and comfort — but their current experience involved:\n• Slow food & beverage ordering\n• Confusing TV controls\n• Inconsistent access to attendants\n• No centralized interface for services\n• Missing out on highlights or game insights' },
+      { id: '7', type: 'quote', content: 'Opportunity: To design a premium, unified, intuitive tablet experience that lets guests enjoy the game without interruptions and enhances the Ravens’ hospitality offering.' },
+
+      { id: '8', type: 'h2', content: 'Goals & Success Criteria' },
+      { id: '9', type: 'paragraph', content: 'Our goals were clear:\n• Deliver a single digital hub for all suite services\n• Make TV control effortless and fast\n• Reduce wait times for food, beverages & assistance\n• Support real-time match engagement through live streams & highlights\n• Create a luxurious visual identity aligned with the Ravens brand' },
+
+      { id: '10', type: 'h2', content: 'Process Overview' },
+      { id: '11', type: 'paragraph', content: 'A structured approach ensured clarity and speed:\n🔍 Research\n🗂 Information Architecture\n✏️ Wireframes\n🎨 High-Fidelity UI\n\nEach stage helped refine interactions, reduce friction, and craft a premium experience suitable for a stadium environment.' },
+
+      { id: '12', type: 'h2', content: 'Research & Key Insights' },
+      { id: '13', type: 'paragraph', content: 'Based on stakeholder interviews, suite visit observations, and competitor benchmarking, we identified several core insights:' },
+      { id: '14', type: 'paragraph', content: '• Guests want to interact quickly and return to watching the game.\n• Stadium suites have low lighting, requiring a dark, high-contrast UI.\n• Large touch targets are essential due to movement and multitasking.\n• Ordering should be fast, with minimal customization steps.\n• Service requests must be instant, without searching through menus.' },
+
+      { id: '15', type: 'h2', content: 'User Flow Diagram' },
+      { id: '16', type: 'paragraph', content: 'Home → TV Controls → Food & Beverages → Merchandise Shop → Service Requests → Settings' },
+      { id: '16b', type: 'paragraph', content: 'The flow is intentionally linear and shallow to ensure guests reach any function within 1–2 taps.' },
+
+      { id: '17', type: 'h2', content: 'Information Architecture' },
+      { id: '18', type: 'paragraph', content: 'The structure keeps navigation familiar and predictable:\n\n• Home\n• TV (Live Match, Highlights, Channels)\n• Food & Beverages (Snacks, Drinks)\n• Merchandise (Jerseys, Caps)\n• Service Requests (Attendant, Valet)\n• Settings' },
+
+      { id: '19', type: 'h2', content: 'Wireframes (Low-Fi)' },
+      { id: '20', type: 'paragraph', content: 'Wireframes focused on primary navigation layout, quick access touchpoints, and visual hierarchy. Early testing validated that users preferred large buttons, high-contrast layouts, and dedicated shortcuts for TV and ordering.' },
+      { id: '20b', type: 'image', content: 'https://images.unsplash.com/photo-1581291518633-83b4ebd1d83e?q=80&w=2070&auto=format&fit=crop', caption: 'Initial low-fidelity sketches of the interface' },
+
+      { id: '21', type: 'h2', content: 'Final UI (High-Fidelity Mockups)' },
+      { id: '22', type: 'paragraph', content: 'The final UI blends Ravens branding with a luxurious digital aesthetic.' },
+      
+      { id: '23', type: 'h2', content: 'Home Screen' },
+      { id: '24', type: 'paragraph', content: 'A central hub with clear categories, large tiles, and bold visuals to guide users quickly.' },
+      { id: '24b', type: 'image', content: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=1974&auto=format&fit=crop', caption: 'Home Screen UI' },
+
+      { id: '25', type: 'h2', content: 'TV Controls' },
+      { id: '26', type: 'paragraph', content: 'Full media control with options for live match, highlights, multi-camera angles, and entertainment channels. Designed with tactile buttons and clarity in motion.' },
+
+      { id: '27', type: 'h2', content: 'Food & Beverage Ordering' },
+      { id: '28', type: 'paragraph', content: 'Full-screen item cards, vivid photography, quick add-to-cart interactions, and streamlined customization.' },
+
+      { id: '29', type: 'h2', content: 'Key Design Decisions' },
+      { id: '30', type: 'paragraph', content: '1. Dark, premium interface: Matches suite lighting and reduces glare.\n2. Large, comfortable touch targets: Ensures effortless use even while multitasking.\n3. High-contrast action buttons: Increases accessibility.\n4. One-tap service interactions: Removes friction during high-engagement moments.\n5. Modular card layout: Makes navigation predictable.' },
+
+      { id: '31', type: 'h2', content: 'Outcome & Impact' },
+      { id: '32', type: 'paragraph', content: 'The final tablet interface created a significantly smoother and elevated suite experience. Outcomes included faster ordering processes, reduced confusion with TV controls, and higher guest engagement during live games. Stakeholders responded positively, noting the system’s potential to set a new hospitality standard inside the stadium.' },
+    ]
+  },
+  {
     id: "fintech-dashboard-2024",
     title: "Nova Financial",
     client: "Nova Inc.",
@@ -123,6 +190,7 @@ export const EXPERIENCE: Experience[] = [
 ];
 
 export const CLIENTS: Client[] = [
+  { id: "ravens", name: "Baltimore Ravens" },
   { id: "c1", name: "Nova Inc." },
   { id: "c2", name: "Lumina Fashion" },
   { id: "c3", name: "Syntax Labs" },
