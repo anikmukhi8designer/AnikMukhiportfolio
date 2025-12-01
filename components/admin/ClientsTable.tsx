@@ -1,26 +1,9 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Trash2, Plus, Upload, Loader2, Link as LinkIcon, Image as ImageIcon } from 'lucide-react';
-
-// Manually define Vite env types since vite/client is missing
-declare global {
-  interface ImportMetaEnv {
-    VITE_GITHUB_OWNER?: string;
-    VITE_GITHUB_REPO?: string;
-    VITE_GITHUB_TOKEN?: string;
-  }
-  interface ImportMeta {
-    readonly env: ImportMetaEnv;
-  }
-}
+import { Trash2, Plus, Link as LinkIcon, Image as ImageIcon } from 'lucide-react';
 
 const ClientsTable: React.FC = () => {
   const { clients, updateClient, deleteClient, addClient } = useData();
-  
-  // Upload State
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadingForId, setUploadingForId] = useState<string | null>(null);
 
   const handleAddNew = () => {
     const newId = `client-${Date.now()}`;
@@ -32,102 +15,13 @@ const ClientsTable: React.FC = () => {
     });
   };
 
-  const triggerUpload = (clientId: string) => {
-    setUploadingForId(clientId);
-    fileInputRef.current?.click();
-  };
-
-  const processUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !uploadingForId) return;
-
-    setIsUploading(true);
-    
-    try {
-        const storedGit = localStorage.getItem('cms_git_config');
-        let gitConfig = storedGit ? JSON.parse(storedGit) : null;
-        
-        const env = (import.meta.env || {}) as any;
-
-        if (!gitConfig && env.VITE_GITHUB_TOKEN) {
-            gitConfig = {
-                owner: env.VITE_GITHUB_OWNER,
-                repo: env.VITE_GITHUB_REPO,
-                token: env.VITE_GITHUB_TOKEN
-            };
-        }
-
-        let finalUrl = '';
-
-        if (gitConfig && gitConfig.owner && gitConfig.repo && gitConfig.token) {
-            try {
-                const { owner, repo, token } = gitConfig;
-                const reader = new FileReader();
-                await new Promise<void>((resolve, reject) => {
-                    reader.onload = async () => {
-                        try {
-                            const base64Content = (reader.result as string).split(',')[1];
-                            const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '');
-                            const filename = `client-${Date.now()}-${cleanName}`;
-                            const path = `public/uploads/clients/${filename}`;
-                            
-                            const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
-                                method: 'PUT',
-                                headers: {
-                                    'Authorization': `token ${token}`,
-                                    'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({
-                                    message: `CMS Client Logo Upload: ${cleanName}`,
-                                    content: base64Content
-                                })
-                            });
-
-                            if (res.ok) {
-                                finalUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${path}`;
-                            }
-                            resolve();
-                        } catch (err) {
-                            reject(err);
-                        }
-                    };
-                    reader.readAsDataURL(file);
-                });
-            } catch (err) {
-                console.warn("GitHub upload failed, falling back to Base64", err);
-            }
-        }
-
-        if (!finalUrl) {
-            const reader = new FileReader();
-            finalUrl = await new Promise((resolve) => {
-                reader.onload = () => resolve(reader.result as string);
-                reader.readAsDataURL(file);
-            });
-        }
-
-        updateClient(uploadingForId, { logo: finalUrl });
-
-    } catch (error) {
-        console.error("Upload error", error);
-        alert("Failed to upload image.");
-    } finally {
-        setIsUploading(false);
-        setUploadingForId(null);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-    }
+  const handleUpdateLogo = (id: string) => {
+      const url = prompt("Enter Logo URL:");
+      if (url) updateClient(id, { logo: url });
   };
 
   return (
     <div className="space-y-6">
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        className="hidden" 
-        accept="image/png,image/svg+xml,image/jpeg"
-        onChange={processUpload}
-      />
-
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">Clients & Collaborations ({clients.length})</h3>
         <button 
@@ -154,20 +48,12 @@ const ClientsTable: React.FC = () => {
                 <tr key={client.id} className="hover:bg-neutral-50/50 transition-colors">
                   <td className="px-6 py-4 align-top">
                     <button 
-                        onClick={() => triggerUpload(client.id)}
-                        disabled={isUploading && uploadingForId === client.id}
+                        onClick={() => handleUpdateLogo(client.id)}
                         className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center border border-neutral-200 overflow-hidden hover:border-neutral-400 transition-colors group relative"
-                        title="Upload Logo"
+                        title="Set Logo URL"
                     >
-                        {isUploading && uploadingForId === client.id ? (
-                             <Loader2 className="w-4 h-4 animate-spin text-neutral-500" />
-                        ) : client.logo ? (
-                            <>
-                                <img src={client.logo} alt="" className="w-full h-full object-cover" />
-                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white">
-                                    <Upload className="w-4 h-4"/>
-                                </div>
-                            </>
+                        {client.logo ? (
+                            <img src={client.logo} alt="" className="w-full h-full object-cover" />
                         ) : (
                              <ImageIcon className="w-4 h-4 text-neutral-400 group-hover:text-neutral-600" />
                         )}

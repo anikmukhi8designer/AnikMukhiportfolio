@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Project, Experience, Client, SkillCategory } from '../types';
+import { supabase } from '../supabaseClient';
 import { 
   PROJECTS as INITIAL_PROJECTS, 
   EXPERIENCE as INITIAL_EXPERIENCE, 
   CLIENTS as INITIAL_CLIENTS, 
   SKILLS as INITIAL_SKILLS
 } from '../data';
-import { db } from '../firebase';
 
 interface DataContextType {
   projects: Project[];
@@ -42,98 +42,188 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [clients, setClients] = useState<Client[]>([]);
   const [skills, setSkills] = useState<SkillCategory[]>([]);
 
-  // --- Helper: Sync Collection ---
-  // Connects local state to a Firestore collection using Compat SDK
-  const syncCollection = (
-    collectionName: string, 
-    setState: React.Dispatch<React.SetStateAction<any[]>>, 
-    initialData: any[]
-  ) => {
-    useEffect(() => {
-      const colRef = db.collection(collectionName);
-      const unsubscribe = colRef.onSnapshot(async (snapshot: any) => {
-        if (snapshot.empty) {
-          // SEEDING: If DB is empty, upload initial data automatically
-          console.log(`Seeding ${collectionName}...`);
-          const batch = db.batch();
-          initialData.forEach((item) => {
-            const docRef = db.collection(collectionName).doc(item.id);
-            batch.set(docRef, item);
-          });
-          await batch.commit();
-        } else {
-          // SYNC: Update local state from DB
-          const items = snapshot.docs.map((doc: any) => doc.data());
-          setState(items);
-        }
-      });
-      return () => unsubscribe();
-    }, []);
+  // Helper to map DB snake_case to Frontend camelCase
+  const mapProjectFromDB = (data: any): Project => ({
+    ...data,
+    heroImage: data.hero_image,
+    // Ensure arrays are initialized
+    roles: data.roles || [],
+    tags: data.tags || [],
+    images: data.images || [],
+    content: data.content || []
+  });
+
+  const mapProjectToDB = (data: Partial<Project>) => {
+    const { heroImage, ...rest } = data;
+    return {
+      ...rest,
+      ...(heroImage && { hero_image: heroImage })
+    };
   };
 
-  // --- Activate Syncs ---
-  syncCollection('projects', setProjects, INITIAL_PROJECTS.map(p => ({ ...p, published: true })));
-  syncCollection('experience', setExperience, INITIAL_EXPERIENCE.map(e => ({ ...e, published: true })));
-  syncCollection('clients', setClients, INITIAL_CLIENTS);
-  syncCollection('skills', setSkills, INITIAL_SKILLS);
+  // --- Real-time Sync & Fetch Logic ---
 
-  // --- Actions (Write to Firebase) ---
+  const fetchData = async () => {
+    // Projects
+    const { data: projData } = await supabase.from('work_items').select('*').order('created_at', { ascending: false });
+    if (projData) setProjects(projData.map(mapProjectFromDB));
+
+    // Experience
+    const { data: expData } = await supabase.from('experience_items').select('*').order('created_at', { ascending: false });
+    if (expData) setExperience(expData as Experience[]);
+
+    // Clients
+    const { data: clientData } = await supabase.from('clients').select('*').order('created_at', { ascending: false });
+    if (clientData) setClients(clientData as Client[]);
+
+    // Skills
+    const { data: skillData } = await supabase.from('skills').select('*').order('created_at', { ascending: true });
+    if (skillData) setSkills(skillData as SkillCategory[]);
+  };
+
+  useEffect(() => {
+    fetchData();
+
+    const channels = [
+      supabase.channel('work_items_changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'work_items' }, (payload) => {
+            // Re-fetch simplified for consistency, or we could optimistic update
+            fetchData();
+        })
+        .subscribe(),
+
+      supabase.channel('experience_changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'experience_items' }, () => fetchData())
+        .subscribe(),
+
+      supabase.channel('clients_changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => fetchData())
+        .subscribe(),
+
+      supabase.channel('skills_changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'skills' }, () => fetchData())
+        .subscribe(),
+    ];
+
+    return () => {
+      channels.forEach(channel => supabase.removeChannel(channel));
+    };
+  }, []);
+
+  // --- Actions ---
 
   // Projects
   const updateProject = async (id: string, data: Partial<Project>) => {
-    await db.collection('projects').doc(id).update(data);
+    // Optimistic UI update
+    setProjects(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
+    const dbData = mapProjectToDB(data);
+    await supabase.from('work_items').update(dbData).eq('id', id);
   };
+  
   const addProject = async (project: Project) => {
-    await db.collection('projects').doc(project.id).set(project);
+    // Remove ID to let DB generate UUID if it's a placeholder ID, 
+    // BUT we usually need the ID for the UI. 
+    // Strategy: Let UI generate ID for optimistic, but DB might overwrite. 
+    // Better: Omit ID for insert if it looks like a temp ID, or use UPSERT.
+    const { id, ...rest } = project;
+    const dbData = mapProjectToDB(rest);
+    
+    // For new items, we insert
+    await supabase.from('work_items').insert([dbData]);
   };
+  
   const deleteProject = async (id: string) => {
-    await db.collection('projects').doc(id).delete();
+    setProjects(prev => prev.filter(p => p.id !== id));
+    await supabase.from('work_items').delete().eq('id', id);
   };
 
   // Experience
   const updateExperience = async (id: string, data: Partial<Experience>) => {
-    await db.collection('experience').doc(id).update(data);
+    setExperience(prev => prev.map(e => e.id === id ? { ...e, ...data } : e));
+    await supabase.from('experience_items').update(data).eq('id', id);
   };
   const addExperience = async (exp: Experience) => {
-    await db.collection('experience').doc(exp.id).set(exp);
+    const { id, ...rest } = exp;
+    await supabase.from('experience_items').insert([rest]);
   };
   const deleteExperience = async (id: string) => {
-    await db.collection('experience').doc(id).delete();
+    setExperience(prev => prev.filter(e => e.id !== id));
+    await supabase.from('experience_items').delete().eq('id', id);
   };
-  const reorderExperience = async (items: Experience[]) => {
-    const batch = db.batch();
-    items.forEach((item) => {
-      batch.set(db.collection('experience').doc(item.id), item);
-    });
-    await batch.commit();
-    setExperience(items); // Optimistic update
+  const reorderExperience = (items: Experience[]) => {
+    setExperience(items);
+    // Note: To persist order, we would need an 'order_index' column in DB.
+    // For now, we update local state.
   };
 
   // Clients
   const updateClient = async (id: string, data: Partial<Client>) => {
-    await db.collection('clients').doc(id).update(data);
+    setClients(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
+    await supabase.from('clients').update(data).eq('id', id);
   };
   const addClient = async (client: Client) => {
-    await db.collection('clients').doc(client.id).set(client);
+    const { id, ...rest } = client;
+    await supabase.from('clients').insert([rest]);
   };
   const deleteClient = async (id: string) => {
-    await db.collection('clients').doc(id).delete();
+    setClients(prev => prev.filter(c => c.id !== id));
+    await supabase.from('clients').delete().eq('id', id);
   };
 
   // Skills
   const updateSkill = async (id: string, data: Partial<SkillCategory>) => {
-    await db.collection('skills').doc(id).update(data);
+    setSkills(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
+    await supabase.from('skills').update(data).eq('id', id);
   };
   const addSkill = async (skill: SkillCategory) => {
-    await db.collection('skills').doc(skill.id).set(skill);
+    const { id, ...rest } = skill;
+    await supabase.from('skills').insert([rest]);
   };
   const deleteSkill = async (id: string) => {
-    await db.collection('skills').doc(id).delete();
+    setSkills(prev => prev.filter(s => s.id !== id));
+    await supabase.from('skills').delete().eq('id', id);
   };
 
+  // --- Reset / Seed ---
   const resetData = async () => {
-    if (confirm("This will overwrite your Cloud Database with the demo data. Are you sure?")) {
-      alert("Please clear the collections in your Firebase Console to trigger a re-seed.");
+    if (confirm("⚠️ WARNING: This will WIPE the Supabase Database and seed with demo data. Continue?")) {
+      
+      // Clear all tables
+      await supabase.from('work_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('experience_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('clients').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('skills').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+
+      // Seed Projects
+      const projectsPayload = INITIAL_PROJECTS.map(p => {
+        const { id, ...rest } = p;
+        return mapProjectToDB({ ...rest, published: true });
+      });
+      await supabase.from('work_items').insert(projectsPayload);
+
+      // Seed Experience
+      const expPayload = INITIAL_EXPERIENCE.map(e => {
+        const { id, ...rest } = e;
+        return { ...rest, published: true };
+      });
+      await supabase.from('experience_items').insert(expPayload);
+
+      // Seed Clients
+      const clientsPayload = INITIAL_CLIENTS.map(c => {
+        const { id, ...rest } = c;
+        return rest;
+      });
+      await supabase.from('clients').insert(clientsPayload);
+
+      // Seed Skills
+      const skillsPayload = INITIAL_SKILLS.map(s => {
+        const { id, ...rest } = s;
+        return rest;
+      });
+      await supabase.from('skills').insert(skillsPayload);
+
+      alert("Database reset complete.");
+      fetchData();
     }
   };
 

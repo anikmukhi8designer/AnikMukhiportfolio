@@ -58,7 +58,7 @@ const WorkSection: React.FC<WorkSectionProps> = ({ onProjectClick }) => {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-baseline justify-between mb-16 gap-4">
           <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-400">
-            Selected Work
+            Our Work
           </h2>
           <span className="text-sm text-neutral-400 font-medium hidden md:block">
             {publishedProjects.length} Projects

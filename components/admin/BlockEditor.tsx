@@ -1,22 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Project, ContentBlock, BlockType } from '../../types';
 import { 
-  ArrowLeft, Save, Plus, Trash2, GripVertical, Image as ImageIcon, 
+  ArrowLeft, Save, Trash2, GripVertical, Image as ImageIcon, 
   Type, Heading1, Heading2, Code, Quote, ArrowUp, ArrowDown, Minus,
-  Upload, Loader2, Copy, X, Link as LinkIcon, Calendar, Tag
+  Link as LinkIcon, Calendar, Tag, Copy, X, Upload, Loader2
 } from 'lucide-react';
-
-// Manually define Vite env types since vite/client is missing
-declare global {
-  interface ImportMetaEnv {
-    VITE_GITHUB_OWNER?: string;
-    VITE_GITHUB_REPO?: string;
-    VITE_GITHUB_TOKEN?: string;
-  }
-  interface ImportMeta {
-    readonly env: ImportMetaEnv;
-  }
-}
+import { supabase } from '../../supabaseClient';
 
 interface BlockEditorProps {
   project: Project;
@@ -25,7 +14,6 @@ interface BlockEditorProps {
 }
 
 const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) => {
-  // Local state for the form to handle edits before saving
   const [formData, setFormData] = useState<Project>(project);
   const [blocks, setBlocks] = useState<ContentBlock[]>(project.content || []);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -35,7 +23,6 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
   const [isUploading, setIsUploading] = useState(false);
   const [pendingUploadHandler, setPendingUploadHandler] = useState<((url: string) => void) | null>(null);
 
-  // Initialize blocks if empty
   useEffect(() => {
     if (!project.content || project.content.length === 0) {
       setBlocks([
@@ -44,7 +31,6 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
     }
   }, [project]);
 
-  // Handle Metadata Changes
   const handleMetaChange = (field: keyof Project, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setHasUnsavedChanges(true);
@@ -60,7 +46,6 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
     handleMetaChange('images', currentImages.filter((_, i) => i !== index));
   };
 
-  // Block Operations
   const addBlock = (type: BlockType) => {
     const newBlock: ContentBlock = {
       id: `block-${Date.now()}`,
@@ -103,7 +88,7 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
     setHasUnsavedChanges(false);
   };
 
-  // Upload Logic
+  // Upload Logic (Supabase Storage)
   const triggerUpload = (handler: (url: string) => void) => {
     setPendingUploadHandler(() => handler);
     fileInputRef.current?.click();
@@ -116,76 +101,25 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
     setIsUploading(true);
     
     try {
-        // Try GitHub upload first if configured
-        // Priority: Local Storage -> Env Vars
-        const storedGit = localStorage.getItem('cms_git_config');
-        let gitConfig = storedGit ? JSON.parse(storedGit) : null;
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const { data, error } = await supabase.storage
+            .from('portfolio')
+            .upload(filePath, file);
+
+        if (error) throw error;
+
+        // Get Public URL
+        const { data: urlData } = supabase.storage.from('portfolio').getPublicUrl(filePath);
         
-        const env = (import.meta.env || {}) as any;
-
-        if (!gitConfig && env.VITE_GITHUB_TOKEN) {
-            gitConfig = {
-                owner: env.VITE_GITHUB_OWNER,
-                repo: env.VITE_GITHUB_REPO,
-                token: env.VITE_GITHUB_TOKEN
-            };
+        if (urlData) {
+            pendingUploadHandler(urlData.publicUrl);
         }
-
-        let finalUrl = '';
-
-        if (gitConfig && gitConfig.owner && gitConfig.repo && gitConfig.token) {
-            try {
-                const { owner, repo, token } = gitConfig;
-                const reader = new FileReader();
-                await new Promise<void>((resolve, reject) => {
-                    reader.onload = async () => {
-                        try {
-                            const base64Content = (reader.result as string).split(',')[1];
-                            const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '');
-                            const filename = `${Date.now()}-${cleanName}`;
-                            const path = `public/uploads/${filename}`;
-                            
-                            const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
-                                method: 'PUT',
-                                headers: {
-                                    'Authorization': `token ${token}`,
-                                    'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({
-                                    message: `CMS Upload: ${cleanName}`,
-                                    content: base64Content
-                                })
-                            });
-
-                            if (res.ok) {
-                                // Use Raw URL
-                                finalUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${path}`;
-                            }
-                            resolve();
-                        } catch (err) {
-                            reject(err);
-                        }
-                    };
-                    reader.readAsDataURL(file);
-                });
-            } catch (err) {
-                console.warn("GitHub upload failed, falling back to Base64", err);
-            }
-        }
-
-        // Fallback to Base64 if GitHub failed or not configured
-        if (!finalUrl) {
-            const reader = new FileReader();
-            finalUrl = await new Promise((resolve) => {
-                reader.onload = () => resolve(reader.result as string);
-                reader.readAsDataURL(file);
-            });
-        }
-
-        pendingUploadHandler(finalUrl);
     } catch (error) {
-        console.error("Upload error", error);
-        alert("Failed to upload image.");
+        console.error("Upload failed", error);
+        alert("Upload failed. Make sure your Supabase Storage bucket 'portfolio' is public.");
     } finally {
         setIsUploading(false);
         setPendingUploadHandler(null);
@@ -195,7 +129,6 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
 
   return (
     <div className="min-h-screen bg-neutral-100 flex flex-col">
-      {/* Hidden File Input */}
       <input 
         type="file" 
         ref={fileInputRef} 
@@ -204,7 +137,6 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
         onChange={processUpload}
       />
 
-      {/* Editor Header */}
       <header className="bg-white border-b border-neutral-200 sticky top-0 z-40 px-6 h-16 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-4">
           <button onClick={onBack} className="p-2 hover:bg-neutral-100 rounded-full transition-colors text-neutral-500 hover:text-neutral-900">
@@ -213,7 +145,7 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
           <div className="h-6 w-px bg-neutral-200"></div>
           <div>
             <h1 className="text-sm font-bold text-neutral-900">Editing: {formData.title}</h1>
-            <p className="text-xs text-neutral-500">{hasUnsavedChanges ? 'Unsaved changes' : 'All changes saved'}</p>
+            <p className="text-xs text-neutral-500">{hasUnsavedChanges ? 'Unsaved changes' : 'All changes saved to cloud'}</p>
           </div>
         </div>
         
@@ -293,32 +225,21 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
                 />
             </div>
 
-            <div>
-                <label className="block text-xs font-bold text-neutral-900 mb-2">Roles (comma separated)</label>
-                <input 
-                    type="text" 
-                    value={formData.roles.join(', ')}
-                    onChange={(e) => handleMetaChange('roles', e.target.value.split(',').map(s => s.trim()))}
-                    className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-                />
-            </div>
-
             {/* Thumbnail Image Section */}
             <div>
-              <label className="block text-xs font-bold text-neutral-900 mb-2">Thumbnail (Home Screen)</label>
+              <label className="block text-xs font-bold text-neutral-900 mb-2">Thumbnail URL</label>
               <div className="flex gap-2">
                 <input 
-                  type="text" 
-                  value={formData.thumb}
-                  onChange={(e) => handleMetaChange('thumb', e.target.value)}
-                  className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-                  placeholder="https://..."
+                    type="text" 
+                    value={formData.thumb}
+                    onChange={(e) => handleMetaChange('thumb', e.target.value)}
+                    className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+                    placeholder="https://..."
                 />
                 <button 
                     onClick={() => triggerUpload((url) => handleMetaChange('thumb', url))}
                     disabled={isUploading}
                     className="p-2 bg-neutral-100 hover:bg-neutral-200 rounded-lg border border-neutral-200 transition-colors"
-                    title="Upload Image"
                 >
                     {isUploading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Upload className="w-4 h-4" />}
                 </button>
@@ -329,7 +250,7 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
             {/* Hero Image Section */}
             <div>
               <label className="block text-xs font-bold text-neutral-900 mb-2 flex items-center justify-between">
-                <span>Hero Image (Case Study)</span>
+                <span>Hero Image URL</span>
                 <button 
                     onClick={() => handleMetaChange('heroImage', formData.thumb)}
                     className="text-[10px] text-blue-600 hover:underline font-normal flex items-center gap-1"
@@ -339,17 +260,16 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
               </label>
               <div className="flex gap-2">
                 <input 
-                  type="text" 
-                  value={formData.heroImage}
-                  onChange={(e) => handleMetaChange('heroImage', e.target.value)}
-                  className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-                  placeholder="https://..."
+                    type="text" 
+                    value={formData.heroImage}
+                    onChange={(e) => handleMetaChange('heroImage', e.target.value)}
+                    className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+                    placeholder="https://..."
                 />
-                <button 
+                 <button 
                     onClick={() => triggerUpload((url) => handleMetaChange('heroImage', url))}
                     disabled={isUploading}
                     className="p-2 bg-neutral-100 hover:bg-neutral-200 rounded-lg border border-neutral-200 transition-colors"
-                    title="Upload Image"
                 >
                     {isUploading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Upload className="w-4 h-4" />}
                 </button>
@@ -383,16 +303,14 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
                         </div>
                     ))}
                 </div>
-                <div className="flex gap-2">
-                    <button 
-                        onClick={() => triggerUpload(handleAddGalleryImage)}
-                        disabled={isUploading}
-                        className="flex-1 flex items-center justify-center gap-2 py-2 bg-neutral-100 hover:bg-neutral-200 border border-neutral-200 rounded-lg text-xs font-medium transition-colors"
-                    >
-                        {isUploading ? <Loader2 className="w-3 h-3 animate-spin"/> : <Upload className="w-3 h-3" />}
-                        Upload to Gallery
-                    </button>
-                </div>
+                <button 
+                    onClick={() => triggerUpload(handleAddGalleryImage)}
+                    disabled={isUploading}
+                    className="w-full py-2 bg-neutral-100 hover:bg-neutral-200 border border-neutral-200 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                     {isUploading ? <Loader2 className="w-3 h-3 animate-spin"/> : <Upload className="w-3 h-3" />}
+                    Upload Image
+                </button>
             </div>
 
             <div className="pt-6 border-t border-neutral-100">

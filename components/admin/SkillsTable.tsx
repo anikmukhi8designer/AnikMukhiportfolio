@@ -1,19 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Trash2, Plus, X, Check, Upload, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Trash2, Plus, X, Check, Link as LinkIcon } from 'lucide-react';
 import { ICON_KEYS, SkillIcon } from '../SkillIcons';
-
-// Manually define Vite env types since vite/client is missing
-declare global {
-  interface ImportMetaEnv {
-    VITE_GITHUB_OWNER?: string;
-    VITE_GITHUB_REPO?: string;
-    VITE_GITHUB_TOKEN?: string;
-  }
-  interface ImportMeta {
-    readonly env: ImportMetaEnv;
-  }
-}
 
 const SkillsTable: React.FC = () => {
   const { skills, updateSkill, deleteSkill, addSkill } = useData();
@@ -23,10 +11,6 @@ const SkillsTable: React.FC = () => {
   const [newItemName, setNewItemName] = useState('');
   const [newItemIcon, setNewItemIcon] = useState('Default'); // Fallback icon
   const [newItemImage, setNewItemImage] = useState(''); // Uploaded image URL
-
-  // Upload State
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isUploading, setIsUploading] = useState(false);
 
   const handleAddNewCategory = () => {
     const newId = `skill-${Date.now()}`;
@@ -63,99 +47,13 @@ const SkillsTable: React.FC = () => {
      updateSkill(categoryId, { items: updatedItems });
   };
 
-  const triggerUpload = () => {
-    fileInputRef.current?.click();
-  };
-
-  const processUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    
-    try {
-        const storedGit = localStorage.getItem('cms_git_config');
-        let gitConfig = storedGit ? JSON.parse(storedGit) : null;
-        
-        const env = (import.meta.env || {}) as any;
-
-        if (!gitConfig && env.VITE_GITHUB_TOKEN) {
-            gitConfig = {
-                owner: env.VITE_GITHUB_OWNER,
-                repo: env.VITE_GITHUB_REPO,
-                token: env.VITE_GITHUB_TOKEN
-            };
-        }
-
-        let finalUrl = '';
-
-        if (gitConfig && gitConfig.owner && gitConfig.repo && gitConfig.token) {
-            try {
-                const { owner, repo, token } = gitConfig;
-                const reader = new FileReader();
-                await new Promise<void>((resolve, reject) => {
-                    reader.onload = async () => {
-                        try {
-                            const base64Content = (reader.result as string).split(',')[1];
-                            const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '');
-                            const filename = `skill-${Date.now()}-${cleanName}`;
-                            const path = `public/uploads/skills/${filename}`;
-                            
-                            const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
-                                method: 'PUT',
-                                headers: {
-                                    'Authorization': `token ${token}`,
-                                    'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({
-                                    message: `CMS Skill Upload: ${cleanName}`,
-                                    content: base64Content
-                                })
-                            });
-
-                            if (res.ok) {
-                                finalUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${path}`;
-                            }
-                            resolve();
-                        } catch (err) {
-                            reject(err);
-                        }
-                    };
-                    reader.readAsDataURL(file);
-                });
-            } catch (err) {
-                console.warn("GitHub upload failed, falling back to Base64", err);
-            }
-        }
-
-        if (!finalUrl) {
-            const reader = new FileReader();
-            finalUrl = await new Promise((resolve) => {
-                reader.onload = () => resolve(reader.result as string);
-                reader.readAsDataURL(file);
-            });
-        }
-
-        setNewItemImage(finalUrl);
-    } catch (error) {
-        console.error("Upload error", error);
-        alert("Failed to upload image.");
-    } finally {
-        setIsUploading(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-    }
+  const handleSetImage = () => {
+      const url = prompt("Enter URL for Icon (SVG/PNG):");
+      if (url) setNewItemImage(url);
   };
 
   return (
     <div className="space-y-6">
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        className="hidden" 
-        accept="image/png,image/svg+xml"
-        onChange={processUpload}
-      />
-
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">Skills & Tools ({skills.length} Categories)</h3>
         <button 
@@ -215,17 +113,14 @@ const SkillsTable: React.FC = () => {
                             
                             {/* Upload Button */}
                             <button 
-                                onClick={triggerUpload}
-                                disabled={isUploading}
+                                onClick={handleSetImage}
                                 className="w-8 h-8 flex items-center justify-center bg-neutral-100 hover:bg-neutral-200 rounded text-neutral-500 transition-colors overflow-hidden border border-neutral-200"
-                                title="Upload PNG/SVG"
+                                title="Set Icon URL"
                             >
-                                {isUploading ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : newItemImage ? (
+                                {newItemImage ? (
                                     <img src={newItemImage} className="w-full h-full object-cover" alt="preview" />
                                 ) : (
-                                    <Upload className="w-4 h-4" />
+                                    <LinkIcon className="w-4 h-4" />
                                 )}
                             </button>
 
