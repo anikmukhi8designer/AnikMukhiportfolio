@@ -194,6 +194,14 @@ export const EXPERIENCE: Experience[] = [
     period: "2018 — 2019",
     description: "Assisted in user research, wireframing, and usability testing for mobile applications.",
     published: true
+  },
+  {
+    id: "placeholder-2024",
+    role: "Design Lead",
+    company: "Next Gen Solutions",
+    period: "2024",
+    description: "Spearheading the UI overhaul for the next generation of enterprise tools.",
+    published: true
   }
 ];
 

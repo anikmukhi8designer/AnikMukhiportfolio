@@ -69,40 +69,65 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const fetchData = async () => {
     try {
-        // Projects
-        const { data: projData } = await supabase.from('work_items').select('*').order('created_at', { ascending: false });
+        // 1. Projects
+        const { data: projData, error: projError } = await supabase.from('work_items').select('*').order('created_at', { ascending: false });
+        
         if (projData && projData.length > 0) {
             setProjects(projData.map(mapProjectFromDB));
-        } else if (projects.length === 0) {
-            // Fallback to initial data if DB is empty or connection fails
+        } else if (!projError) {
+            // DB is accessible but empty. Auto-seed so updates work.
+            console.log("Seeding Projects DB...");
+            const dbPayload = INITIAL_PROJECTS.map(p => mapProjectToDB({ ...p, published: true }));
+            await supabase.from('work_items').insert(dbPayload);
+            setProjects(INITIAL_PROJECTS);
+        } else {
+            // Offline fallback
             setProjects(INITIAL_PROJECTS);
         }
 
-        // Experience
-        const { data: expData } = await supabase.from('experience_items').select('*').order('created_at', { ascending: false });
+        // 2. Experience
+        const { data: expData, error: expError } = await supabase.from('experience_items').select('*').order('created_at', { ascending: false });
+        
         if (expData && expData.length > 0) {
             setExperience(expData as Experience[]);
-        } else if (experience.length === 0) {
+        } else if (!expError) {
+             console.log("Seeding Experience DB...");
+             const dbPayload = INITIAL_EXPERIENCE.map(e => ({ ...e, published: true }));
+             await supabase.from('experience_items').insert(dbPayload);
+             setExperience(INITIAL_EXPERIENCE);
+        } else {
             setExperience(INITIAL_EXPERIENCE);
         }
 
-        // Clients
-        const { data: clientData } = await supabase.from('clients').select('*').order('created_at', { ascending: false });
+        // 3. Clients
+        const { data: clientData, error: clientError } = await supabase.from('clients').select('*').order('created_at', { ascending: false });
+        
         if (clientData && clientData.length > 0) {
             setClients(clientData as Client[]);
-        } else if (clients.length === 0) {
+        } else if (!clientError) {
+             console.log("Seeding Clients DB...");
+             await supabase.from('clients').insert(INITIAL_CLIENTS);
+             setClients(INITIAL_CLIENTS);
+        } else {
             setClients(INITIAL_CLIENTS);
         }
 
-        // Skills
-        const { data: skillData } = await supabase.from('skills').select('*').order('created_at', { ascending: true });
+        // 4. Skills
+        const { data: skillData, error: skillError } = await supabase.from('skills').select('*').order('created_at', { ascending: true });
+        
         if (skillData && skillData.length > 0) {
             setSkills(skillData as SkillCategory[]);
-        } else if (skills.length === 0) {
+        } else if (!skillError) {
+             console.log("Seeding Skills DB...");
+             await supabase.from('skills').insert(INITIAL_SKILLS);
+             setSkills(INITIAL_SKILLS);
+        } else {
             setSkills(INITIAL_SKILLS);
         }
+
     } catch (e) {
         console.warn("Fetch Error - falling back to local data:", e);
+        // Ensure data is present even if fetch explodes
         if(projects.length === 0) setProjects(INITIAL_PROJECTS);
         if(experience.length === 0) setExperience(INITIAL_EXPERIENCE);
         if(clients.length === 0) setClients(INITIAL_CLIENTS);
