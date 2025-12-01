@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Database } from 'lucide-react';
+import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Database, Radio } from 'lucide-react';
 import WorkTable from './WorkTable';
 import ExperienceTable from './ExperienceTable';
 import SkillsTable from './SkillsTable';
@@ -14,11 +14,19 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   const [activeTab, setActiveTab] = useState<'work' | 'experience' | 'skills' | 'clients'>('work');
-  const { resetData } = useData();
+  const { resetData, refreshAllClients } = useData();
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     onLogout();
+  };
+
+  const handleBroadcast = async () => {
+    setIsBroadcasting(true);
+    await refreshAllClients();
+    // Keep animation active for a moment to give feedback
+    setTimeout(() => setIsBroadcasting(false), 2000);
   };
 
   return (
@@ -36,6 +44,20 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
           </div>
           
           <div className="flex items-center gap-4">
+            <button 
+                onClick={handleBroadcast}
+                disabled={isBroadcasting}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+                    isBroadcasting 
+                    ? 'bg-red-50 text-red-600 border border-red-100' 
+                    : 'bg-white text-neutral-600 hover:text-neutral-900 border border-neutral-200 hover:border-neutral-400'
+                }`}
+                title="Force update on all visitor screens"
+            >
+                <Radio className={`w-4 h-4 ${isBroadcasting ? 'animate-pulse' : ''}`} />
+                {isBroadcasting ? 'Broadcasting...' : 'Live Sync'}
+            </button>
+
             <button onClick={handleLogout} className="p-2 text-neutral-400 hover:text-neutral-900 transition-colors" title="Logout">
                 <LogOut className="w-5 h-5" />
             </button>

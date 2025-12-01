@@ -32,6 +32,7 @@ interface DataContextType {
   deleteSkill: (id: string) => void;
 
   resetData: () => void;
+  refreshAllClients: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -41,6 +42,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [experience, setExperience] = useState<Experience[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [skills, setSkills] = useState<SkillCategory[]>([]);
+  
+  // Keep track of the broadcast channel to send messages
+  const [globalChannel, setGlobalChannel] = useState<any>(null);
 
   // Helper to map DB snake_case to Frontend camelCase
   const mapProjectFromDB = (data: any): Project => ({
@@ -111,6 +115,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Safely subscribe only if supabase real-time is available
     try {
+        // 1. Setup Broadcast Channel for Manual Sync
+        const syncChannel = supabase.channel('global_sync')
+            .on('broadcast', { event: 'force_update' }, () => {
+                console.log("Received global update signal");
+                fetchData();
+            })
+            .subscribe();
+        setGlobalChannel(syncChannel);
+
+        // 2. Setup Database Change Listeners
         const channels = [
           supabase.channel('work_items_changes')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'work_items' }, () => fetchData())
@@ -130,12 +144,33 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         ];
 
         return () => {
+          supabase.removeChannel(syncChannel);
           channels.forEach(channel => supabase.removeChannel(channel));
         };
     } catch (e) {
         console.warn("Realtime subscription failed (offline mode):", e);
     }
   }, []);
+
+  // --- Broadcast Action ---
+  const refreshAllClients = async () => {
+      // 1. Fetch locally immediately
+      fetchData();
+
+      // 2. Send signal to the world
+      if (globalChannel) {
+          try {
+              await globalChannel.send({
+                  type: 'broadcast',
+                  event: 'force_update',
+                  payload: { timestamp: Date.now() }
+              });
+              console.log("Global update signal sent.");
+          } catch (e) {
+              console.warn("Failed to broadcast update:", e);
+          }
+      }
+  };
 
   // --- Actions ---
 
@@ -300,7 +335,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       updateExperience, addExperience, deleteExperience, reorderExperience,
       updateClient, addClient, deleteClient,
       updateSkill, addSkill, deleteSkill,
-      resetData
+      resetData, refreshAllClients
     }}>
       {children}
     </DataContext.Provider>
