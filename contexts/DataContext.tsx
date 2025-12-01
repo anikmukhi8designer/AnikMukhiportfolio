@@ -66,19 +66,36 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchData = async () => {
     // Projects
     const { data: projData } = await supabase.from('work_items').select('*').order('created_at', { ascending: false });
-    if (projData) setProjects(projData.map(mapProjectFromDB));
+    if (projData && projData.length > 0) {
+        setProjects(projData.map(mapProjectFromDB));
+    } else if (projects.length === 0) {
+        // Fallback to initial data if DB is empty or connection fails
+        setProjects(INITIAL_PROJECTS);
+    }
 
     // Experience
     const { data: expData } = await supabase.from('experience_items').select('*').order('created_at', { ascending: false });
-    if (expData) setExperience(expData as Experience[]);
+    if (expData && expData.length > 0) {
+        setExperience(expData as Experience[]);
+    } else if (experience.length === 0) {
+        setExperience(INITIAL_EXPERIENCE);
+    }
 
     // Clients
     const { data: clientData } = await supabase.from('clients').select('*').order('created_at', { ascending: false });
-    if (clientData) setClients(clientData as Client[]);
+    if (clientData && clientData.length > 0) {
+        setClients(clientData as Client[]);
+    } else if (clients.length === 0) {
+        setClients(INITIAL_CLIENTS);
+    }
 
     // Skills
     const { data: skillData } = await supabase.from('skills').select('*').order('created_at', { ascending: true });
-    if (skillData) setSkills(skillData as SkillCategory[]);
+    if (skillData && skillData.length > 0) {
+        setSkills(skillData as SkillCategory[]);
+    } else if (skills.length === 0) {
+        setSkills(INITIAL_SKILLS);
+    }
   };
 
   useEffect(() => {
@@ -113,8 +130,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateProject = async (id: string, data: Partial<Project>) => {
     // Optimistic UI update
     setProjects(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
+    
     const dbData = mapProjectToDB(data);
-    await supabase.from('work_items').update(dbData).eq('id', id);
+    const { error } = await supabase.from('work_items').update(dbData).eq('id', id);
+    if (error) console.warn("Supabase Sync Error (Update Project):", error.message);
   };
   
   const addProject = async (project: Project) => {
@@ -125,81 +144,70 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const { error } = await supabase.from('work_items').insert([dbData]);
     
     if (error) {
-      console.error("Add Project Error:", error);
-      // Rollback on error
-      setProjects(prev => prev.filter(p => p.id !== project.id));
-      alert("Failed to save project to database. Check console.");
+      console.warn("Supabase Sync Error (Add Project):", error.message);
+      // We DO NOT rollback here to ensure the UI remains functional in "Demo/Offline" mode
+      // setProjects(prev => prev.filter(p => p.id !== project.id)); 
     }
   };
   
   const deleteProject = async (id: string) => {
     setProjects(prev => prev.filter(p => p.id !== id));
-    await supabase.from('work_items').delete().eq('id', id);
+    const { error } = await supabase.from('work_items').delete().eq('id', id);
+    if (error) console.warn("Supabase Sync Error (Delete Project):", error.message);
   };
 
   // Experience
   const updateExperience = async (id: string, data: Partial<Experience>) => {
     setExperience(prev => prev.map(e => e.id === id ? { ...e, ...data } : e));
-    await supabase.from('experience_items').update(data).eq('id', id);
+    const { error } = await supabase.from('experience_items').update(data).eq('id', id);
+    if (error) console.warn("Supabase Sync Error (Update Experience):", error.message);
   };
   const addExperience = async (exp: Experience) => {
-    // Optimistic Update
     setExperience(prev => [exp, ...prev]);
-    
     const { error } = await supabase.from('experience_items').insert([exp]);
-    if (error) {
-        console.error("Add Experience Error:", error);
-        setExperience(prev => prev.filter(e => e.id !== exp.id));
-    }
+    if (error) console.warn("Supabase Sync Error (Add Experience):", error.message);
   };
   const deleteExperience = async (id: string) => {
     setExperience(prev => prev.filter(e => e.id !== id));
-    await supabase.from('experience_items').delete().eq('id', id);
+    const { error } = await supabase.from('experience_items').delete().eq('id', id);
+    if (error) console.warn("Supabase Sync Error (Delete Experience):", error.message);
   };
   const reorderExperience = (items: Experience[]) => {
     setExperience(items);
-    // Note: To persist order, we would need an 'order_index' column in DB.
-    // For now, we update local state.
   };
 
   // Clients
   const updateClient = async (id: string, data: Partial<Client>) => {
     setClients(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
-    await supabase.from('clients').update(data).eq('id', id);
+    const { error } = await supabase.from('clients').update(data).eq('id', id);
+    if (error) console.warn("Supabase Sync Error (Update Client):", error.message);
   };
   const addClient = async (client: Client) => {
-    // Optimistic Update
     setClients(prev => [client, ...prev]);
-    
     const { error } = await supabase.from('clients').insert([client]);
-    if (error) {
-        console.error("Add Client Error:", error);
-        setClients(prev => prev.filter(c => c.id !== client.id));
-    }
+    if (error) console.warn("Supabase Sync Error (Add Client):", error.message);
   };
   const deleteClient = async (id: string) => {
     setClients(prev => prev.filter(c => c.id !== id));
-    await supabase.from('clients').delete().eq('id', id);
+    const { error } = await supabase.from('clients').delete().eq('id', id);
+    if (error) console.warn("Supabase Sync Error (Delete Client):", error.message);
   };
 
   // Skills
   const updateSkill = async (id: string, data: Partial<SkillCategory>) => {
     setSkills(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
-    await supabase.from('skills').update(data).eq('id', id);
+    const { error } = await supabase.from('skills').update(data).eq('id', id);
+    if (error) console.warn("Supabase Sync Error (Update Skill):", error.message);
   };
   const addSkill = async (skill: SkillCategory) => {
-    // Optimistic Update
     setSkills(prev => [...prev, skill]);
-    
     const { error } = await supabase.from('skills').insert([skill]);
-    if (error) {
-        console.error("Add Skill Error:", error);
-        setSkills(prev => prev.filter(s => s.id !== skill.id));
-    }
+    if (error) console.warn("Supabase Sync Error (Add Skill):", error.message);
   };
   const deleteSkill = async (id: string) => {
     setSkills(prev => prev.filter(s => s.id !== id));
-    await supabase.from('skills').delete().eq('id', id);
+    const { error } = await supabase.from('skills').delete().eq('id', id);
+    if (error) console.warn("Supabase Sync Error (Delete Skill):", error.message);
   };
 
   // --- Reset / Seed ---
@@ -214,9 +222,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // Seed Projects
       const projectsPayload = INITIAL_PROJECTS.map(p => {
-        // We can reuse IDs from data.ts for seed if they are UUIDs, 
-        // but they are slugs. We should let DB generate or force them.
-        // For simplicity in seed, let's just insert.
         const { id, ...rest } = p;
         return mapProjectToDB({ ...rest, published: true });
       });
