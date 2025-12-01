@@ -18,10 +18,22 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
   const [blocks, setBlocks] = useState<ContentBlock[]>(project.content || []);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
+  // Focus Management
+  const blockInputRefs = useRef<{ [key: string]: HTMLInputElement | HTMLTextAreaElement | null }>({});
+  const [shouldFocusId, setShouldFocusId] = useState<string | null>(null);
+  
   // Upload State
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [pendingUploadHandler, setPendingUploadHandler] = useState<((url: string) => void) | null>(null);
+
+  // Focus effect when shouldFocusId changes
+  useEffect(() => {
+    if (shouldFocusId && blockInputRefs.current[shouldFocusId]) {
+        blockInputRefs.current[shouldFocusId]?.focus();
+        setShouldFocusId(null);
+    }
+  }, [shouldFocusId, blocks]);
 
   useEffect(() => {
     if (!project.content || project.content.length === 0) {
@@ -46,15 +58,31 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
     handleMetaChange('images', currentImages.filter((_, i) => i !== index));
   };
 
+  const generateId = () => `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
   const addBlock = (type: BlockType) => {
     const newBlock: ContentBlock = {
-      id: `block-${Date.now()}`,
+      id: generateId(),
       type,
       content: '',
       caption: type === 'code' ? 'javascript' : ''
     };
     setBlocks([...blocks, newBlock]);
     setHasUnsavedChanges(true);
+  };
+
+  const insertBlockAfter = (index: number, type: BlockType = 'paragraph') => {
+    const newBlock: ContentBlock = {
+        id: generateId(),
+        type,
+        content: '',
+        caption: ''
+    };
+    const newBlocks = [...blocks];
+    newBlocks.splice(index + 1, 0, newBlock);
+    setBlocks(newBlocks);
+    setHasUnsavedChanges(true);
+    setShouldFocusId(newBlock.id);
   };
 
   const updateBlock = (id: string, content: string, caption?: string) => {
@@ -78,6 +106,60 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
     [newBlocks[index], newBlocks[targetIndex]] = [newBlocks[targetIndex], newBlocks[index]];
     setBlocks(newBlocks);
     setHasUnsavedChanges(true);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, index: number, block: ContentBlock) => {
+      // 1. Shift + Delete: Delete Block
+      if (e.shiftKey && e.key === 'Delete') {
+          e.preventDefault();
+          const prev = blocks[index - 1];
+          const next = blocks[index + 1];
+          setBlocks(blocks.filter(b => b.id !== block.id));
+          setHasUnsavedChanges(true);
+          if (prev) setShouldFocusId(prev.id);
+          else if (next) setShouldFocusId(next.id);
+          return;
+      }
+
+      // 2. Enter: New Block (Paragraph)
+      // Only for text blocks where Enter typically means "done with this block"
+      // We allow Shift+Enter for new lines in textareas
+      if (e.key === 'Enter' && !e.shiftKey) {
+          if (['paragraph', 'h1', 'h2', 'quote'].includes(block.type)) {
+             e.preventDefault();
+             insertBlockAfter(index, 'paragraph');
+          }
+      }
+
+      // 3. Backspace on Empty: Delete Block
+      if (e.key === 'Backspace' && block.content === '' && blocks.length > 1) {
+          e.preventDefault();
+          const prev = blocks[index - 1];
+          const next = blocks[index + 1];
+          setBlocks(blocks.filter(b => b.id !== block.id));
+          setHasUnsavedChanges(true);
+          if (prev) setShouldFocusId(prev.id);
+          else if (next) setShouldFocusId(next.id);
+      }
+      
+      // 4. Arrow Navigation
+      if (e.key === 'ArrowUp' && index > 0) {
+          const target = e.currentTarget as HTMLInputElement | HTMLTextAreaElement;
+          // Only move if at start of input
+          if (target.selectionStart === 0 && target.selectionEnd === 0) {
+              e.preventDefault();
+              // Skip checking type, just try to focus previous
+              setShouldFocusId(blocks[index - 1].id);
+          }
+      }
+      if (e.key === 'ArrowDown' && index < blocks.length - 1) {
+           const target = e.currentTarget as HTMLInputElement | HTMLTextAreaElement;
+           // Only move if at end of input
+           if (target.selectionStart === target.value.length && target.selectionEnd === target.value.length) {
+              e.preventDefault();
+              setShouldFocusId(blocks[index + 1].id);
+           }
+      }
   };
 
   const handleSave = () => {
@@ -359,6 +441,7 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
                     <button 
                         onClick={() => deleteBlock(block.id)}
                         className="absolute -right-3 -top-3 bg-white shadow-md p-1.5 rounded-full text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 z-10"
+                        title="Delete (Shift+Delete)"
                     >
                         <Trash2 className="w-3 h-3" />
                     </button>
@@ -366,6 +449,8 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
                     {/* Render Input based on Type */}
                     {block.type === 'paragraph' && (
                         <textarea
+                            ref={(el) => { blockInputRefs.current[block.id] = el; }}
+                            onKeyDown={(e) => handleKeyDown(e, index, block)}
                             value={block.content}
                             onChange={(e) => updateBlock(block.id, e.target.value)}
                             placeholder="Type your paragraph here..."
@@ -376,6 +461,8 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
 
                     {block.type === 'h1' && (
                          <input
+                            ref={(el) => { blockInputRefs.current[block.id] = el; }}
+                            onKeyDown={(e) => handleKeyDown(e, index, block)}
                             value={block.content}
                             onChange={(e) => updateBlock(block.id, e.target.value)}
                             placeholder="Heading 1"
@@ -385,6 +472,8 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
 
                     {block.type === 'h2' && (
                          <input
+                            ref={(el) => { blockInputRefs.current[block.id] = el; }}
+                            onKeyDown={(e) => handleKeyDown(e, index, block)}
                             value={block.content}
                             onChange={(e) => updateBlock(block.id, e.target.value)}
                             placeholder="Heading 2"
@@ -396,6 +485,8 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
                         <div className="flex gap-4">
                             <div className="w-1 bg-neutral-300 rounded-full shrink-0"></div>
                             <textarea
+                                ref={(el) => { blockInputRefs.current[block.id] = el; }}
+                                onKeyDown={(e) => handleKeyDown(e, index, block)}
                                 value={block.content}
                                 onChange={(e) => updateBlock(block.id, e.target.value)}
                                 placeholder="Enter quote..."
@@ -414,6 +505,8 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
                                 className="w-full bg-transparent border-b border-neutral-200 mb-2 pb-1 text-xs text-neutral-500 focus:outline-none"
                             />
                             <textarea
+                                ref={(el) => { blockInputRefs.current[block.id] = el; }}
+                                onKeyDown={(e) => handleKeyDown(e, index, block)}
                                 value={block.content}
                                 onChange={(e) => updateBlock(block.id, e.target.value)}
                                 placeholder="// Type your code here"
@@ -438,6 +531,8 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
                             )}
                             <div className="flex gap-2">
                                 <input
+                                    ref={(el) => { blockInputRefs.current[block.id] = el; }}
+                                    onKeyDown={(e) => handleKeyDown(e, index, block)}
                                     type="text"
                                     value={block.content}
                                     onChange={(e) => updateBlock(block.id, e.target.value, block.caption)}
