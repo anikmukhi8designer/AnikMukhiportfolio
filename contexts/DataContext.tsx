@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { Project, Experience, Client, SkillCategory } from '../types';
 import { supabase } from '../supabaseClient';
 import { 
@@ -42,6 +42,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [experience, setExperience] = useState<Experience[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [skills, setSkills] = useState<SkillCategory[]>([]);
+  
+  // Unique ID for this session to identify self-broadcasts
+  const clientId = useRef(Math.random().toString(36).substring(7)).current;
   
   // Keep track of the broadcast channel to send messages
   const [globalChannel, setGlobalChannel] = useState<any>(null);
@@ -142,14 +145,19 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
         // 1. Setup Broadcast Channel for Manual Sync
         const syncChannel = supabase.channel('global_sync')
-            .on('broadcast', { event: 'force_update' }, () => {
-                console.log("Received global update signal");
-                fetchData();
+            .on('broadcast', { event: 'force_update' }, (payload) => {
+                // Only fetch if the signal came from a DIFFERENT client
+                if (payload.payload?.senderId !== clientId) {
+                    console.log("Received global update signal");
+                    fetchData();
+                }
             })
             .subscribe();
         setGlobalChannel(syncChannel);
 
         // 2. Setup Database Change Listeners
+        // Note: We might want to throttle these or check origin if possible to avoid overwriting active edits
+        // For now, we keep them active for multi-user collab, but the Live Sync button won't trigger self-overwrite.
         const channels = [
           supabase.channel('work_items_changes')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'work_items' }, () => fetchData())
@@ -179,16 +187,19 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // --- Broadcast Action ---
   const refreshAllClients = async () => {
-      // 1. Fetch locally immediately
-      fetchData();
-
+      // 1. DO NOT fetch locally. We trust our optimistic state. 
+      // Fetching here risks overwriting unsaved/pending inputs with stale DB data.
+      
       // 2. Send signal to the world
       if (globalChannel) {
           try {
               await globalChannel.send({
                   type: 'broadcast',
                   event: 'force_update',
-                  payload: { timestamp: Date.now() }
+                  payload: { 
+                      timestamp: Date.now(),
+                      senderId: clientId // Identify ourselves so we don't handle our own broadcast
+                  }
               });
               console.log("Global update signal sent.");
           } catch (e) {

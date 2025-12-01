@@ -1,43 +1,47 @@
 # Portfolio & CMS - Deployment Guide
 
-This project is now configured as a **Vite + React** application. This makes it production-ready and compatible with Vercel's automated build systems.
+This project is now configured as a **Vite + React** application with a **Supabase** backend.
 
-## How to Deploy to Vercel (Recommended)
+## 1. Database Setup (Supabase)
 
-1.  **Download Code**: Download all the files from this project to your local computer.
-2.  **Push to GitHub**:
-    *   Initialize a git repository (`git init`).
-    *   Commit your files.
-    *   Push to a new GitHub repository.
-3.  **Connect to Vercel**:
-    *   Go to [Vercel.com](https://vercel.com) and log in.
-    *   Click **"Add New Project"**.
-    *   Import your GitHub repository.
-4.  **Deploy**:
-    *   Vercel will automatically detect `vite.config.ts` and `package.json`.
-    *   It will set the **Framework Preset** to `Vite`.
-    *   Click **Deploy**.
+If you haven't done this yet:
+1.  Open your [Supabase Dashboard](https://supabase.com/dashboard).
+2.  Go to the **SQL Editor**.
+3.  Run the contents of `supabase_schema.sql` to create your tables.
 
-## CMS Access
+## 2. Connect Your App (Environment Variables)
 
-Once deployed, your live URL will be something like `https://your-project.vercel.app`.
+To connect this code to your Supabase project, you must set up your API keys.
 
-*   **Access CMS**: Click the "CMS" link in the footer or login via the dashboard.
-*   **Credentials**:
-    *   Email: `admin@newgenre.studio`
-    *   Password: `password`
+1.  Create a new file in the root directory named `.env`.
+2.  Add the following lines to it (replace with your actual keys from Supabase Settings -> API):
 
-## Data Persistence Warning
+```env
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-public-key
+```
 
-This CMS uses **LocalStorage** (browser memory). 
-*   **Important**: Edits made in the CMS are saved **only on your specific browser/device**. 
-*   If you want to update the public site permanently for all visitors, you must manually update the `data.ts` file in your code with your changes and redeploy to Vercel.
+> **Note:** Do not commit `.env` to GitHub if you want to keep your keys private (though the Anon key is technically public).
 
-## Local Development
+## 3. Verify & Seed Data
 
-If you want to run this locally:
+1.  Run the app locally: `npm run dev`.
+2.  Open your browser to `http://localhost:5173`.
+3.  Navigate to the Admin Panel by adding `#admin` to the URL:
+    *   `http://localhost:5173/#admin`
+4.  Login with the default fallback credentials (or your Supabase Auth user if you created one):
+    *   **Email:** `admin@newgenre.studio`
+    *   **Password:** `password`
+5.  **Automatic Seeding:** The first time the app connects to your empty database, it will automatically upload the demo data (Projects, Experience, etc.) so you have something to start with.
 
-1.  Install Node.js.
-2.  Run `npm install`.
-3.  Run `npm run dev`.
-4.  Open `http://localhost:5173`.
+## 4. Deploy to Vercel
+
+1.  Push your code to GitHub.
+2.  Import project into Vercel.
+3.  **Important:** In Vercel Project Settings -> **Environment Variables**, add the same `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` values you used locally.
+4.  Deploy.
+
+## Troubleshooting
+
+*   **Images not uploading?** Check your Supabase Storage policies. The SQL script should have enabled "Public" access, but you can double-check in Supabase -> Storage -> `portfolio` bucket -> Configuration.
+*   **Login fails?** Ensure you copied the `VITE_SUPABASE_ANON_KEY` correctly and that it has no extra spaces.
