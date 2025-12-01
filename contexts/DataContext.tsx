@@ -86,10 +86,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const channels = [
       supabase.channel('work_items_changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'work_items' }, (payload) => {
-            // Re-fetch simplified for consistency, or we could optimistic update
-            fetchData();
-        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'work_items' }, () => fetchData())
         .subscribe(),
 
       supabase.channel('experience_changes')
@@ -121,15 +118,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
   
   const addProject = async (project: Project) => {
-    // Remove ID to let DB generate UUID if it's a placeholder ID, 
-    // BUT we usually need the ID for the UI. 
-    // Strategy: Let UI generate ID for optimistic, but DB might overwrite. 
-    // Better: Omit ID for insert if it looks like a temp ID, or use UPSERT.
-    const { id, ...rest } = project;
-    const dbData = mapProjectToDB(rest);
+    // Optimistic Update: Add immediately to local state
+    setProjects(prev => [project, ...prev]);
+
+    const dbData = mapProjectToDB(project);
+    const { error } = await supabase.from('work_items').insert([dbData]);
     
-    // For new items, we insert
-    await supabase.from('work_items').insert([dbData]);
+    if (error) {
+      console.error("Add Project Error:", error);
+      // Rollback on error
+      setProjects(prev => prev.filter(p => p.id !== project.id));
+      alert("Failed to save project to database. Check console.");
+    }
   };
   
   const deleteProject = async (id: string) => {
@@ -143,8 +143,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await supabase.from('experience_items').update(data).eq('id', id);
   };
   const addExperience = async (exp: Experience) => {
-    const { id, ...rest } = exp;
-    await supabase.from('experience_items').insert([rest]);
+    // Optimistic Update
+    setExperience(prev => [exp, ...prev]);
+    
+    const { error } = await supabase.from('experience_items').insert([exp]);
+    if (error) {
+        console.error("Add Experience Error:", error);
+        setExperience(prev => prev.filter(e => e.id !== exp.id));
+    }
   };
   const deleteExperience = async (id: string) => {
     setExperience(prev => prev.filter(e => e.id !== id));
@@ -162,8 +168,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await supabase.from('clients').update(data).eq('id', id);
   };
   const addClient = async (client: Client) => {
-    const { id, ...rest } = client;
-    await supabase.from('clients').insert([rest]);
+    // Optimistic Update
+    setClients(prev => [client, ...prev]);
+    
+    const { error } = await supabase.from('clients').insert([client]);
+    if (error) {
+        console.error("Add Client Error:", error);
+        setClients(prev => prev.filter(c => c.id !== client.id));
+    }
   };
   const deleteClient = async (id: string) => {
     setClients(prev => prev.filter(c => c.id !== id));
@@ -176,8 +188,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await supabase.from('skills').update(data).eq('id', id);
   };
   const addSkill = async (skill: SkillCategory) => {
-    const { id, ...rest } = skill;
-    await supabase.from('skills').insert([rest]);
+    // Optimistic Update
+    setSkills(prev => [...prev, skill]);
+    
+    const { error } = await supabase.from('skills').insert([skill]);
+    if (error) {
+        console.error("Add Skill Error:", error);
+        setSkills(prev => prev.filter(s => s.id !== skill.id));
+    }
   };
   const deleteSkill = async (id: string) => {
     setSkills(prev => prev.filter(s => s.id !== id));
@@ -196,6 +214,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // Seed Projects
       const projectsPayload = INITIAL_PROJECTS.map(p => {
+        // We can reuse IDs from data.ts for seed if they are UUIDs, 
+        // but they are slugs. We should let DB generate or force them.
+        // For simplicity in seed, let's just insert.
         const { id, ...rest } = p;
         return mapProjectToDB({ ...rest, published: true });
       });

@@ -11,7 +11,9 @@ const ExperienceTable: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
 
   const handleAddNew = () => {
-    const newId = `exp-${Date.now()}`;
+    // Generate UUID
+    const newId = self.crypto.randomUUID();
+    
     addExperience({
       id: newId,
       role: "Role Title",
@@ -25,10 +27,7 @@ const ExperienceTable: React.FC = () => {
   const onDragStart = (e: React.DragEvent<HTMLTableRowElement>, index: number) => {
     dragItem.current = index;
     setIsDragging(true);
-    // Visual drag effect
     e.dataTransfer.effectAllowed = "move";
-    // Optional: Set a drag image if needed, default ghost is usually fine
-    // e.dataTransfer.setDragImage(e.currentTarget, 0, 0);
   };
 
   const onDragEnter = (e: React.DragEvent<HTMLTableRowElement>, index: number) => {

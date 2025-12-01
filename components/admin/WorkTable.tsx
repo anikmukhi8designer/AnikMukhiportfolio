@@ -10,7 +10,9 @@ const WorkTable: React.FC<WorkTableProps> = ({ onEdit }) => {
   const { projects, updateProject, deleteProject, addProject } = useData();
 
   const handleAddNew = () => {
-    const newId = `project-${Date.now()}`;
+    // Generate a proper UUID so UI and DB are in sync
+    const newId = self.crypto.randomUUID();
+    
     const newProject = {
       id: newId,
       title: "New Project",
@@ -25,8 +27,11 @@ const WorkTable: React.FC<WorkTableProps> = ({ onEdit }) => {
       images: [],
       content: []
     };
+    
     addProject(newProject);
+    
     // Immediately open editor for new project
+    // This works because DataContext now optimistically updates the list
     if (onEdit) onEdit(newId);
   };
 

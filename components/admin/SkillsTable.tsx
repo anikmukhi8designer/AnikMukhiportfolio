@@ -13,7 +13,7 @@ const SkillsTable: React.FC = () => {
   const [newItemImage, setNewItemImage] = useState(''); // Uploaded image URL
 
   const handleAddNewCategory = () => {
-    const newId = `skill-${Date.now()}`;
+    const newId = self.crypto.randomUUID();
     addSkill({
       id: newId,
       title: "New Category",

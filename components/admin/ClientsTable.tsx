@@ -6,7 +6,7 @@ const ClientsTable: React.FC = () => {
   const { clients, updateClient, deleteClient, addClient } = useData();
 
   const handleAddNew = () => {
-    const newId = `client-${Date.now()}`;
+    const newId = self.crypto.randomUUID();
     addClient({
       id: newId,
       name: "New Client",
