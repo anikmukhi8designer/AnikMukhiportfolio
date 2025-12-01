@@ -33,11 +33,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   // Auth & Config State
   const [cmsCreds, setCmsCreds] = useState({ email: '', password: '' });
   
+  const env = (import.meta.env || {}) as any;
+
   // Initialize Git Config with Env Vars if available
   const [gitConfig, setGitConfig] = useState({ 
-    owner: import.meta.env.VITE_GITHUB_OWNER || '', 
-    repo: import.meta.env.VITE_GITHUB_REPO || '', 
-    token: import.meta.env.VITE_GITHUB_TOKEN || '' 
+    owner: env.VITE_GITHUB_OWNER || '', 
+    repo: env.VITE_GITHUB_REPO || '', 
+    token: env.VITE_GITHUB_TOKEN || '' 
   });
 
   useEffect(() => {

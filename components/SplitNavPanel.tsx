@@ -15,35 +15,38 @@ const containerVariants: Variants = {
   visible: { 
     y: "0%",
     transition: {
-      duration: 0.6,
-      ease: [0.76, 0, 0.24, 1] as const,
-      when: "beforeChildren",
-      staggerChildren: 0.05
+      duration: 0.7,
+      ease: [0.16, 1, 0.3, 1], // Custom smooth cubic-bezier
     }
   },
   exit: {
     y: "-100%",
     transition: {
       duration: 0.5,
-      ease: [0.76, 0, 0.24, 1] as const,
-      when: "afterChildren",
+      ease: [0.16, 1, 0.3, 1]
     }
   }
 };
 
-const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
-  exit: { opacity: 0, y: -20, transition: { duration: 0.3 } }
+const columnVariants: Variants = {
+  hidden: { opacity: 0, y: 40 },
+  visible: (custom) => ({
+    opacity: 1, 
+    y: 0, 
+    transition: { 
+      delay: custom * 0.1,
+      duration: 0.8,
+      ease: "easeOut" 
+    }
+  })
 };
 
 const SplitNavPanel: React.FC<SplitNavPanelProps> = ({ isOpen, onClose, onProjectClick }) => {
   const [hoveredProject, setHoveredProject] = useState<string | null>(null);
   const { projects, experience } = useData();
 
-  // Filter for published content only
-  const visibleProjects = projects.filter(p => p.published);
-  const visibleExperience = experience.filter(e => e.published);
+  const visibleProjects = projects.filter(p => p.published).slice(0, 6); // Limit to 6 for menu
+  const visibleExperience = experience.filter(e => e.published).slice(0, 4);
 
   return (
     <AnimatePresence>
@@ -53,86 +56,98 @@ const SplitNavPanel: React.FC<SplitNavPanelProps> = ({ isOpen, onClose, onProjec
           animate="visible"
           exit="exit"
           variants={containerVariants}
-          className="fixed inset-0 z-40 bg-neutral-900 text-white overflow-y-auto"
+          className="fixed inset-0 z-40 bg-[#111] text-white overflow-hidden"
         >
-          <div className="min-h-screen flex flex-col pt-24 pb-12 px-4 md:px-8 max-w-screen-xl mx-auto">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-24 flex-grow">
+          <div className="h-full w-full flex flex-col md:flex-row max-w-screen-xl mx-auto pt-24 pb-8 px-4 md:px-8">
+            
+            {/* Left Column: Work Index */}
+            <motion.div 
+              custom={1}
+              variants={columnVariants}
+              className="flex-1 flex flex-col md:border-r border-white/10 md:pr-12"
+            >
+              <h2 className="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-8 flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                Selected Works
+              </h2>
               
-              {/* Left Column: Work */}
-              <div className="flex flex-col gap-8">
-                <motion.h2 
-                  variants={itemVariants}
-                  className="text-sm font-bold uppercase tracking-widest text-neutral-500 border-b border-neutral-800 pb-4"
-                >
-                  Work
-                </motion.h2>
-                
-                <ul className="flex flex-col gap-6">
-                  {visibleProjects.map((project) => (
-                    <motion.li 
-                      key={project.id} 
-                      variants={itemVariants}
-                      onMouseEnter={() => setHoveredProject(project.id)}
-                      onMouseLeave={() => setHoveredProject(null)}
-                      className="relative"
+              <ul className="flex flex-col gap-2">
+                {visibleProjects.map((project, i) => (
+                  <motion.li 
+                    key={project.id} 
+                    onMouseEnter={() => setHoveredProject(project.id)}
+                    onMouseLeave={() => setHoveredProject(null)}
+                    className="relative group"
+                  >
+                    <button
+                      onClick={() => {
+                        onProjectClick(project);
+                        onClose();
+                      }}
+                      className="w-full text-left py-2 border-b border-white/10 flex items-center justify-between group-hover:border-white transition-colors"
                     >
-                      <button
-                        onClick={() => {
-                          onProjectClick(project);
-                          onClose();
-                        }}
-                        className={`text-3xl md:text-5xl font-bold tracking-tight text-left transition-colors duration-300 flex items-center gap-4 group w-full
-                          ${hoveredProject && hoveredProject !== project.id ? 'text-neutral-700' : 'text-white'}
-                        `}
-                      >
+                      <span className={`text-3xl md:text-5xl font-medium tracking-tight transition-colors duration-300 ${
+                        hoveredProject && hoveredProject !== project.id ? 'text-neutral-700' : 'text-white'
+                      }`}>
                         {project.title}
-                        <ArrowUpRight className="w-6 h-6 opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 text-neutral-400" />
-                      </button>
-                      <p className={`text-sm text-neutral-500 mt-1 transition-opacity duration-300 ${hoveredProject === project.id ? 'opacity-100' : 'opacity-0 hidden md:block'}`}>
-                        {project.client} — {project.roles[0]}
-                      </p>
-                    </motion.li>
-                  ))}
-                </ul>
+                      </span>
+                      <span className="text-xs text-neutral-500 uppercase tracking-widest group-hover:text-white transition-colors">
+                        {project.year}
+                      </span>
+                    </button>
+                  </motion.li>
+                ))}
+              </ul>
+              
+              <div className="mt-auto pt-8">
+                <button onClick={onClose} className="text-sm text-neutral-400 hover:text-white transition-colors">
+                    View All Projects ({projects.length})
+                </button>
+              </div>
+            </motion.div>
+
+            {/* Right Column: Info & Experience */}
+            <motion.div 
+              custom={2}
+              variants={columnVariants}
+              className="flex-1 flex flex-col md:pl-12 pt-12 md:pt-0"
+            >
+              <div className="mb-12">
+                  <h2 className="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-8">
+                    Navigation
+                  </h2>
+                  <div className="flex flex-col gap-4 text-xl font-medium">
+                      <a href="#work" onClick={onClose} className="hover:text-neutral-400 transition-colors">Work</a>
+                      <a href="#experience" onClick={onClose} className="hover:text-neutral-400 transition-colors">Experience</a>
+                      <a href="#contact" onClick={onClose} className="hover:text-neutral-400 transition-colors">Contact</a>
+                  </div>
               </div>
 
-              {/* Right Column: Experience */}
-              <div className="flex flex-col gap-8">
-                <motion.h2 
-                  variants={itemVariants}
-                  className="text-sm font-bold uppercase tracking-widest text-neutral-500 border-b border-neutral-800 pb-4"
-                >
-                  Experience
-                </motion.h2>
-
-                <ul className="flex flex-col gap-8">
+              <div>
+                <h2 className="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-6">
+                  Latest Roles
+                </h2>
+                <div className="space-y-6">
                   {visibleExperience.map((exp) => (
-                    <motion.li key={exp.id} variants={itemVariants} className="group">
-                      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 mb-2">
-                        <h3 className="text-xl md:text-2xl font-bold text-neutral-200 group-hover:text-white transition-colors">
-                          {exp.company}
-                        </h3>
-                        <span className="text-sm font-mono text-neutral-500">{exp.period}</span>
+                    <div key={exp.id} className="flex justify-between items-baseline group cursor-default">
+                      <div>
+                        <h3 className="text-lg font-bold text-neutral-200 group-hover:text-white transition-colors">{exp.company}</h3>
+                        <p className="text-sm text-neutral-500">{exp.role}</p>
                       </div>
-                      <p className="text-neutral-400 group-hover:text-neutral-300 transition-colors">
-                        {exp.role}
-                      </p>
-                    </motion.li>
+                      <span className="text-xs text-neutral-600 font-mono">{exp.period}</span>
+                    </div>
                   ))}
-                </ul>
-                
-                <motion.div variants={itemVariants} className="mt-auto pt-12">
-                     <a href="mailto:hello@mukhianik.com" className="text-xl font-medium text-neutral-400 hover:text-white transition-colors">
-                        hello@mukhianik.com
-                     </a>
-                </motion.div>
+                </div>
               </div>
 
-            </div>
+              <div className="mt-auto pt-12">
+                 <a href="mailto:hello@mukhianik.com" className="text-2xl md:text-3xl font-bold hover:text-neutral-400 transition-colors inline-flex items-center gap-2">
+                    Let's Talk <ArrowUpRight className="w-6 h-6" />
+                 </a>
+              </div>
+            </motion.div>
+
           </div>
-          
-          <div className="absolute inset-0 -z-10 pointer-events-none bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-neutral-800/20 via-transparent to-transparent opacity-50" />
-          
         </motion.div>
       )}
     </AnimatePresence>

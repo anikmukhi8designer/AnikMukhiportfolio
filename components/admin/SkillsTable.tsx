@@ -77,11 +77,13 @@ const SkillsTable: React.FC = () => {
         const storedGit = localStorage.getItem('cms_git_config');
         let gitConfig = storedGit ? JSON.parse(storedGit) : null;
         
-        if (!gitConfig && import.meta.env.VITE_GITHUB_TOKEN) {
+        const env = (import.meta.env || {}) as any;
+
+        if (!gitConfig && env.VITE_GITHUB_TOKEN) {
             gitConfig = {
-                owner: import.meta.env.VITE_GITHUB_OWNER,
-                repo: import.meta.env.VITE_GITHUB_REPO,
-                token: import.meta.env.VITE_GITHUB_TOKEN
+                owner: env.VITE_GITHUB_OWNER,
+                repo: env.VITE_GITHUB_REPO,
+                token: env.VITE_GITHUB_TOKEN
             };
         }
 

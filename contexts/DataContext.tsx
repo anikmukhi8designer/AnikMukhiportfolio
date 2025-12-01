@@ -4,9 +4,9 @@ import {
   PROJECTS as INITIAL_PROJECTS, 
   EXPERIENCE as INITIAL_EXPERIENCE, 
   CLIENTS as INITIAL_CLIENTS, 
-  SKILLS as INITIAL_SKILLS,
-  LAST_UPDATED as REMOTE_LAST_UPDATED
+  SKILLS as INITIAL_SKILLS
 } from '../data';
+import { db } from '../firebase';
 
 interface DataContextType {
   projects: Project[];
@@ -36,157 +36,105 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-// Helper to determine initial state based on sync status
-const getInitialState = <T,>(key: string, initialData: T): T => {
-    const saved = localStorage.getItem(key);
-    const localTimestamp = localStorage.getItem('cms_last_updated');
-    const isAdmin = localStorage.getItem('cms_authenticated') === 'true';
-
-    // Smart Sync: If we are a public visitor (not admin) and the remote version is newer,
-    // we ignore the local cache and use the fresh data from the build.
-    if (!isAdmin && localTimestamp !== REMOTE_LAST_UPDATED) {
-        return initialData;
-    }
-
-    if (saved) {
-        try {
-            return JSON.parse(saved);
-        } catch (e) {
-            console.error(`Failed to parse ${key}`, e);
-            return initialData;
-        }
-    }
-    return initialData;
-};
-
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  
-  const [projects, setProjects] = useState<Project[]>(() => 
-    getInitialState('cms_projects', INITIAL_PROJECTS.map(p => ({ ...p, published: true })))
-  );
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [experience, setExperience] = useState<Experience[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [skills, setSkills] = useState<SkillCategory[]>([]);
 
-  const [experience, setExperience] = useState<Experience[]>(() => 
-    getInitialState('cms_experience', INITIAL_EXPERIENCE.map(e => ({ ...e, published: true })))
-  );
-
-  const [clients, setClients] = useState<Client[]>(() => 
-    getInitialState('cms_clients', INITIAL_CLIENTS)
-  );
-
-  const [skills, setSkills] = useState<SkillCategory[]>(() => {
-    // Custom logic for skills migration + sync
-    const saved = localStorage.getItem('cms_skills');
-    const localTimestamp = localStorage.getItem('cms_last_updated');
-    const isAdmin = localStorage.getItem('cms_authenticated') === 'true';
-
-    if (!isAdmin && localTimestamp !== REMOTE_LAST_UPDATED) {
-        return INITIAL_SKILLS;
-    }
-
-    if (saved) {
-        try {
-            const parsed = JSON.parse(saved);
-            // Migration check
-            if (parsed.length > 0 && parsed[0].items.length > 0 && typeof parsed[0].items[0] === 'string') {
-                return parsed.map((cat: any) => ({
-                    ...cat,
-                    items: cat.items.map((item: string) => ({ name: item, icon: 'Default' }))
-                }));
-            }
-            return parsed;
-        } catch (e) {
-            return INITIAL_SKILLS;
+  // --- Helper: Sync Collection ---
+  // Connects local state to a Firestore collection using Compat SDK
+  const syncCollection = (
+    collectionName: string, 
+    setState: React.Dispatch<React.SetStateAction<any[]>>, 
+    initialData: any[]
+  ) => {
+    useEffect(() => {
+      const colRef = db.collection(collectionName);
+      const unsubscribe = colRef.onSnapshot(async (snapshot: any) => {
+        if (snapshot.empty) {
+          // SEEDING: If DB is empty, upload initial data automatically
+          console.log(`Seeding ${collectionName}...`);
+          const batch = db.batch();
+          initialData.forEach((item) => {
+            const docRef = db.collection(collectionName).doc(item.id);
+            batch.set(docRef, item);
+          });
+          await batch.commit();
+        } else {
+          // SYNC: Update local state from DB
+          const items = snapshot.docs.map((doc: any) => doc.data());
+          setState(items);
         }
+      });
+      return () => unsubscribe();
+    }, []);
+  };
+
+  // --- Activate Syncs ---
+  syncCollection('projects', setProjects, INITIAL_PROJECTS.map(p => ({ ...p, published: true })));
+  syncCollection('experience', setExperience, INITIAL_EXPERIENCE.map(e => ({ ...e, published: true })));
+  syncCollection('clients', setClients, INITIAL_CLIENTS);
+  syncCollection('skills', setSkills, INITIAL_SKILLS);
+
+  // --- Actions (Write to Firebase) ---
+
+  // Projects
+  const updateProject = async (id: string, data: Partial<Project>) => {
+    await db.collection('projects').doc(id).update(data);
+  };
+  const addProject = async (project: Project) => {
+    await db.collection('projects').doc(project.id).set(project);
+  };
+  const deleteProject = async (id: string) => {
+    await db.collection('projects').doc(id).delete();
+  };
+
+  // Experience
+  const updateExperience = async (id: string, data: Partial<Experience>) => {
+    await db.collection('experience').doc(id).update(data);
+  };
+  const addExperience = async (exp: Experience) => {
+    await db.collection('experience').doc(exp.id).set(exp);
+  };
+  const deleteExperience = async (id: string) => {
+    await db.collection('experience').doc(id).delete();
+  };
+  const reorderExperience = async (items: Experience[]) => {
+    const batch = db.batch();
+    items.forEach((item) => {
+      batch.set(db.collection('experience').doc(item.id), item);
+    });
+    await batch.commit();
+    setExperience(items); // Optimistic update
+  };
+
+  // Clients
+  const updateClient = async (id: string, data: Partial<Client>) => {
+    await db.collection('clients').doc(id).update(data);
+  };
+  const addClient = async (client: Client) => {
+    await db.collection('clients').doc(client.id).set(client);
+  };
+  const deleteClient = async (id: string) => {
+    await db.collection('clients').doc(id).delete();
+  };
+
+  // Skills
+  const updateSkill = async (id: string, data: Partial<SkillCategory>) => {
+    await db.collection('skills').doc(id).update(data);
+  };
+  const addSkill = async (skill: SkillCategory) => {
+    await db.collection('skills').doc(skill.id).set(skill);
+  };
+  const deleteSkill = async (id: string) => {
+    await db.collection('skills').doc(id).delete();
+  };
+
+  const resetData = async () => {
+    if (confirm("This will overwrite your Cloud Database with the demo data. Are you sure?")) {
+      alert("Please clear the collections in your Firebase Console to trigger a re-seed.");
     }
-    return INITIAL_SKILLS;
-  });
-
-  // Sync Timestamp Effect
-  useEffect(() => {
-    const isAdmin = localStorage.getItem('cms_authenticated') === 'true';
-    if (!isAdmin) {
-        // If we just loaded fresh data (implied by the getInitialState logic returning initial),
-        // we must update the local timestamp so next reload is consistent.
-        if (localStorage.getItem('cms_last_updated') !== REMOTE_LAST_UPDATED) {
-            localStorage.setItem('cms_last_updated', REMOTE_LAST_UPDATED);
-            
-            // Also, to be safe, we should overwrite the 'saved' keys in LS with the fresh data
-            // because the useEffects below will run and might save stale state if we aren't careful.
-            // However, since state is initialized with Fresh Data, the useEffects below 
-            // will immediately save that Fresh Data to LS. So we are good.
-        }
-    }
-  }, []);
-
-  // Persistence effects
-  useEffect(() => { localStorage.setItem('cms_projects', JSON.stringify(projects)); }, [projects]);
-  useEffect(() => { localStorage.setItem('cms_experience', JSON.stringify(experience)); }, [experience]);
-  useEffect(() => { localStorage.setItem('cms_clients', JSON.stringify(clients)); }, [clients]);
-  useEffect(() => { localStorage.setItem('cms_skills', JSON.stringify(skills)); }, [skills]);
-
-  // Project Actions
-  const updateProject = (id: string, data: Partial<Project>) => {
-    setProjects(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
-  };
-
-  const addProject = (project: Project) => {
-    setProjects(prev => [project, ...prev]);
-  };
-
-  const deleteProject = (id: string) => {
-    setProjects(prev => prev.filter(p => p.id !== id));
-  };
-
-  // Experience Actions
-  const updateExperience = (id: string, data: Partial<Experience>) => {
-    setExperience(prev => prev.map(e => e.id === id ? { ...e, ...data } : e));
-  };
-
-  const addExperience = (exp: Experience) => {
-    setExperience(prev => [exp, ...prev]);
-  };
-
-  const deleteExperience = (id: string) => {
-    setExperience(prev => prev.filter(e => e.id !== id));
-  };
-
-  const reorderExperience = (items: Experience[]) => {
-    setExperience(items);
-  };
-
-  // Client Actions
-  const updateClient = (id: string, data: Partial<Client>) => {
-    setClients(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
-  };
-
-  const addClient = (client: Client) => {
-    setClients(prev => [...prev, client]);
-  };
-
-  const deleteClient = (id: string) => {
-    setClients(prev => prev.filter(c => c.id !== id));
-  };
-
-  // Skill Actions
-  const updateSkill = (id: string, data: Partial<SkillCategory>) => {
-    setSkills(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
-  };
-
-  const addSkill = (skill: SkillCategory) => {
-    setSkills(prev => [...prev, skill]);
-  };
-
-  const deleteSkill = (id: string) => {
-    setSkills(prev => prev.filter(s => s.id !== id));
-  };
-
-  const resetData = () => {
-    setProjects(INITIAL_PROJECTS.map(p => ({ ...p, published: true })));
-    setExperience(INITIAL_EXPERIENCE.map(e => ({ ...e, published: true })));
-    setClients(INITIAL_CLIENTS);
-    setSkills(INITIAL_SKILLS);
-    localStorage.clear();
-    window.location.reload();
   };
 
   return (
