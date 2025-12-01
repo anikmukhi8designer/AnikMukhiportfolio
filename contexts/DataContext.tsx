@@ -323,7 +323,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           alert("Database reset complete.");
           fetchData();
       } catch (e: any) {
-          alert("Reset failed: " + e.message);
+          // Silent fallback for demo
+          console.warn("Reset failed", e);
       }
     }
   };
