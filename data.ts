@@ -186,6 +186,14 @@ export const EXPERIENCE: Experience[] = [
     period: "2019 — 2021",
     description: "Partnered with early-stage startups to define their MVP visuals.",
     published: true
+  },
+  {
+    id: "junior-ux-2018",
+    role: "Junior UX Designer",
+    company: "StartUp Inc.",
+    period: "2018 — 2019",
+    description: "Assisted in user research, wireframing, and usability testing for mobile applications.",
+    published: true
   }
 ];
 
