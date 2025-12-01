@@ -64,113 +64,137 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // --- Real-time Sync & Fetch Logic ---
 
   const fetchData = async () => {
-    // Projects
-    const { data: projData } = await supabase.from('work_items').select('*').order('created_at', { ascending: false });
-    if (projData && projData.length > 0) {
-        setProjects(projData.map(mapProjectFromDB));
-    } else if (projects.length === 0) {
-        // Fallback to initial data if DB is empty or connection fails
-        setProjects(INITIAL_PROJECTS);
-    }
+    try {
+        // Projects
+        const { data: projData } = await supabase.from('work_items').select('*').order('created_at', { ascending: false });
+        if (projData && projData.length > 0) {
+            setProjects(projData.map(mapProjectFromDB));
+        } else if (projects.length === 0) {
+            // Fallback to initial data if DB is empty or connection fails
+            setProjects(INITIAL_PROJECTS);
+        }
 
-    // Experience
-    const { data: expData } = await supabase.from('experience_items').select('*').order('created_at', { ascending: false });
-    if (expData && expData.length > 0) {
-        setExperience(expData as Experience[]);
-    } else if (experience.length === 0) {
-        setExperience(INITIAL_EXPERIENCE);
-    }
+        // Experience
+        const { data: expData } = await supabase.from('experience_items').select('*').order('created_at', { ascending: false });
+        if (expData && expData.length > 0) {
+            setExperience(expData as Experience[]);
+        } else if (experience.length === 0) {
+            setExperience(INITIAL_EXPERIENCE);
+        }
 
-    // Clients
-    const { data: clientData } = await supabase.from('clients').select('*').order('created_at', { ascending: false });
-    if (clientData && clientData.length > 0) {
-        setClients(clientData as Client[]);
-    } else if (clients.length === 0) {
-        setClients(INITIAL_CLIENTS);
-    }
+        // Clients
+        const { data: clientData } = await supabase.from('clients').select('*').order('created_at', { ascending: false });
+        if (clientData && clientData.length > 0) {
+            setClients(clientData as Client[]);
+        } else if (clients.length === 0) {
+            setClients(INITIAL_CLIENTS);
+        }
 
-    // Skills
-    const { data: skillData } = await supabase.from('skills').select('*').order('created_at', { ascending: true });
-    if (skillData && skillData.length > 0) {
-        setSkills(skillData as SkillCategory[]);
-    } else if (skills.length === 0) {
-        setSkills(INITIAL_SKILLS);
+        // Skills
+        const { data: skillData } = await supabase.from('skills').select('*').order('created_at', { ascending: true });
+        if (skillData && skillData.length > 0) {
+            setSkills(skillData as SkillCategory[]);
+        } else if (skills.length === 0) {
+            setSkills(INITIAL_SKILLS);
+        }
+    } catch (e) {
+        console.warn("Fetch Error - falling back to local data:", e);
+        if(projects.length === 0) setProjects(INITIAL_PROJECTS);
+        if(experience.length === 0) setExperience(INITIAL_EXPERIENCE);
+        if(clients.length === 0) setClients(INITIAL_CLIENTS);
+        if(skills.length === 0) setSkills(INITIAL_SKILLS);
     }
   };
 
   useEffect(() => {
     fetchData();
 
-    const channels = [
-      supabase.channel('work_items_changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'work_items' }, () => fetchData())
-        .subscribe(),
+    // Safely subscribe only if supabase real-time is available
+    try {
+        const channels = [
+          supabase.channel('work_items_changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'work_items' }, () => fetchData())
+            .subscribe(),
 
-      supabase.channel('experience_changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'experience_items' }, () => fetchData())
-        .subscribe(),
+          supabase.channel('experience_changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'experience_items' }, () => fetchData())
+            .subscribe(),
 
-      supabase.channel('clients_changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => fetchData())
-        .subscribe(),
+          supabase.channel('clients_changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => fetchData())
+            .subscribe(),
 
-      supabase.channel('skills_changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'skills' }, () => fetchData())
-        .subscribe(),
-    ];
+          supabase.channel('skills_changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'skills' }, () => fetchData())
+            .subscribe(),
+        ];
 
-    return () => {
-      channels.forEach(channel => supabase.removeChannel(channel));
-    };
+        return () => {
+          channels.forEach(channel => supabase.removeChannel(channel));
+        };
+    } catch (e) {
+        console.warn("Realtime subscription failed (offline mode):", e);
+    }
   }, []);
 
   // --- Actions ---
 
   // Projects
   const updateProject = async (id: string, data: Partial<Project>) => {
-    // Optimistic UI update
     setProjects(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
-    
-    const dbData = mapProjectToDB(data);
-    const { error } = await supabase.from('work_items').update(dbData).eq('id', id);
-    if (error) console.warn("Supabase Sync Error (Update Project):", error.message);
+    try {
+        const dbData = mapProjectToDB(data);
+        const { error } = await supabase.from('work_items').update(dbData).eq('id', id);
+        if (error) console.warn("Supabase Sync Error (Update Project):", error.message);
+    } catch(e) { console.warn("Sync failed", e) }
   };
   
   const addProject = async (project: Project) => {
     // Optimistic Update: Add immediately to local state
     setProjects(prev => [project, ...prev]);
 
-    const dbData = mapProjectToDB(project);
-    const { error } = await supabase.from('work_items').insert([dbData]);
-    
-    if (error) {
-      console.warn("Supabase Sync Error (Add Project):", error.message);
-      // We DO NOT rollback here to ensure the UI remains functional in "Demo/Offline" mode
-      // setProjects(prev => prev.filter(p => p.id !== project.id)); 
+    try {
+        const dbData = mapProjectToDB(project);
+        const { error } = await supabase.from('work_items').insert([dbData]);
+        
+        // Silent failure - we keep the local state for demo purposes
+        if (error) {
+            console.warn("Supabase Sync Error (Add Project):", error.message);
+        }
+    } catch (e) {
+        console.warn("Sync failed", e);
     }
   };
   
   const deleteProject = async (id: string) => {
     setProjects(prev => prev.filter(p => p.id !== id));
-    const { error } = await supabase.from('work_items').delete().eq('id', id);
-    if (error) console.warn("Supabase Sync Error (Delete Project):", error.message);
+    try {
+        const { error } = await supabase.from('work_items').delete().eq('id', id);
+        if (error) console.warn("Supabase Sync Error (Delete Project):", error.message);
+    } catch(e) { console.warn("Sync failed", e) }
   };
 
   // Experience
   const updateExperience = async (id: string, data: Partial<Experience>) => {
     setExperience(prev => prev.map(e => e.id === id ? { ...e, ...data } : e));
-    const { error } = await supabase.from('experience_items').update(data).eq('id', id);
-    if (error) console.warn("Supabase Sync Error (Update Experience):", error.message);
+    try {
+        const { error } = await supabase.from('experience_items').update(data).eq('id', id);
+        if (error) console.warn("Supabase Sync Error (Update Experience):", error.message);
+    } catch(e) { console.warn("Sync failed", e) }
   };
   const addExperience = async (exp: Experience) => {
     setExperience(prev => [exp, ...prev]);
-    const { error } = await supabase.from('experience_items').insert([exp]);
-    if (error) console.warn("Supabase Sync Error (Add Experience):", error.message);
+    try {
+        const { error } = await supabase.from('experience_items').insert([exp]);
+        if (error) console.warn("Supabase Sync Error (Add Experience):", error.message);
+    } catch(e) { console.warn("Sync failed", e) }
   };
   const deleteExperience = async (id: string) => {
     setExperience(prev => prev.filter(e => e.id !== id));
-    const { error } = await supabase.from('experience_items').delete().eq('id', id);
-    if (error) console.warn("Supabase Sync Error (Delete Experience):", error.message);
+    try {
+        const { error } = await supabase.from('experience_items').delete().eq('id', id);
+        if (error) console.warn("Supabase Sync Error (Delete Experience):", error.message);
+    } catch(e) { console.warn("Sync failed", e) }
   };
   const reorderExperience = (items: Experience[]) => {
     setExperience(items);
@@ -179,77 +203,93 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Clients
   const updateClient = async (id: string, data: Partial<Client>) => {
     setClients(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
-    const { error } = await supabase.from('clients').update(data).eq('id', id);
-    if (error) console.warn("Supabase Sync Error (Update Client):", error.message);
+    try {
+        const { error } = await supabase.from('clients').update(data).eq('id', id);
+        if (error) console.warn("Supabase Sync Error (Update Client):", error.message);
+    } catch(e) { console.warn("Sync failed", e) }
   };
   const addClient = async (client: Client) => {
     setClients(prev => [client, ...prev]);
-    const { error } = await supabase.from('clients').insert([client]);
-    if (error) console.warn("Supabase Sync Error (Add Client):", error.message);
+    try {
+        const { error } = await supabase.from('clients').insert([client]);
+        if (error) console.warn("Supabase Sync Error (Add Client):", error.message);
+    } catch(e) { console.warn("Sync failed", e) }
   };
   const deleteClient = async (id: string) => {
     setClients(prev => prev.filter(c => c.id !== id));
-    const { error } = await supabase.from('clients').delete().eq('id', id);
-    if (error) console.warn("Supabase Sync Error (Delete Client):", error.message);
+    try {
+        const { error } = await supabase.from('clients').delete().eq('id', id);
+        if (error) console.warn("Supabase Sync Error (Delete Client):", error.message);
+    } catch(e) { console.warn("Sync failed", e) }
   };
 
   // Skills
   const updateSkill = async (id: string, data: Partial<SkillCategory>) => {
     setSkills(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
-    const { error } = await supabase.from('skills').update(data).eq('id', id);
-    if (error) console.warn("Supabase Sync Error (Update Skill):", error.message);
+    try {
+        const { error } = await supabase.from('skills').update(data).eq('id', id);
+        if (error) console.warn("Supabase Sync Error (Update Skill):", error.message);
+    } catch(e) { console.warn("Sync failed", e) }
   };
   const addSkill = async (skill: SkillCategory) => {
     setSkills(prev => [...prev, skill]);
-    const { error } = await supabase.from('skills').insert([skill]);
-    if (error) console.warn("Supabase Sync Error (Add Skill):", error.message);
+    try {
+        const { error } = await supabase.from('skills').insert([skill]);
+        if (error) console.warn("Supabase Sync Error (Add Skill):", error.message);
+    } catch(e) { console.warn("Sync failed", e) }
   };
   const deleteSkill = async (id: string) => {
     setSkills(prev => prev.filter(s => s.id !== id));
-    const { error } = await supabase.from('skills').delete().eq('id', id);
-    if (error) console.warn("Supabase Sync Error (Delete Skill):", error.message);
+    try {
+        const { error } = await supabase.from('skills').delete().eq('id', id);
+        if (error) console.warn("Supabase Sync Error (Delete Skill):", error.message);
+    } catch(e) { console.warn("Sync failed", e) }
   };
 
   // --- Reset / Seed ---
   const resetData = async () => {
     if (confirm("⚠️ WARNING: This will WIPE the Supabase Database and seed with demo data. Continue?")) {
       
-      // Clear all tables
-      await supabase.from('work_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('experience_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('clients').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('skills').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      try {
+          // Clear all tables
+          await supabase.from('work_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          await supabase.from('experience_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          await supabase.from('clients').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          await supabase.from('skills').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
-      // Seed Projects
-      const projectsPayload = INITIAL_PROJECTS.map(p => {
-        const { id, ...rest } = p;
-        return mapProjectToDB({ ...rest, published: true });
-      });
-      await supabase.from('work_items').insert(projectsPayload);
+          // Seed Projects
+          const projectsPayload = INITIAL_PROJECTS.map(p => {
+            const { id, ...rest } = p;
+            return mapProjectToDB({ ...rest, published: true });
+          });
+          await supabase.from('work_items').insert(projectsPayload);
 
-      // Seed Experience
-      const expPayload = INITIAL_EXPERIENCE.map(e => {
-        const { id, ...rest } = e;
-        return { ...rest, published: true };
-      });
-      await supabase.from('experience_items').insert(expPayload);
+          // Seed Experience
+          const expPayload = INITIAL_EXPERIENCE.map(e => {
+            const { id, ...rest } = e;
+            return { ...rest, published: true };
+          });
+          await supabase.from('experience_items').insert(expPayload);
 
-      // Seed Clients
-      const clientsPayload = INITIAL_CLIENTS.map(c => {
-        const { id, ...rest } = c;
-        return rest;
-      });
-      await supabase.from('clients').insert(clientsPayload);
+          // Seed Clients
+          const clientsPayload = INITIAL_CLIENTS.map(c => {
+            const { id, ...rest } = c;
+            return rest;
+          });
+          await supabase.from('clients').insert(clientsPayload);
 
-      // Seed Skills
-      const skillsPayload = INITIAL_SKILLS.map(s => {
-        const { id, ...rest } = s;
-        return rest;
-      });
-      await supabase.from('skills').insert(skillsPayload);
+          // Seed Skills
+          const skillsPayload = INITIAL_SKILLS.map(s => {
+            const { id, ...rest } = s;
+            return rest;
+          });
+          await supabase.from('skills').insert(skillsPayload);
 
-      alert("Database reset complete.");
-      fetchData();
+          alert("Database reset complete.");
+          fetchData();
+      } catch (e: any) {
+          alert("Reset failed: " + e.message);
+      }
     }
   };
 
