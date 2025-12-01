@@ -210,36 +210,36 @@ export const SKILLS: SkillCategory[] = [
     id: "s1",
     title: "Design",
     items: [
-        { name: "Figma", icon: "Figma" },
-        { name: "Adobe CC", icon: "Adobe" },
-        { name: "Prototyping", icon: "Design" },
-        { name: "Design Systems", icon: "Design" },
-        { name: "UI/UX", icon: "Design" },
-        { name: "Motion", icon: "Framer" }
+        { name: "Figma", image: "https://cdn.brandfetch.io/figma.com" },
+        { name: "Adobe", image: "https://cdn.brandfetch.io/adobe.com" },
+        { name: "Sketch", image: "https://cdn.brandfetch.io/sketch.com" },
+        { name: "Framer", image: "https://cdn.brandfetch.io/framer.com" },
+        { name: "Webflow", image: "https://cdn.brandfetch.io/webflow.com" },
+        { name: "Spline", image: "https://cdn.brandfetch.io/spline.design" }
     ]
   },
   {
     id: "s2",
     title: "Development",
     items: [
-        { name: "React", icon: "React" },
-        { name: "TypeScript", icon: "TypeScript" },
-        { name: "Tailwind CSS", icon: "Tailwind" },
-        { name: "Next.js", icon: "Next.js" },
-        { name: "Framer Motion", icon: "Framer" },
-        { name: "Git", icon: "Git" }
+        { name: "React", image: "https://cdn.brandfetch.io/react.dev" },
+        { name: "TypeScript", image: "https://cdn.brandfetch.io/typescriptlang.org" },
+        { name: "Tailwind", image: "https://cdn.brandfetch.io/tailwindcss.com" },
+        { name: "Next.js", image: "https://cdn.brandfetch.io/nextjs.org" },
+        { name: "Vite", image: "https://cdn.brandfetch.io/vitejs.dev" },
+        { name: "Node.js", image: "https://cdn.brandfetch.io/nodejs.org" }
     ]
   },
   {
     id: "s3",
-    title: "Tools",
+    title: "Tools & Productivity",
     items: [
-        { name: "Linear", icon: "Default" },
-        { name: "Notion", icon: "Default" },
-        { name: "VS Code", icon: "VS Code" },
-        { name: "Raycast", icon: "Default" },
-        { name: "Arc", icon: "Arc" },
-        { name: "Spline", icon: "Spline" }
+        { name: "Linear", image: "https://cdn.brandfetch.io/linear.app" },
+        { name: "Notion", image: "https://cdn.brandfetch.io/notion.so" },
+        { name: "VS Code", image: "https://cdn.brandfetch.io/visualstudio.com" },
+        { name: "Raycast", image: "https://cdn.brandfetch.io/raycast.com" },
+        { name: "Arc", image: "https://cdn.brandfetch.io/arc.net" },
+        { name: "GitHub", image: "https://cdn.brandfetch.io/github.com" }
     ]
   }
 ];

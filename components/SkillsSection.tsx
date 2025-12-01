@@ -34,20 +34,25 @@ const SkillsSection: React.FC = () => {
                                 viewport={{ once: true }}
                                 whileHover={{ scale: 1.05, zIndex: 10, backgroundColor: '#ffffff', boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }}
                                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                                className="group relative h-36 border-r border-b border-neutral-200 flex flex-col items-center justify-center p-6 hover:border-transparent transition-all cursor-default"
+                                className="group relative h-40 border-r border-b border-neutral-200 flex flex-col items-center justify-center p-8 hover:border-transparent transition-all cursor-default"
                                 title={item.name}
                             >
-                                {item.image ? (
-                                    <img 
-                                        src={item.image} 
-                                        alt={item.name} 
-                                        className="w-16 h-16 object-contain grayscale group-hover:grayscale-0 transition-all duration-300" 
-                                    />
-                                ) : (
-                                    <div className="w-12 h-12 text-neutral-400 group-hover:text-neutral-900 transition-colors">
-                                        <SkillIcon icon={item.icon || 'Default'} className="w-full h-full" />
-                                    </div>
-                                )}
+                                <div className="w-16 h-16 flex items-center justify-center mb-3">
+                                    {item.image ? (
+                                        <img 
+                                            src={item.image} 
+                                            alt={item.name} 
+                                            className="w-full h-full object-contain filter grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300" 
+                                        />
+                                    ) : (
+                                        <div className="w-12 h-12 text-neutral-400 group-hover:text-neutral-900 transition-colors">
+                                            <SkillIcon icon={item.icon || 'Default'} className="w-full h-full" />
+                                        </div>
+                                    )}
+                                </div>
+                                <span className="text-sm font-medium text-neutral-500 group-hover:text-neutral-900 transition-colors">
+                                    {item.name}
+                                </span>
                             </motion.div>
                         ))}
                     </div>
