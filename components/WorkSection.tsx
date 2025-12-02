@@ -18,7 +18,7 @@ const WorkSection: React.FC<WorkSectionProps> = ({ onProjectClick }) => {
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
   
-  const springConfig = { damping: 25, stiffness: 300, mass: 0.5 };
+  const springConfig = { damping: 20, stiffness: 300, mass: 0.5 };
   const springX = useSpring(mouseX, springConfig);
   const springY = useSpring(mouseY, springConfig);
 
@@ -71,26 +71,30 @@ const WorkSection: React.FC<WorkSectionProps> = ({ onProjectClick }) => {
       <AnimatePresence>
         {hoveredProject && (
            <motion.div
-             initial={{ opacity: 0, scale: 0.8 }}
-             animate={{ opacity: 1, scale: 1 }}
-             exit={{ opacity: 0, scale: 0.8 }}
-             transition={{ duration: 0.2 }}
+             initial={{ opacity: 0, scale: 0.9, y: 10 }}
+             animate={{ opacity: 1, scale: 1, y: 0 }}
+             exit={{ opacity: 0, scale: 0.9, y: 10 }}
+             transition={{ type: "spring", stiffness: 400, damping: 25 }}
              style={{ 
                position: 'fixed', 
                left: springX, 
                top: springY,
-               x: 40, // offset from cursor
-               y: 40,
-               zIndex: 50,
+               x: 20, 
+               y: 20,
+               zIndex: 60,
                pointerEvents: 'none'
              }}
-             className="hidden md:block w-[400px] aspect-[4/3] rounded-lg overflow-hidden shadow-2xl bg-neutral-100 border border-white/20"
+             className="hidden md:block w-[450px] aspect-video rounded-xl overflow-hidden shadow-2xl shadow-neutral-900/10 bg-white border border-neutral-100 isolate"
            >
-             <img 
+             <motion.img 
                src={projects.find(p => p.id === hoveredProject)?.thumb} 
                alt="" 
                className="w-full h-full object-cover"
+               initial={{ scale: 1.1 }}
+               animate={{ scale: 1 }}
+               transition={{ duration: 0.4 }}
              />
+             <div className="absolute inset-0 bg-neutral-900/5 mix-blend-multiply" />
            </motion.div>
         )}
       </AnimatePresence>
