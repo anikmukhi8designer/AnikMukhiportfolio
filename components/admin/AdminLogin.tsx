@@ -1,26 +1,46 @@
 import React, { useState } from 'react';
-import { Lock } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
 interface AdminLoginProps {
   onLogin: () => void;
 }
 
+type AuthStep = 'LOGIN' | 'FORGOT' | 'OTP' | 'RESET';
+
 const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
+  const [step, setStep] = useState<AuthStep>('LOGIN');
+  
+  // Form States
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [otp, setOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  
+  // UI States
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Password Validation
+  const passwordCriteria = {
+      length: newPassword.length >= 8,
+      upper: /[A-Z]/.test(newPassword),
+      lower: /[a-z]/.test(newPassword),
+      number: /[0-9]/.test(newPassword),
+      special: /[!@#$%^&*(),.?":{}|<>]/.test(newPassword),
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 800));
 
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Simple auth check for GitHub-based CMS
-    if (email === 'admin@newgenre.studio' && password === 'password') {
+    // Hardcoded check (matches previous implementation)
+    if (email.toLowerCase() === 'admin@newgenre.studio' && password === 'password') {
         onLogin();
     } else {
         setError('Invalid credentials');
@@ -28,57 +48,248 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
     setLoading(false);
   };
 
+  const handleSendOTP = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setLoading(true);
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 800));
+      setStep('OTP');
+      setLoading(false);
+  };
+
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setLoading(true);
+      setError('');
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      // Mock OTP check
+      if (otp.length === 6) {
+          setStep('RESET');
+      } else {
+          setError('Please enter a 6-digit code');
+      }
+      setLoading(false);
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setLoading(true);
+      setError('');
+      
+      if (newPassword !== confirmPassword) {
+          setError('Passwords do not match');
+          setLoading(false);
+          return;
+      }
+      
+      if (!Object.values(passwordCriteria).every(Boolean)) {
+           setError('Password does not meet requirements');
+           setLoading(false);
+           return;
+      }
+
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 800));
+      alert("Password reset successfully! (Simulation)");
+      setStep('LOGIN');
+      setPassword(''); 
+      setLoading(false);
+  };
+
+  // --- Render Helpers ---
+
+  const InputField = ({ 
+      label, 
+      type = "text", 
+      value, 
+      onChange, 
+      placeholder,
+      isPassword = false 
+  }: any) => (
+      <div className="space-y-2">
+          <label className="block text-sm text-neutral-600">{label}</label>
+          <div className="relative">
+              <input 
+                  type={isPassword ? (showPassword ? "text" : "password") : type}
+                  required
+                  className="w-full px-4 py-3 border border-neutral-200 rounded-lg text-sm focus:ring-1 focus:ring-[#005F99] focus:border-[#005F99] outline-none transition-all placeholder:text-neutral-300"
+                  value={value}
+                  onChange={(e) => onChange(e.target.value)}
+                  placeholder={placeholder}
+              />
+              {isPassword && (
+                  <button 
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
+                  >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+              )}
+          </div>
+      </div>
+  );
+
+  const SubmitButton = ({ children }: { children: React.ReactNode }) => (
+      <button 
+        type="submit"
+        disabled={loading}
+        className="w-full py-3 bg-[#005F99] hover:bg-[#004d7a] text-white font-medium rounded-lg transition-colors disabled:opacity-70 disabled:cursor-not-allowed mt-6"
+      >
+        {loading ? 'Please wait...' : children}
+      </button>
+  );
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-neutral-100 p-4">
-      <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-lg">
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-12 h-12 bg-neutral-900 rounded-full flex items-center justify-center mb-4">
-            <Lock className="w-6 h-6 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-neutral-900">Admin Login</h1>
-          <p className="text-neutral-500 text-sm">GitHub CMS Access</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">Email</label>
-            <input 
-              type="email" 
-              required
-              className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@example.com"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">Password</label>
-            <input 
-              type="password" 
-              required
-              className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-            />
-          </div>
-          
-          {error && <p className="text-red-500 text-sm font-medium text-center">{error}</p>}
-
-          <button 
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-neutral-900 text-white font-bold rounded-lg hover:bg-neutral-800 transition-colors disabled:opacity-50"
-          >
-            {loading ? 'Authenticating...' : 'Access Dashboard'}
-          </button>
-        </form>
+    <div className="min-h-screen flex items-center justify-center bg-white p-4 font-sans">
+      <div className="w-full max-w-[480px] bg-white p-8 sm:p-12 rounded-2xl border border-neutral-100 shadow-2xl shadow-neutral-100/50">
         
-        <div className="mt-6 text-center p-4 bg-neutral-50 rounded-lg border border-neutral-100">
-             <p className="text-xs text-neutral-500 mb-1">Default Credentials:</p>
-             <p className="text-xs font-mono text-neutral-700">admin@newgenre.studio</p>
-             <p className="text-xs font-mono text-neutral-700">password</p>
-        </div>
+        {/* LOGIN VIEW */}
+        {step === 'LOGIN' && (
+            <form onSubmit={handleLogin} className="space-y-6">
+                <div>
+                    <h1 className="text-2xl font-bold text-[#005F99] mb-1">Login</h1>
+                    <p className="text-sm text-neutral-400">Welcome back to the CMS</p>
+                </div>
+                
+                <InputField 
+                    label="Email" 
+                    type="email" 
+                    value={email} 
+                    onChange={setEmail} 
+                    placeholder="Enter your email ID" 
+                />
+                
+                <div className="space-y-2">
+                    <InputField 
+                        label="Password" 
+                        isPassword
+                        value={password} 
+                        onChange={setPassword} 
+                        placeholder="Enter your password" 
+                    />
+                    <div className="flex justify-start">
+                        <button 
+                            type="button" 
+                            onClick={() => setStep('FORGOT')}
+                            className="text-xs text-[#005F99] hover:underline"
+                        >
+                            Forgot Password ?
+                        </button>
+                    </div>
+                </div>
+
+                {error && <p className="text-red-500 text-sm">{error}</p>}
+
+                <SubmitButton>Submit</SubmitButton>
+
+                {/* Hint for demo purposes */}
+                <div className="mt-8 pt-6 border-t border-neutral-100 text-center text-xs text-neutral-400">
+                    <p>Demo: <span className="font-mono text-neutral-600">admin@newgenre.studio</span> / <span className="font-mono text-neutral-600">password</span></p>
+                </div>
+            </form>
+        )}
+
+        {/* FORGOT PASSWORD VIEW */}
+        {step === 'FORGOT' && (
+            <form onSubmit={handleSendOTP} className="space-y-6">
+                <div>
+                    <button type="button" onClick={() => setStep('LOGIN')} className="flex items-center gap-1 text-neutral-400 hover:text-neutral-900 mb-4 text-xs">
+                        <ArrowLeft className="w-3 h-3" /> Back
+                    </button>
+                    <h1 className="text-2xl font-bold text-[#005F99] mb-2">Forgot your password</h1>
+                    <p className="text-sm text-neutral-500 leading-relaxed">
+                        Please enter the email address you'd like your password reset information sent to.
+                    </p>
+                </div>
+
+                <InputField 
+                    label="Email" 
+                    type="email" 
+                    value={email} 
+                    onChange={setEmail} 
+                    placeholder="Enter your email ID" 
+                />
+
+                <SubmitButton>Send OTP</SubmitButton>
+            </form>
+        )}
+
+        {/* OTP VERIFICATION VIEW */}
+        {step === 'OTP' && (
+            <form onSubmit={handleVerifyOTP} className="space-y-6">
+                 <div>
+                    <button type="button" onClick={() => setStep('FORGOT')} className="flex items-center gap-1 text-neutral-400 hover:text-neutral-900 mb-4 text-xs">
+                        <ArrowLeft className="w-3 h-3" /> Back
+                    </button>
+                    <h1 className="text-2xl font-bold text-[#005F99] mb-2">OTP verification</h1>
+                    <p className="text-sm text-neutral-500 leading-relaxed">
+                        Enter the code sent to <span className="font-medium text-neutral-800">{email}</span> to reset password.
+                    </p>
+                </div>
+
+                <InputField 
+                    label="OTP" 
+                    value={otp} 
+                    onChange={setOtp} 
+                    placeholder="Enter 6 Digit Code here" 
+                />
+                
+                <div className="flex justify-start">
+                    <button type="button" className="text-xs text-[#005F99] hover:underline">
+                        Resend Code ?
+                    </button>
+                </div>
+
+                {error && <p className="text-red-500 text-sm">{error}</p>}
+
+                <SubmitButton>Verify OTP</SubmitButton>
+            </form>
+        )}
+
+        {/* RESET PASSWORD VIEW */}
+        {step === 'RESET' && (
+            <form onSubmit={handleResetPassword} className="space-y-6">
+                <div>
+                    <h1 className="text-2xl font-bold text-[#005F99] mb-1">Reset password</h1>
+                    <p className="text-sm text-neutral-400">Create a new strong password</p>
+                </div>
+
+                <InputField 
+                    label="New Password" 
+                    isPassword
+                    value={newPassword} 
+                    onChange={setNewPassword} 
+                    placeholder="Enter New Password" 
+                />
+
+                <div className="text-xs text-neutral-500 space-y-1 bg-neutral-50 p-3 rounded-lg border border-neutral-100">
+                    <p className="mb-2 font-medium text-neutral-700">Password requirements:</p>
+                    <div className="grid grid-cols-1 gap-1">
+                        <li className={passwordCriteria.length ? "text-green-600" : ""}>Min 8 characters</li>
+                        <li className={passwordCriteria.upper ? "text-green-600" : ""}>1 upper case</li>
+                        <li className={passwordCriteria.lower ? "text-green-600" : ""}>1 lower case</li>
+                        <li className={passwordCriteria.special ? "text-green-600" : ""}>1 special character</li>
+                        <li className={passwordCriteria.number ? "text-green-600" : ""}>1 number</li>
+                    </div>
+                </div>
+
+                <InputField 
+                    label="Confirm Password" 
+                    isPassword
+                    value={confirmPassword} 
+                    onChange={setConfirmPassword} 
+                    placeholder="Enter Confirm Password" 
+                />
+
+                {error && <p className="text-red-500 text-sm">{error}</p>}
+
+                <SubmitButton>Submit</SubmitButton>
+            </form>
+        )}
+
       </div>
     </div>
   );

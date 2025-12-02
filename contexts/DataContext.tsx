@@ -80,15 +80,21 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   
   const fetchFromGitHub = async () => {
     const token = getGitHubToken();
-    if (!token) return;
+    
+    // Prepare headers. If token exists, use it. If not, try public API access.
+    const headers: HeadersInit = {
+        'Accept': 'application/vnd.github.v3+json',
+        'If-None-Match': '' // Disable caching
+    };
+
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
 
     try {
+      // 1. Try fetching via API (Best for freshness)
       const response = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${DATA_PATH}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'If-None-Match': '' // Disable caching
-        }
+        headers
       });
 
       if (response.ok) {
@@ -96,27 +102,40 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // Decode base64 content
         const content = JSON.parse(decodeURIComponent(escape(atob(data.content))));
         
-        setProjects(content.projects || INITIAL_PROJECTS);
-        setExperience(content.experience || INITIAL_EXPERIENCE);
-        setClients(content.clients || INITIAL_CLIENTS);
-        setSkills(content.skills || INITIAL_SKILLS);
+        applyData(content);
         setFileSha(data.sha);
+      } else {
+        // 2. Fallback to Raw URL if API fails (e.g. Rate Limit exceeded for public user)
+        // Note: Raw content has a CDN cache delay of ~5 mins usually.
+        console.warn("GitHub API request failed (likely rate limit or private repo). Falling back to Raw content.");
         
-        if (content.lastUpdated) {
-            const date = new Date(content.lastUpdated);
-            setLastUpdated(date);
-            localStorage.setItem('cms_last_updated', date.toISOString());
+        // Add timestamp to bust browser cache
+        const rawUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${DATA_PATH}?t=${Date.now()}`;
+        const rawResponse = await fetch(rawUrl);
+        
+        if (rawResponse.ok) {
+            const content = await rawResponse.json();
+            applyData(content);
+        } else {
+            console.log("Could not fetch data from GitHub. Using default/initial data.");
         }
-      } else if (response.status === 404) {
-        console.log("Data file not found on GitHub. Initializing with default data...");
-        setProjects(INITIAL_PROJECTS);
-        setExperience(INITIAL_EXPERIENCE);
-        setClients(INITIAL_CLIENTS);
-        setSkills(INITIAL_SKILLS);
       }
     } catch (error) {
       console.error("Failed to fetch from GitHub:", error);
     }
+  };
+
+  const applyData = (content: any) => {
+      if (content.projects) setProjects(content.projects);
+      if (content.experience) setExperience(content.experience);
+      if (content.clients) setClients(content.clients);
+      if (content.skills) setSkills(content.skills);
+      
+      if (content.lastUpdated) {
+          const date = new Date(content.lastUpdated);
+          setLastUpdated(date);
+          localStorage.setItem('cms_last_updated', date.toISOString());
+      }
   };
 
   const saveToGitHub = async (
@@ -170,6 +189,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } else {
         const err = await response.json();
         console.error("GitHub Save Failed:", err);
+        // If 409 Conflict (SHA mismatch), usually implies someone else pushed.
         if (response.status === 409 || response.status === 422) {
              console.warn("SHA mismatch or missing. Fetching latest to resolve...");
              await fetchFromGitHub();
