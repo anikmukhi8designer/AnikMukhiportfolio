@@ -1,6 +1,10 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 
-const WaterRippleEffect: React.FC = () => {
+export interface WaterRippleRef {
+  trigger: (clientX: number, clientY: number) => void;
+}
+
+const WaterRippleEffect = forwardRef<WaterRippleRef>((_, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -12,6 +16,38 @@ const WaterRippleEffect: React.FC = () => {
   // Buffers for wave height
   const buffer1Ref = useRef<Int16Array>(new Int16Array(0));
   const buffer2Ref = useRef<Int16Array>(new Int16Array(0));
+
+  // Expose trigger method to parent
+  useImperativeHandle(ref, () => ({
+    trigger: (clientX: number, clientY: number) => {
+      const canvas = canvasRef.current;
+      if (!canvas || widthRef.current <= 0) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+
+      const x = Math.floor((clientX - rect.left) * scaleX);
+      const y = Math.floor((clientY - rect.top) * scaleY);
+      
+      const w = widthRef.current;
+      const h = heightRef.current;
+      
+      const radius = 3; 
+      const strength = 1000; // Increased strength for visibility
+
+      for (let j = y - radius; j < y + radius; j++) {
+        for (let k = x - radius; k < x + radius; k++) {
+          if (j >= 0 && j < h && k >= 0 && k < w) {
+            const index = j * w + k;
+            if (index >= 0 && index < buffer1Ref.current.length) {
+                buffer1Ref.current[index] = strength;
+            }
+          }
+        }
+      }
+    }
+  }));
   
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -70,7 +106,7 @@ const WaterRippleEffect: React.FC = () => {
            buffer1[i + w]) >> 1
         ) - buffer2[i];
         
-        buffer2[i] = val - (val >> 5); // Damping ~0.968
+        buffer2[i] = val - (val >> 5); // Damping
       }
 
       // Swap buffers
@@ -87,22 +123,34 @@ const WaterRippleEffect: React.FC = () => {
           for (let i = 0; i < size; i++) {
             const wave = buffer[i];
             
-            // Base white (255) so it's transparent in Multiply mode
+            // Base background is White (transparent in multiply, but we handle color mixing directly)
             let r = 255;
             let g = 255;
             let b = 255;
 
-            if (wave !== 0) {
-              // Create shadow from wave height
-              // Clamped to avoid wrapping
-              const intensity = Math.max(0, Math.min(255, wave));
+            if (wave > 0) {
+              const intensity = Math.min(255, wave);
               
-              if (intensity > 0) {
-                  // Subtract intensity to create shadow
-                  // Less subtraction from Blue channel = Blue Tint
-                  r = 255 - intensity;
-                  g = 255 - intensity;
-                  b = 255 - Math.floor(intensity * 0.8); 
+              if (intensity > 5) {
+                  // Calculate gradient position (0 to 1) from left to right
+                  const x = i % w;
+                  const ratio = x / w;
+
+                  // Gradient Colors:
+                  // Start: Violet (#8b5cf6) -> RGB(139, 92, 246)
+                  // End: Cyan (#06b6d4) -> RGB(6, 182, 212)
+                  
+                  const targetR = 139 + (6 - 139) * ratio;
+                  const targetG = 92 + (182 - 92) * ratio;
+                  const targetB = 246 + (212 - 246) * ratio;
+
+                  // Blend White with Target Color based on wave intensity
+                  // Higher intensity = more color
+                  const alpha = intensity / 255;
+                  
+                  r = 255 * (1 - alpha) + targetR * alpha;
+                  g = 255 * (1 - alpha) + targetG * alpha;
+                  b = 255 * (1 - alpha) + targetB * alpha;
               }
             }
 
@@ -127,57 +175,16 @@ const WaterRippleEffect: React.FC = () => {
       init();
     };
 
-    const handleMouseMove = (e: MouseEvent) => {
-      if (widthRef.current <= 0) return;
-
-      const rect = canvas.getBoundingClientRect();
-      
-      // Check if mouse is within canvas bounds
-      if (
-          e.clientX < rect.left || 
-          e.clientX > rect.right || 
-          e.clientY < rect.top || 
-          e.clientY > rect.bottom
-      ) return;
-
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-
-      const x = Math.floor((e.clientX - rect.left) * scaleX);
-      const y = Math.floor((e.clientY - rect.top) * scaleY);
-      
-      const w = widthRef.current;
-      const h = heightRef.current;
-      
-      const radius = 2; // Smaller radius for sharper ripples
-      const strength = 600; // Amplitude
-
-      for (let j = y - radius; j < y + radius; j++) {
-        for (let k = x - radius; k < x + radius; k++) {
-          if (j >= 0 && j < h && k >= 0 && k < w) {
-            const index = j * w + k;
-            if (index >= 0 && index < buffer1Ref.current.length) {
-                // Add disturbance
-                buffer1Ref.current[index] = strength;
-            }
-          }
-        }
-      }
-    };
-    
-    // Attach to window to capture moves even over overlay text
-    window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('resize', handleResize);
 
     return () => {
       cancelAnimationFrame(animationFrameRef.current);
       window.removeEventListener('resize', handleResize);
-      window.removeEventListener('mousemove', handleMouseMove);
     };
   }, []);
 
   return (
-    <div ref={containerRef} className="absolute inset-0 z-0 overflow-hidden pointer-events-none mix-blend-multiply opacity-80">
+    <div ref={containerRef} className="absolute inset-0 z-0 overflow-hidden pointer-events-none opacity-100">
       <canvas 
         ref={canvasRef} 
         className="w-full h-full block"
@@ -185,6 +192,6 @@ const WaterRippleEffect: React.FC = () => {
       />
     </div>
   );
-};
+});
 
 export default WaterRippleEffect;

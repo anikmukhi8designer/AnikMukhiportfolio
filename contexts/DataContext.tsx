@@ -78,7 +78,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // --- GitHub Helpers ---
   
-  const fetchFromGitHub = async () => {
+  const fetchFromGitHub = async (shouldApplyData = true) => {
     const token = getGitHubToken();
     
     // Prepare headers. If token exists, use it. If not, try public API access.
@@ -99,25 +99,32 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (response.ok) {
         const data = await response.json();
-        // Decode base64 content
-        const content = JSON.parse(decodeURIComponent(escape(atob(data.content))));
         
-        applyData(content);
+        if (shouldApplyData) {
+            // Decode base64 content
+            const content = JSON.parse(decodeURIComponent(escape(atob(data.content))));
+            applyData(content);
+        }
+        
         setFileSha(data.sha);
       } else {
         // 2. Fallback to Raw URL if API fails (e.g. Rate Limit exceeded for public user)
         // Note: Raw content has a CDN cache delay of ~5 mins usually.
-        console.warn("GitHub API request failed (likely rate limit or private repo). Falling back to Raw content.");
+        // Only fallback if we strictly need the data (shouldApplyData=true).
         
-        // Add timestamp to bust browser cache
-        const rawUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${DATA_PATH}?t=${Date.now()}`;
-        const rawResponse = await fetch(rawUrl);
-        
-        if (rawResponse.ok) {
-            const content = await rawResponse.json();
-            applyData(content);
-        } else {
-            console.log("Could not fetch data from GitHub. Using default/initial data.");
+        if (shouldApplyData) {
+            console.warn("GitHub API request failed (likely rate limit or private repo). Falling back to Raw content.");
+            
+            // Add timestamp to bust browser cache
+            const rawUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${DATA_PATH}?t=${Date.now()}`;
+            const rawResponse = await fetch(rawUrl);
+            
+            if (rawResponse.ok) {
+                const content = await rawResponse.json();
+                applyData(content);
+            } else {
+                console.log("Could not fetch data from GitHub. Using default/initial data.");
+            }
         }
       }
     } catch (error) {
@@ -191,8 +198,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.error("GitHub Save Failed:", err);
         // If 409 Conflict (SHA mismatch), usually implies someone else pushed.
         if (response.status === 409 || response.status === 422) {
-             console.warn("SHA mismatch or missing. Fetching latest to resolve...");
-             await fetchFromGitHub();
+             console.warn("SHA mismatch or missing. Fetching latest SHA to resolve...");
+             // Pass false to avoid overwriting local changes with remote data
+             await fetchFromGitHub(false);
         }
       }
     } catch (error) {
@@ -202,7 +210,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // --- Initialization ---
   useEffect(() => {
-    fetchFromGitHub();
+    fetchFromGitHub(true); // Initial load: we want the data
   }, []);
 
   // --- Actions ---
@@ -311,7 +319,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               token = userInput.trim();
               
               // Try to fetch first to get the latest SHA
-              await fetchFromGitHub();
+              await fetchFromGitHub(false);
           } else {
               alert("Sync cancelled. Token is required.");
               return;
@@ -320,7 +328,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       try {
           if (!fileSha) {
-             await fetchFromGitHub();
+             // Pass false to avoid overwriting local data with remote data if SHA is missing
+             await fetchFromGitHub(false);
           }
 
           await saveToGitHub(projects, experience, clients, skills);

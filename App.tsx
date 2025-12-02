@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './index.css'; // Import the new Design System
 import { Project } from './types';
 import WorkSection from './components/WorkSection';
@@ -11,6 +11,7 @@ import SplitNavPanel from './components/SplitNavPanel';
 import CustomCursor from './components/CustomCursor';
 import ScrollToTop from './components/ScrollToTop';
 import LoadingScreen from './components/LoadingScreen';
+import WaterRippleEffect, { WaterRippleRef } from './components/WaterRippleEffect';
 import { SOCIALS } from './data';
 import { ArrowDown } from 'lucide-react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
@@ -84,6 +85,15 @@ const AppContent: React.FC = () => {
   const heroTextY = useTransform(scrollY, [0, 500], [0, 150]); // Text moves slower
   const heroOpacity = useTransform(scrollY, [0, 400], [1, 0]); // Fade out
 
+  // Ripple Ref
+  const rippleRef = useRef<WaterRippleRef>(null);
+
+  const handleRippleHover = (e: React.MouseEvent) => {
+      if (rippleRef.current) {
+          rippleRef.current.trigger(e.clientX, e.clientY);
+      }
+  };
+
   useEffect(() => {
     if (window.location.hash === '#admin') {
       setIsAdminMode(true);
@@ -126,6 +136,9 @@ const AppContent: React.FC = () => {
         {/* Hero Section */}
         <section className="min-h-[90vh] flex flex-col justify-center px-4 md:px-8 max-w-screen-xl mx-auto relative overflow-hidden group">
           
+          {/* Colorful Ripple Background */}
+          <WaterRippleEffect ref={rippleRef} />
+
           {/* Main Content with Parallax */}
           <motion.div 
             style={{ y: heroTextY, opacity: heroOpacity }}
@@ -135,7 +148,8 @@ const AppContent: React.FC = () => {
               initial={{ opacity: 0, y: 60 }}
               animate={!isLoading ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
-              className="text-5xl sm:text-7xl md:text-9xl font-bold tracking-tighter max-w-6xl mb-12 relative z-10 leading-[0.9]"
+              onMouseMove={handleRippleHover}
+              className="text-5xl sm:text-7xl md:text-9xl font-bold tracking-tighter max-w-6xl mb-12 relative z-10 leading-[0.9] cursor-default"
             >
               Product Designer <br />
               <span className="text-neutral-400">& Creative Dev.</span>
@@ -147,11 +161,17 @@ const AppContent: React.FC = () => {
                 transition={{ duration: 1, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
                 className="flex flex-col gap-12 items-start max-w-2xl"
             >
-                <p className="text-lg md:text-2xl text-neutral-600 leading-relaxed max-w-xl">
-                  Building digital products that blend aesthetics with function. Currently crafting experiences in San Francisco.
-                </p>
+                <div onMouseMove={handleRippleHover} className="cursor-default">
+                    <p className="text-lg md:text-2xl text-neutral-600 leading-relaxed max-w-xl">
+                    Building digital products that blend aesthetics with function. Currently crafting experiences in San Francisco.
+                    </p>
+                </div>
                 
-                <a href="#work" className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-neutral-900 hover:text-neutral-500 transition-colors">
+                <a 
+                    href="#work" 
+                    onMouseMove={handleRippleHover}
+                    className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-neutral-900 hover:text-neutral-500 transition-colors z-20"
+                >
                     Explore Work <ArrowDown className="w-4 h-4 animate-bounce" />
                 </a>
             </motion.div>
