@@ -105,18 +105,23 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Prepare headers. If token exists, use it. If not, try public API access.
     const headers: HeadersInit = {
         'Accept': 'application/vnd.github.v3+json',
-        'If-None-Match': '' // Disable caching
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
     };
 
     if (token) {
         headers['Authorization'] = `Bearer ${token}`;
     }
 
+    const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${DATA_PATH}?t=${Date.now()}`;
+    const rawUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${DATA_PATH}?t=${Date.now()}`;
+
+    let apiSuccess = false;
+
+    // 1. Try fetching via API (Best for freshness & Auth)
     try {
-      // 1. Try fetching via API (Best for freshness)
-      const response = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${DATA_PATH}`, {
-        headers
-      });
+      const response = await fetch(apiUrl, { headers });
 
       if (response.ok) {
         const data = await response.json();
@@ -124,43 +129,51 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (shouldApplyData) {
             // Decode base64 content
             try {
-                const content = JSON.parse(decodeURIComponent(escape(atob(data.content))));
+                // Handle UTF-8 characters properly
+                const decodedContent = decodeURIComponent(escape(atob(data.content)));
+                const content = JSON.parse(decodedContent);
                 applyData(content);
             } catch (err) {
-                console.error("Error parsing GitHub data:", err);
+                console.error("Error parsing GitHub data from API:", err);
+                // If parsing fails, we consider API fetch failed regarding content, but we got SHA.
+                // We'll let fallback try if needed, but usually this means data is corrupted.
             }
         }
         
         setFileSha(data.sha);
-      } else {
-        // 2. Fallback to Raw URL if API fails (e.g. Rate Limit exceeded for public user)
-        if (shouldApplyData) {
-            console.warn("GitHub API request failed (likely rate limit or private repo). Falling back to Raw content.");
-            
-            // Add timestamp to bust browser cache
-            const rawUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${DATA_PATH}?t=${Date.now()}`;
-            const rawResponse = await fetch(rawUrl);
+        apiSuccess = true;
+      }
+    } catch (error) {
+      console.warn("GitHub API fetch failed (Network/CORS):", error);
+    }
+
+    // 2. Fallback to Raw URL if API failed (or threw error) AND we need data
+    if (!apiSuccess && shouldApplyData) {
+        console.log("Falling back to Raw GitHub content...");
+        try {
+            const rawResponse = await fetch(rawUrl, { cache: 'no-store' });
             
             if (rawResponse.ok) {
                 const content = await rawResponse.json();
                 applyData(content);
+                console.log("Successfully fetched from Raw URL");
             } else {
-                console.log("Could not fetch data from GitHub. Using default/initial data.");
+                console.log("Could not fetch data from GitHub (API & Raw failed). Using default/initial data.");
             }
+        } catch (error) {
+            console.error("Failed to fetch from GitHub Raw:", error);
         }
-      }
-    } catch (error) {
-      console.error("Failed to fetch from GitHub:", error);
     }
   };
 
   const applyData = (content: any) => {
-      if (content.projects) setProjects(content.projects);
-      if (content.experience) setExperience(content.experience);
-      if (content.clients) setClients(content.clients);
-      if (content.skills) setSkills(content.skills);
+      // Safely apply data only if it exists in the fetched content
+      if (content.projects && Array.isArray(content.projects)) setProjects(content.projects);
+      if (content.experience && Array.isArray(content.experience)) setExperience(content.experience);
+      if (content.clients && Array.isArray(content.clients)) setClients(content.clients);
+      if (content.skills && Array.isArray(content.skills)) setSkills(content.skills);
       if (content.config) setConfig(content.config);
-      if (content.socials) setSocials(content.socials);
+      if (content.socials && Array.isArray(content.socials)) setSocials(content.socials);
       
       if (content.lastUpdated) {
           const date = new Date(content.lastUpdated);
@@ -170,6 +183,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const saveToGitHub = async () => {
+    // Clear any pending timeouts to prevent double-saves
+    if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+    }
+
     const token = getGitHubToken();
     if (!token) {
         console.warn("Missing GitHub Token - cannot save.");
@@ -194,12 +213,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     // Safe Base64 encoding for UTF-8 characters
-    const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(content, null, 2))));
+    const contentString = JSON.stringify(content, null, 2);
+    const contentBase64 = btoa(unescape(encodeURIComponent(contentString)));
 
     try {
       const body: any = {
         message: `CMS Update: ${now.toLocaleString()}`,
-        content: contentBase64
+        content: contentBase64,
+        branch: 'main' // Explicitly set branch
       };
 
       if (fileSha) {
@@ -224,19 +245,39 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } else {
         const err = await response.json();
         console.error("GitHub Save Failed:", err);
-        // If 409 Conflict (SHA mismatch), usually implies someone else pushed.
+        // If 409 Conflict (SHA mismatch), implies someone else pushed or we lost the SHA.
         if (response.status === 409 || response.status === 422) {
-             console.warn("SHA mismatch or missing. Fetching latest SHA to resolve...");
-             // Pass false to avoid overwriting local changes with remote data
-             // We just want to get the new SHA so the next save succeeds
-             // await fetchFromGitHub(false); // Can lead to loop if not careful, just refresh SHA
+             console.warn("SHA mismatch. Fetching latest SHA to resolve...");
+             // Retrieve ONLY the SHA without overwriting local data
              const shaRes = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${DATA_PATH}`, {
-                 headers: { 'Authorization': `Bearer ${token}` }
+                 headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Cache-Control': 'no-cache'
+                 }
              });
              if(shaRes.ok) {
                  const shaData = await shaRes.json();
+                 // Update SHA and try saving again immediately
                  setFileSha(shaData.sha);
-                 // We don't retry immediately to avoid loops, next user action will succeed
+                 
+                 // Retry save with new SHA
+                 body.sha = shaData.sha;
+                 const retryResponse = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${DATA_PATH}`, {
+                    method: 'PUT',
+                    headers: {
+                      'Authorization': `Bearer ${token}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(body)
+                  });
+                  
+                  if (retryResponse.ok) {
+                      const retryData = await retryResponse.json();
+                      setFileSha(retryData.content.sha);
+                      setLastUpdated(now);
+                      localStorage.setItem('cms_last_updated', now.toISOString());
+                      console.log("GitHub Sync Successful (after retry)");
+                  }
              }
         }
       }
@@ -249,20 +290,20 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // --- Initialization ---
   useEffect(() => {
-    fetchFromGitHub(true); // Initial load: we want the data
+    fetchFromGitHub(true); // Initial load
   }, []);
 
   // --- Actions ---
 
   const triggerSave = () => {
-      // Debounce the save operation to prevent API rate limiting
+      // Debounce the save operation
       if (saveTimeoutRef.current) {
           clearTimeout(saveTimeoutRef.current);
       }
       setIsSaving(true); // Indicate pending save
       saveTimeoutRef.current = setTimeout(() => {
           saveToGitHub();
-      }, 2000); // Wait 2 seconds of inactivity before saving
+      }, 2000); // 2 seconds delay
   };
 
   const updateProject = (id: string, data: Partial<Project>) => {
@@ -363,14 +404,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // Forces a Push to GitHub to ensure the file in the repo matches the current App state
   const refreshAllClients = async () => {
       let token = getGitHubToken();
 
       if (!token) {
           const userInput = prompt("GitHub Token is missing.\n\nPlease enter your GitHub Personal Access Token (with 'repo' scope) to enable syncing:");
           if (userInput) {
-              // Save to localStorage so they don't have to enter it again this session
               localStorage.setItem('github_token', userInput.trim());
               token = userInput.trim();
               
