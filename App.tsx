@@ -136,12 +136,12 @@ const AppContent: React.FC = () => {
               className="text-4xl sm:text-6xl md:text-8xl font-bold tracking-tighter max-w-5xl mb-8 select-none"
             >
               <motion.span 
-                className="inline-block hover:text-neutral-500 hover:skew-x-2 transition-all duration-300 origin-left"
+                className="inline-block hover:text-neutral-500 hover:skew-x-2 transition-all duration-300 origin-left cursor-default"
               >
                 Product Designer &
               </motion.span> <br />
               <motion.span 
-                className="text-neutral-400 inline-block hover:text-neutral-900 hover:skew-x-2 transition-all duration-300 origin-left"
+                className="text-neutral-400 inline-block hover:text-neutral-900 hover:skew-x-2 transition-all duration-300 origin-left cursor-default"
               >
                 Creative Developer.
               </motion.span>
