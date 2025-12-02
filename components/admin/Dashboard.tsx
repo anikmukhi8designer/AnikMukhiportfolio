@@ -5,7 +5,6 @@ import ExperienceTable from './ExperienceTable';
 import SkillsTable from './SkillsTable';
 import ClientsTable from './ClientsTable';
 import { useData } from '../../contexts/DataContext';
-import { supabase } from '../../supabaseClient';
 
 interface DashboardProps {
   onLogout: () => void;
@@ -17,15 +16,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   const { resetData, refreshAllClients, lastUpdated } = useData();
   const [isBroadcasting, setIsBroadcasting] = useState(false);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    onLogout();
-  };
-
   const handleBroadcast = async () => {
     setIsBroadcasting(true);
     await refreshAllClients();
-    // Keep animation active for a moment to give feedback
     setTimeout(() => setIsBroadcasting(false), 2000);
   };
 
@@ -43,12 +36,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
             {/* Sync Status Text */}
             <div className="text-right flex flex-col items-end">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                    Repository Status
+                    GitHub Status
                 </span>
                 <div className="flex items-center gap-1.5">
                     <div className={`w-2 h-2 rounded-full ${lastUpdated ? 'bg-green-500' : 'bg-red-500'}`}></div>
                     <span className={`text-xs font-bold ${lastUpdated ? 'text-neutral-900' : 'text-neutral-500'}`}>
-                        {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : 'Not Updated'}
+                        {lastUpdated ? `Synced ${lastUpdated.toLocaleTimeString()}` : 'Not Synced'}
                     </span>
                 </div>
             </div>
@@ -61,19 +54,19 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
                     ? 'bg-neutral-100 text-neutral-400 border border-neutral-200' 
                     : 'bg-neutral-900 text-white border border-neutral-900 hover:bg-neutral-800'
                 }`}
-                title="Force update on all visitor screens"
+                title="Fetch latest data from GitHub"
             >
                 {isBroadcasting ? (
                     <RefreshCw className="w-3 h-3 animate-spin" />
                 ) : (
                     <Radio className="w-3 h-3" />
                 )}
-                {isBroadcasting ? 'Updating...' : 'Update Repository'}
+                {isBroadcasting ? 'Syncing...' : 'Sync Data'}
             </button>
 
             <div className="h-6 w-px bg-neutral-200"></div>
 
-            <button onClick={handleLogout} className="p-2 text-neutral-400 hover:text-neutral-900 transition-colors" title="Logout">
+            <button onClick={onLogout} className="p-2 text-neutral-400 hover:text-neutral-900 transition-colors" title="Logout">
                 <LogOut className="w-5 h-5" />
             </button>
           </div>
@@ -136,7 +129,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
         <div className="mt-12 pt-8 border-t border-neutral-200 flex justify-between items-center text-sm text-neutral-500">
             <p className="flex items-center gap-2">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                Changes sync instantly across all devices.
+                Data persists to src/data.json in your GitHub repo.
             </p>
             <button onClick={resetData} className="text-red-500 hover:text-red-700 underline text-xs">
                 Reset DB to Demo Data

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Lock } from 'lucide-react';
-import { supabase } from '../../supabaseClient';
 
 interface AdminLoginProps {
   onLogin: () => void;
@@ -17,31 +16,16 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
     setLoading(true);
     setError('');
 
-    try {
-      // Attempt login
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-      if (error) {
-         // Fallback for demo purposes if no real backend is set up yet
-         // We allow the default demo credentials if supabase fails or is not configured
-         if (email === 'admin@newgenre.studio' && password === 'password') {
-            onLogin();
-            return;
-         }
-         throw error;
-      }
-
-      if (data.user) {
+    // Simple auth check for GitHub-based CMS
+    if (email === 'admin@newgenre.studio' && password === 'password') {
         onLogin();
-      }
-    } catch (err: any) {
-      setError(err.message || 'Login failed');
-    } finally {
-      setLoading(false);
+    } else {
+        setError('Invalid credentials');
     }
+    setLoading(false);
   };
 
   return (
@@ -52,7 +36,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
             <Lock className="w-6 h-6 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-neutral-900">Admin Login</h1>
-          <p className="text-neutral-500 text-sm">Supabase Secured Access</p>
+          <p className="text-neutral-500 text-sm">GitHub CMS Access</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -91,7 +75,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
         </form>
         
         <div className="mt-6 text-center p-4 bg-neutral-50 rounded-lg border border-neutral-100">
-             <p className="text-xs text-neutral-500 mb-1">Default Fallback:</p>
+             <p className="text-xs text-neutral-500 mb-1">Default Credentials:</p>
              <p className="text-xs font-mono text-neutral-700">admin@newgenre.studio</p>
              <p className="text-xs font-mono text-neutral-700">password</p>
         </div>

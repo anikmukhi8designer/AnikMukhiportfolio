@@ -5,13 +5,24 @@ import {
   Type, Heading1, Heading2, Code, Quote, ArrowUp, ArrowDown, Minus,
   Link as LinkIcon, Calendar, Tag, Copy, X, Upload, Loader2
 } from 'lucide-react';
-import { supabase } from '../../supabaseClient';
 
 interface BlockEditorProps {
   project: Project;
   onSave: (updatedProject: Project) => void;
   onBack: () => void;
 }
+
+// Helper to access env safely
+const getEnv = (key: string) => {
+    try {
+        // @ts-ignore
+        if (typeof import.meta !== 'undefined' && import.meta.env) {
+            // @ts-ignore
+            return import.meta.env[key];
+        }
+    } catch(e) {}
+    return '';
+};
 
 const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) => {
   const [formData, setFormData] = useState<Project>(project);
@@ -26,6 +37,11 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [pendingUploadHandler, setPendingUploadHandler] = useState<((url: string) => void) | null>(null);
+
+  // GitHub Config for Uploads
+  const GITHUB_TOKEN = getEnv('VITE_GITHUB_TOKEN');
+  const GITHUB_OWNER = getEnv('VITE_GITHUB_OWNER') || "anikmukhi8designer";
+  const GITHUB_REPO = getEnv('VITE_GITHUB_REPO') || "AnikMukhiportfolio";
 
   // Focus effect when shouldFocusId changes
   useEffect(() => {
@@ -109,7 +125,6 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, index: number, block: ContentBlock) => {
-      // 1. Shift + Delete: Delete Block
       if (e.shiftKey && e.key === 'Delete') {
           e.preventDefault();
           const prev = blocks[index - 1];
@@ -121,9 +136,6 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
           return;
       }
 
-      // 2. Enter: New Block (Paragraph)
-      // Only for text blocks where Enter typically means "done with this block"
-      // We allow Shift+Enter for new lines in textareas
       if (e.key === 'Enter' && !e.shiftKey) {
           if (['paragraph', 'h1', 'h2', 'quote'].includes(block.type)) {
              e.preventDefault();
@@ -131,7 +143,6 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
           }
       }
 
-      // 3. Backspace on Empty: Delete Block
       if (e.key === 'Backspace' && block.content === '' && blocks.length > 1) {
           e.preventDefault();
           const prev = blocks[index - 1];
@@ -142,19 +153,15 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
           else if (next) setShouldFocusId(next.id);
       }
       
-      // 4. Arrow Navigation
       if (e.key === 'ArrowUp' && index > 0) {
           const target = e.currentTarget as HTMLInputElement | HTMLTextAreaElement;
-          // Only move if at start of input
           if (target.selectionStart === 0 && target.selectionEnd === 0) {
               e.preventDefault();
-              // Skip checking type, just try to focus previous
               setShouldFocusId(blocks[index - 1].id);
           }
       }
       if (e.key === 'ArrowDown' && index < blocks.length - 1) {
            const target = e.currentTarget as HTMLInputElement | HTMLTextAreaElement;
-           // Only move if at end of input
            if (target.selectionStart === target.value.length && target.selectionEnd === target.value.length) {
               e.preventDefault();
               setShouldFocusId(blocks[index + 1].id);
@@ -170,7 +177,7 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
     setHasUnsavedChanges(false);
   };
 
-  // Upload Logic (Supabase Storage)
+  // Upload Logic (GitHub API)
   const triggerUpload = (handler: (url: string) => void) => {
     setPendingUploadHandler(() => handler);
     fileInputRef.current?.click();
@@ -179,33 +186,63 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
   const processUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !pendingUploadHandler) return;
+    
+    if (!GITHUB_TOKEN) {
+        alert("GitHub Token not configured. Cannot upload images.");
+        return;
+    }
 
     setIsUploading(true);
     
     try {
         const fileExt = file.name.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
-        const filePath = `${fileName}`;
+        const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${fileExt}`;
+        const filePath = `public/uploads/${fileName}`;
 
-        const { data, error } = await supabase.storage
-            .from('portfolio')
-            .upload(filePath, file);
-
-        if (error) throw error;
-
-        // Get Public URL
-        const { data: urlData } = supabase.storage.from('portfolio').getPublicUrl(filePath);
+        // Convert file to Base64
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
         
-        if (urlData) {
-            pendingUploadHandler(urlData.publicUrl);
-        }
+        reader.onload = async () => {
+            const base64Content = (reader.result as string).split(',')[1];
+
+            try {
+                const response = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${filePath}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${GITHUB_TOKEN}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: `Upload image: ${fileName}`,
+                        content: base64Content
+                    })
+                });
+
+                if (!response.ok) throw new Error("GitHub Upload Failed");
+
+                // Construct public URL
+                // Note: For immediate preview we might want raw.githubusercontent.com
+                // But for production usage, a CDN like jsDelivr or relative path is better if deployed together.
+                // Assuming Vite deploy: files in public/ end up at root.
+                // However, we are running local dev often. 
+                // Let's use the Raw URL for now to ensure it works across environments.
+                const publicUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${filePath}`;
+                
+                pendingUploadHandler(publicUrl);
+            } catch (err) {
+                console.error(err);
+                alert("Upload failed. Check console.");
+            } finally {
+                setIsUploading(false);
+                setPendingUploadHandler(null);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            }
+        };
+
     } catch (error) {
         console.error("Upload failed", error);
-        alert("Upload failed. Make sure your Supabase Storage bucket 'portfolio' is public.");
-    } finally {
         setIsUploading(false);
-        setPendingUploadHandler(null);
-        if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
