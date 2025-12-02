@@ -24,6 +24,13 @@ const getEnv = (key: string) => {
     return '';
 };
 
+// Helper to get token from Env OR LocalStorage
+const getGitHubToken = () => {
+    const env = getEnv('VITE_GITHUB_TOKEN');
+    if (env) return env;
+    return localStorage.getItem('github_token') || '';
+};
+
 const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) => {
   const [formData, setFormData] = useState<Project>(project);
   const [blocks, setBlocks] = useState<ContentBlock[]>(project.content || []);
@@ -38,8 +45,6 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
   const [isUploading, setIsUploading] = useState(false);
   const [pendingUploadHandler, setPendingUploadHandler] = useState<((url: string) => void) | null>(null);
 
-  // GitHub Config for Uploads
-  const GITHUB_TOKEN = getEnv('VITE_GITHUB_TOKEN');
   const GITHUB_OWNER = getEnv('VITE_GITHUB_OWNER') || "anikmukhi8designer";
   const GITHUB_REPO = getEnv('VITE_GITHUB_REPO') || "AnikMukhiportfolio";
 
@@ -187,9 +192,17 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
     const file = e.target.files?.[0];
     if (!file || !pendingUploadHandler) return;
     
-    if (!GITHUB_TOKEN) {
-        alert("GitHub Token not configured. Cannot upload images.");
-        return;
+    let token = getGitHubToken();
+    
+    if (!token) {
+        const userInput = prompt("GitHub Token is required for uploads. Please enter your GitHub Personal Access Token:");
+        if (userInput) {
+            localStorage.setItem('github_token', userInput.trim());
+            token = userInput.trim();
+        } else {
+            alert("Upload cancelled. Token is required.");
+            return;
+        }
     }
 
     setIsUploading(true);
@@ -210,7 +223,7 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
                 const response = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${filePath}`, {
                     method: 'PUT',
                     headers: {
-                        'Authorization': `Bearer ${GITHUB_TOKEN}`,
+                        'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
@@ -222,17 +235,13 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
                 if (!response.ok) throw new Error("GitHub Upload Failed");
 
                 // Construct public URL
-                // Note: For immediate preview we might want raw.githubusercontent.com
-                // But for production usage, a CDN like jsDelivr or relative path is better if deployed together.
-                // Assuming Vite deploy: files in public/ end up at root.
-                // However, we are running local dev often. 
-                // Let's use the Raw URL for now to ensure it works across environments.
+                // Use Raw URL for immediate feedback in preview
                 const publicUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${filePath}`;
                 
                 pendingUploadHandler(publicUrl);
             } catch (err) {
                 console.error(err);
-                alert("Upload failed. Check console.");
+                alert("Upload failed. Check console or verify your token permissions.");
             } finally {
                 setIsUploading(false);
                 setPendingUploadHandler(null);

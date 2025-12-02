@@ -65,7 +65,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Store the SHA of the data.json file to handle GitHub atomic updates
   const [fileSha, setFileSha] = useState<string | null>(null);
 
-  const GITHUB_TOKEN = getEnv('VITE_GITHUB_TOKEN');
+  // Helper to get token from Env OR LocalStorage
+  const getGitHubToken = () => {
+      const env = getEnv('VITE_GITHUB_TOKEN');
+      if (env) return env;
+      return localStorage.getItem('github_token') || '';
+  };
+
   const GITHUB_OWNER = getEnv('VITE_GITHUB_OWNER') || "anikmukhi8designer";
   const GITHUB_REPO = getEnv('VITE_GITHUB_REPO') || "AnikMukhiportfolio";
   const DATA_PATH = 'src/data.json';
@@ -73,12 +79,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // --- GitHub Helpers ---
   
   const fetchFromGitHub = async () => {
-    if (!GITHUB_TOKEN) return;
+    const token = getGitHubToken();
+    if (!token) return;
 
     try {
       const response = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${DATA_PATH}`, {
         headers: {
-          'Authorization': `Bearer ${GITHUB_TOKEN}`,
+          'Authorization': `Bearer ${token}`,
           'Accept': 'application/vnd.github.v3+json',
           'If-None-Match': '' // Disable caching
         }
@@ -102,7 +109,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       } else if (response.status === 404) {
         console.log("Data file not found on GitHub. Initializing with default data...");
-        // Use default data if file doesn't exist yet
         setProjects(INITIAL_PROJECTS);
         setExperience(INITIAL_EXPERIENCE);
         setClients(INITIAL_CLIENTS);
@@ -119,7 +125,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     c: Client[], 
     s: SkillCategory[]
   ) => {
-    if (!GITHUB_TOKEN) {
+    const token = getGitHubToken();
+    if (!token) {
         console.warn("Missing GitHub Token - cannot save.");
         return;
     }
@@ -148,7 +155,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const response = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${DATA_PATH}`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${GITHUB_TOKEN}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(body)
@@ -163,10 +170,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } else {
         const err = await response.json();
         console.error("GitHub Save Failed:", err);
-        // If 409 Conflict (SHA mismatch), usually implies someone else pushed.
-        // In this simple CMS, we might warn the user.
         if (response.status === 409 || response.status === 422) {
-             // If we don't have the SHA or it's wrong, we might need to fetch first.
              console.warn("SHA mismatch or missing. Fetching latest to resolve...");
              await fetchFromGitHub();
         }
@@ -277,13 +281,24 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Forces a Push to GitHub to ensure the file in the repo matches the current App state
   const refreshAllClients = async () => {
-      if (!GITHUB_TOKEN) {
-          alert("GitHub Token not configured.");
-          return;
+      let token = getGitHubToken();
+
+      if (!token) {
+          const userInput = prompt("GitHub Token is missing.\n\nPlease enter your GitHub Personal Access Token (with 'repo' scope) to enable syncing:");
+          if (userInput) {
+              // Save to localStorage so they don't have to enter it again this session
+              localStorage.setItem('github_token', userInput.trim());
+              token = userInput.trim();
+              
+              // Try to fetch first to get the latest SHA
+              await fetchFromGitHub();
+          } else {
+              alert("Sync cancelled. Token is required.");
+              return;
+          }
       }
 
       try {
-          // If we don't have a file SHA yet (e.g. didn't load successfully), try fetching first
           if (!fileSha) {
              await fetchFromGitHub();
           }
