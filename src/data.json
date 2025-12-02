@@ -378,8 +378,8 @@
   "experience": [
     {
       "id": "senior-pd-2023",
-      "role": "",
-      "company": "TechFlow Systems",
+      "role": "uJ",
+      "company": "",
       "period": "2023 — Present",
       "description": "Leading the design system team and overseeing core product UX.",
       "published": true
@@ -563,5 +563,5 @@
       ]
     }
   ],
-  "lastUpdated": "2025-12-02T05:34:03.989Z"
+  "lastUpdated": "2025-12-02T05:34:04.934Z"
 }
