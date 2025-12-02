@@ -1,8 +1,7 @@
 import React from 'react';
 import { 
-  Code, PenTool, Layout, Terminal, Database, Globe, 
-  Cpu, Layers, Command, Box, Image, Figma, Pen,
-  Hexagon, Codepen, GitBranch, Wrench, Circle
+  Code, PenTool, Layout, Terminal, Globe, 
+  Cpu, Box, Hexagon, GitBranch, Wrench, Circle
 } from 'lucide-react';
 
 // Using Lucide icons for some, and custom SVG paths for brands where Lucide falls short.

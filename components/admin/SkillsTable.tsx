@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Trash2, Plus, X, Check, Link as LinkIcon, Search, Loader2 } from 'lucide-react';
+import { Trash2, Plus, X, Check, Search, Loader2 } from 'lucide-react';
 import { ICON_KEYS, SkillIcon } from '../SkillIcons';
 
 // Use the provided Brandfetch API Key
@@ -146,7 +146,7 @@ const SkillsTable: React.FC = () => {
                      {addingToId === skill.id ? (
                         <div className="relative mt-2 bg-white border border-neutral-300 rounded-lg p-2 w-full max-w-md animate-in fade-in slide-in-from-left-4 duration-200 shadow-lg">
                             <div className="flex items-center gap-2">
-                                {/* Search Button */}
+                                {/* Search Input */}
                                 <div className="relative flex-grow">
                                     <input 
                                         autoFocus
@@ -159,8 +159,8 @@ const SkillsTable: React.FC = () => {
                                             }
                                             if (e.key === 'Escape') resetForm();
                                         }}
-                                        placeholder="Type brand name (e.g. Figma)..."
-                                        className="text-sm border-none focus:ring-0 w-full p-1"
+                                        placeholder="Type brand name..."
+                                        className="text-sm border-none focus:ring-0 w-full p-1 bg-transparent"
                                     />
                                     {isSearching && (
                                         <div className="absolute right-2 top-1.5">
@@ -168,28 +168,47 @@ const SkillsTable: React.FC = () => {
                                         </div>
                                     )}
                                 </div>
+                                
+                                {/* Icon Selector (Only if no image selected) */}
+                                {!newItemImage && (
+                                    <select
+                                        value={newItemIcon}
+                                        onChange={(e) => setNewItemIcon(e.target.value)}
+                                        className="w-24 text-xs bg-neutral-50 border-none rounded focus:ring-0 py-1"
+                                        title="Select Icon"
+                                    >
+                                        {ICON_KEYS.map(k => <option key={k} value={k}>{k}</option>)}
+                                    </select>
+                                )}
 
                                 {/* Current Image Preview */}
                                 {newItemImage && (
-                                    <div className="w-8 h-8 rounded border border-neutral-200 p-0.5 bg-white flex-shrink-0">
+                                    <div className="w-8 h-8 rounded border border-neutral-200 p-0.5 bg-white flex-shrink-0 relative group">
                                         <img src={newItemImage} className="w-full h-full object-contain" alt="preview" />
+                                        <button 
+                                            onClick={() => setNewItemImage('')} 
+                                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            <X className="w-2 h-2" />
+                                        </button>
                                     </div>
                                 )}
 
+                                {/* Actions */}
                                 <button 
                                     onClick={() => searchBrandfetch(newItemName)} 
-                                    className="p-1.5 bg-neutral-100 hover:bg-neutral-200 rounded text-neutral-600 transition-colors"
+                                    className="p-1.5 bg-neutral-100 hover:bg-neutral-200 rounded text-neutral-600 transition-colors flex-shrink-0"
                                     title="Search Brandfetch"
                                 >
                                     <Search className="w-4 h-4"/>
                                 </button>
                                 
-                                <div className="h-6 w-px bg-neutral-200 mx-1"></div>
+                                <div className="h-6 w-px bg-neutral-200 mx-1 flex-shrink-0"></div>
 
-                                <button onClick={() => handleAddItem(skill.id)} className="p-1.5 bg-green-50 hover:bg-green-100 rounded text-green-600 transition-colors">
+                                <button onClick={() => handleAddItem(skill.id)} className="p-1.5 bg-green-50 hover:bg-green-100 rounded text-green-600 transition-colors flex-shrink-0">
                                     <Check className="w-4 h-4"/>
                                 </button>
-                                <button onClick={resetForm} className="p-1.5 hover:bg-red-50 rounded text-red-500 transition-colors">
+                                <button onClick={resetForm} className="p-1.5 hover:bg-red-50 rounded text-red-500 transition-colors flex-shrink-0">
                                     <X className="w-4 h-4"/>
                                 </button>
                             </div>
