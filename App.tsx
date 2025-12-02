@@ -10,10 +10,9 @@ import SplitNavPanel from './components/SplitNavPanel';
 import CustomCursor from './components/CustomCursor';
 import ScrollToTop from './components/ScrollToTop';
 import LoadingScreen from './components/LoadingScreen';
-import WaterRippleEffect from './components/WaterRippleEffect';
 import { SOCIALS } from './data';
 import { ArrowDown } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 
 // CMS Imports
 import { DataProvider, useData } from './contexts/DataContext';
@@ -79,6 +78,11 @@ const AppContent: React.FC = () => {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Scroll Animations for Hero
+  const { scrollY } = useScroll();
+  const heroY = useTransform(scrollY, [0, 1000], [0, 300]);
+  const heroOpacity = useTransform(scrollY, [0, 500], [1, 0]);
+
   useEffect(() => {
     if (window.location.hash === '#admin') {
       setIsAdminMode(true);
@@ -121,26 +125,38 @@ const AppContent: React.FC = () => {
         {/* Hero Section */}
         <section className="min-h-[85vh] flex flex-col justify-center px-4 md:px-8 max-w-screen-xl mx-auto relative overflow-hidden group">
           
-          {/* Water Ripple Background */}
-          {!isLoading && <WaterRippleEffect />}
+          <motion.div 
+            style={{ y: heroY, opacity: heroOpacity }}
+            className="relative z-10"
+          >
+            <motion.h1 
+              initial={{ opacity: 0, y: 40 }}
+              animate={!isLoading ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+              className="text-4xl sm:text-6xl md:text-8xl font-bold tracking-tighter max-w-5xl mb-8 select-none"
+            >
+              <motion.span 
+                className="inline-block hover:text-neutral-500 hover:skew-x-2 transition-all duration-300 origin-left"
+              >
+                Product Designer &
+              </motion.span> <br />
+              <motion.span 
+                className="text-neutral-400 inline-block hover:text-neutral-900 hover:skew-x-2 transition-all duration-300 origin-left"
+              >
+                Creative Developer.
+              </motion.span>
+            </motion.h1>
+            
+            <motion.p 
+              initial={{ opacity: 0, y: 20 }}
+              animate={!isLoading ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 1, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="text-lg md:text-2xl text-neutral-600 max-w-2xl leading-relaxed"
+            >
+              I help startups and established companies build digital products that look good and work even better. Currently based in San Francisco.
+            </motion.p>
+          </motion.div>
 
-          <motion.h1 
-            initial={{ opacity: 0, y: 40 }}
-            animate={!isLoading ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
-            className="text-4xl sm:text-6xl md:text-8xl font-bold tracking-tighter max-w-5xl mb-8 relative z-10"
-          >
-            Product Designer & <br />
-            <span className="text-neutral-400">Creative Developer.</span>
-          </motion.h1>
-          <motion.p 
-            initial={{ opacity: 0, y: 20 }}
-            animate={!isLoading ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 1, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className="text-lg md:text-2xl text-neutral-600 max-w-2xl leading-relaxed relative z-10"
-          >
-            I help startups and established companies build digital products that look good and work even better. Currently based in San Francisco.
-          </motion.p>
           <motion.div 
             initial={{ opacity: 0 }}
             animate={!isLoading ? { opacity: 1 } : {}}

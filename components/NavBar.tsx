@@ -9,7 +9,7 @@ interface NavBarProps {
 
 const NavBar: React.FC<NavBarProps> = ({ isMenuOpen, setIsMenuOpen }) => {
   const [isVisible, setIsVisible] = useState(true);
-  const { scrollY } = useScroll();
+  const { scrollY, scrollYProgress } = useScroll();
   const [lastScrollY, setLastScrollY] = useState(0);
 
   useMotionValueEvent(scrollY, "change", (latest) => {
@@ -43,7 +43,7 @@ const NavBar: React.FC<NavBarProps> = ({ isMenuOpen, setIsMenuOpen }) => {
       transition={{ duration: 0.3, ease: "easeInOut" }}
       className="fixed top-0 left-0 right-0 z-50 mix-blend-difference text-white pointer-events-none"
     >
-      <div className="max-w-screen-xl mx-auto px-4 md:px-8 h-20 flex items-center justify-between pointer-events-auto">
+      <div className="max-w-screen-xl mx-auto px-4 md:px-8 h-20 flex items-center justify-between pointer-events-auto relative">
         <a href="#" className="text-lg font-bold tracking-tight z-50">
           Mukhi Anik
         </a>
@@ -80,6 +80,12 @@ const NavBar: React.FC<NavBarProps> = ({ isMenuOpen, setIsMenuOpen }) => {
           </div>
         </button>
       </div>
+
+      {/* Scroll Progress Bar */}
+      <motion.div 
+        className="absolute bottom-0 left-0 h-[2px] bg-white origin-left"
+        style={{ scaleX: scrollYProgress, width: '100%' }}
+      />
     </motion.header>
   );
 };
