@@ -3,7 +3,7 @@ import { Project, ContentBlock, BlockType } from '../../types';
 import { 
   ArrowLeft, Save, Trash2, GripVertical, Image as ImageIcon, 
   Type, Heading1, Heading2, Code, Quote, ArrowUp, ArrowDown, Minus,
-  Link as LinkIcon, Calendar, Tag, Copy, X, Upload, Loader2
+  Link as LinkIcon, Calendar, Tag, Copy, X, Upload, Loader2, Settings
 } from 'lucide-react';
 
 interface BlockEditorProps {
@@ -35,6 +35,7 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
   const [formData, setFormData] = useState<Project>(project);
   const [blocks, setBlocks] = useState<ContentBlock[]>(project.content || []);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showMobileSettings, setShowMobileSettings] = useState(false);
   
   // Focus Management
   const blockInputRefs = useRef<{ [key: string]: HTMLInputElement | HTMLTextAreaElement | null }>({});
@@ -265,33 +266,53 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
         onChange={processUpload}
       />
 
-      <header className="bg-white border-b border-neutral-200 sticky top-0 z-40 px-6 h-16 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-4">
+      <header className="bg-white border-b border-neutral-200 sticky top-0 z-40 px-4 md:px-6 h-16 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-2 md:gap-4">
           <button onClick={onBack} className="p-2 hover:bg-neutral-100 rounded-full transition-colors text-neutral-500 hover:text-neutral-900">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <div className="h-6 w-px bg-neutral-200"></div>
+          <div className="h-6 w-px bg-neutral-200 hidden md:block"></div>
           <div>
-            <h1 className="text-sm font-bold text-neutral-900">Editing: {formData.title}</h1>
-            <p className="text-xs text-neutral-500">{hasUnsavedChanges ? 'Unsaved changes' : 'All changes saved to cloud'}</p>
+            <h1 className="text-sm font-bold text-neutral-900 truncate max-w-[150px] md:max-w-none">Editing: {formData.title}</h1>
+            <p className="text-xs text-neutral-500 hidden md:block">{hasUnsavedChanges ? 'Unsaved changes' : 'All changes saved to cloud'}</p>
           </div>
         </div>
         
-        <button 
-          onClick={handleSave}
-          className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-bold text-white transition-all ${
-            hasUnsavedChanges ? 'bg-neutral-900 hover:bg-neutral-800' : 'bg-green-600 hover:bg-green-700'
-          }`}
-        >
-          <Save className="w-4 h-4" /> {hasUnsavedChanges ? 'Save Changes' : 'Saved'}
-        </button>
+        <div className="flex items-center gap-3">
+            <button 
+                onClick={() => setShowMobileSettings(!showMobileSettings)}
+                className="lg:hidden p-2 text-neutral-500 hover:text-neutral-900 bg-neutral-100 rounded-lg"
+                title="Project Settings"
+            >
+                <Settings className="w-4 h-4" />
+            </button>
+            <button 
+            onClick={handleSave}
+            className={`flex items-center gap-2 px-3 md:px-6 py-2 rounded-lg text-sm font-bold text-white transition-all ${
+                hasUnsavedChanges ? 'bg-neutral-900 hover:bg-neutral-800' : 'bg-green-600 hover:bg-green-700'
+            }`}
+            >
+            <Save className="w-4 h-4" /> <span className="hidden md:inline">{hasUnsavedChanges ? 'Save Changes' : 'Saved'}</span>
+            </button>
+        </div>
       </header>
 
-      <div className="flex-grow flex overflow-hidden">
+      <div className="flex-grow flex overflow-hidden relative">
         
-        {/* Sidebar: Metadata */}
-        <aside className="w-96 bg-white border-r border-neutral-200 overflow-y-auto p-6 hidden lg:block">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-neutral-400 mb-6">Project Details</h2>
+        {/* Sidebar: Metadata - Sliding Panel on Mobile, Fixed on Desktop */}
+        <aside className={`
+            fixed inset-0 z-50 bg-white p-6 overflow-y-auto transition-transform duration-300 ease-in-out lg:translate-x-0
+            lg:static lg:w-96 lg:border-r lg:block lg:z-auto
+            ${showMobileSettings ? 'translate-x-0' : '-translate-x-full'}
+        `}>
+          <div className="flex justify-between items-center lg:hidden mb-6">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-900">Project Details</h2>
+            <button onClick={() => setShowMobileSettings(false)} className="p-2 hover:bg-neutral-100 rounded-full">
+                <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <h2 className="text-xs font-bold uppercase tracking-widest text-neutral-400 mb-6 hidden lg:block">Project Details</h2>
           
           <div className="space-y-6">
             <div>
@@ -456,7 +477,7 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
         </aside>
 
         {/* Main Content: Blocks */}
-        <main className="flex-1 overflow-y-auto bg-neutral-100 p-8 pb-32">
+        <main className="flex-1 overflow-y-auto bg-neutral-100 p-4 md:p-8 pb-32">
           <div className="max-w-3xl mx-auto space-y-4">
             
             {/* Project Header Preview */}
@@ -467,10 +488,10 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
 
             {/* Blocks List */}
             {blocks.map((block, index) => (
-              <div key={block.id} className="group relative flex gap-4 items-start">
+              <div key={block.id} className="group relative flex gap-2 md:gap-4 items-start">
                 
-                {/* Block Controls */}
-                <div className="w-8 pt-2 flex flex-col items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                {/* Block Controls - Hidden on mobile usually, accessible via focus or tap */}
+                <div className="hidden md:flex w-8 pt-2 flex-col items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => moveBlock(index, 'up')} className="p-1 hover:bg-white rounded text-neutral-400 hover:text-neutral-900">
                         <ArrowUp className="w-3 h-3" />
                     </button>
@@ -486,7 +507,7 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
                     {/* Delete Button (absolute) */}
                     <button 
                         onClick={() => deleteBlock(block.id)}
-                        className="absolute -right-3 -top-3 bg-white shadow-md p-1.5 rounded-full text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 z-10"
+                        className="absolute -right-2 -top-2 md:-right-3 md:-top-3 bg-white shadow-md p-1.5 rounded-full text-red-500 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 z-10"
                         title="Delete (Shift+Delete)"
                     >
                         <Trash2 className="w-3 h-3" />

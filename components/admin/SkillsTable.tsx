@@ -93,15 +93,15 @@ const SkillsTable: React.FC = () => {
         <h3 className="text-lg font-medium">Skills & Tools ({skills.length} Categories)</h3>
         <button 
           onClick={handleAddNewCategory}
-          className="flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white text-sm font-medium rounded-lg hover:bg-neutral-800"
+          className="flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white text-sm font-medium rounded-lg hover:bg-neutral-800 whitespace-nowrap"
         >
-          <Plus className="w-4 h-4" /> Add Category
+          <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Category</span><span className="sm:hidden">Add</span>
         </button>
       </div>
 
       <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
+          <table className="w-full text-sm text-left min-w-[600px]">
             <thead className="bg-neutral-50 border-b border-neutral-200 text-neutral-500 uppercase tracking-wider text-xs">
               <tr>
                 <th className="px-6 py-4 font-semibold w-1/4">Category Title</th>
@@ -144,8 +144,8 @@ const SkillsTable: React.FC = () => {
 
                      {/* Add Item Interface */}
                      {addingToId === skill.id ? (
-                        <div className="relative mt-2 bg-white border border-neutral-300 rounded-lg p-2 w-full max-w-md animate-in fade-in slide-in-from-left-4 duration-200 shadow-lg">
-                            <div className="flex items-center gap-2">
+                        <div className="relative mt-2 bg-white border border-neutral-300 rounded-lg p-3 w-full max-w-md animate-in fade-in slide-in-from-left-4 duration-200 shadow-lg z-10">
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                                 {/* Search Input */}
                                 <div className="relative flex-grow">
                                     <input 
@@ -160,57 +160,59 @@ const SkillsTable: React.FC = () => {
                                             if (e.key === 'Escape') resetForm();
                                         }}
                                         placeholder="Type brand name..."
-                                        className="text-sm border-none focus:ring-0 w-full p-1 bg-transparent"
+                                        className="text-sm border border-neutral-200 rounded px-2 py-1.5 focus:border-neutral-400 focus:ring-0 w-full bg-transparent"
                                     />
                                     {isSearching && (
-                                        <div className="absolute right-2 top-1.5">
+                                        <div className="absolute right-2 top-2">
                                             <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
                                         </div>
                                     )}
                                 </div>
                                 
-                                {/* Icon Selector (Only if no image selected) */}
-                                {!newItemImage && (
-                                    <select
-                                        value={newItemIcon}
-                                        onChange={(e) => setNewItemIcon(e.target.value)}
-                                        className="w-24 text-xs bg-neutral-50 border-none rounded focus:ring-0 py-1"
-                                        title="Select Icon"
-                                    >
-                                        {ICON_KEYS.map(k => <option key={k} value={k}>{k}</option>)}
-                                    </select>
-                                )}
-
-                                {/* Current Image Preview */}
-                                {newItemImage && (
-                                    <div className="w-8 h-8 rounded border border-neutral-200 p-0.5 bg-white flex-shrink-0 relative group">
-                                        <img src={newItemImage} className="w-full h-full object-contain" alt="preview" />
-                                        <button 
-                                            onClick={() => setNewItemImage('')} 
-                                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                <div className="flex items-center gap-2 justify-end sm:justify-start">
+                                    {/* Icon Selector (Only if no image selected) */}
+                                    {!newItemImage && (
+                                        <select
+                                            value={newItemIcon}
+                                            onChange={(e) => setNewItemIcon(e.target.value)}
+                                            className="w-24 text-xs bg-neutral-50 border border-neutral-200 rounded focus:ring-0 py-1.5"
+                                            title="Select Icon"
                                         >
-                                            <X className="w-2 h-2" />
-                                        </button>
-                                    </div>
-                                )}
+                                            {ICON_KEYS.map(k => <option key={k} value={k}>{k}</option>)}
+                                        </select>
+                                    )}
 
-                                {/* Actions */}
-                                <button 
-                                    onClick={() => searchBrandfetch(newItemName)} 
-                                    className="p-1.5 bg-neutral-100 hover:bg-neutral-200 rounded text-neutral-600 transition-colors flex-shrink-0"
-                                    title="Search Brandfetch"
-                                >
-                                    <Search className="w-4 h-4"/>
-                                </button>
-                                
-                                <div className="h-6 w-px bg-neutral-200 mx-1 flex-shrink-0"></div>
+                                    {/* Current Image Preview */}
+                                    {newItemImage && (
+                                        <div className="w-8 h-8 rounded border border-neutral-200 p-0.5 bg-white flex-shrink-0 relative group">
+                                            <img src={newItemImage} className="w-full h-full object-contain" alt="preview" />
+                                            <button 
+                                                onClick={() => setNewItemImage('')} 
+                                                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                <X className="w-2 h-2" />
+                                            </button>
+                                        </div>
+                                    )}
 
-                                <button onClick={() => handleAddItem(skill.id)} className="p-1.5 bg-green-50 hover:bg-green-100 rounded text-green-600 transition-colors flex-shrink-0">
-                                    <Check className="w-4 h-4"/>
-                                </button>
-                                <button onClick={resetForm} className="p-1.5 hover:bg-red-50 rounded text-red-500 transition-colors flex-shrink-0">
-                                    <X className="w-4 h-4"/>
-                                </button>
+                                    {/* Actions */}
+                                    <button 
+                                        onClick={() => searchBrandfetch(newItemName)} 
+                                        className="p-1.5 bg-neutral-100 hover:bg-neutral-200 rounded text-neutral-600 transition-colors flex-shrink-0"
+                                        title="Search Brandfetch"
+                                    >
+                                        <Search className="w-4 h-4"/>
+                                    </button>
+                                    
+                                    <div className="h-6 w-px bg-neutral-200 mx-1 flex-shrink-0"></div>
+
+                                    <button onClick={() => handleAddItem(skill.id)} className="p-1.5 bg-green-50 hover:bg-green-100 rounded text-green-600 transition-colors flex-shrink-0">
+                                        <Check className="w-4 h-4"/>
+                                    </button>
+                                    <button onClick={resetForm} className="p-1.5 hover:bg-red-50 rounded text-red-500 transition-colors flex-shrink-0">
+                                        <X className="w-4 h-4"/>
+                                    </button>
+                                </div>
                             </div>
                             
                             {/* Search Results Dropdown */}
