@@ -42,13 +42,23 @@ const SkillsSection: React.FC = () => {
                                         <img 
                                             src={item.image} 
                                             alt={item.name} 
-                                            className="w-full h-full object-contain filter grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300" 
+                                            className="w-full h-full object-contain filter grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300"
+                                            onError={(e) => {
+                                                // Fallback to text/icon if image fails
+                                                e.currentTarget.style.display = 'none';
+                                                const fallback = e.currentTarget.nextElementSibling;
+                                                if (fallback) (fallback as HTMLElement).style.display = 'block';
+                                            }}
                                         />
                                     ) : (
                                         <div className="w-12 h-12 text-neutral-400 group-hover:text-neutral-900 transition-colors">
                                             <SkillIcon icon={item.icon || 'Default'} className="w-full h-full" />
                                         </div>
                                     )}
+                                    {/* Fallback container, hidden by default unless image fails */}
+                                    <div className="w-12 h-12 text-neutral-400 group-hover:text-neutral-900 transition-colors hidden">
+                                        <SkillIcon icon={item.icon || 'Default'} className="w-full h-full" />
+                                    </div>
                                 </div>
                                 <span className="text-sm font-medium text-neutral-500 group-hover:text-neutral-900 transition-colors">
                                     {item.name}
