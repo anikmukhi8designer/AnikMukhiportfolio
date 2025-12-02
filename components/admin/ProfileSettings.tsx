@@ -77,6 +77,47 @@ const ProfileSettings: React.FC = () => {
           </button>
       </div>
 
+      {/* Hero Section Configuration */}
+      <section className="space-y-6">
+        <h3 className="text-lg font-medium border-b border-neutral-200 pb-2">Hero Section</h3>
+        
+        <div className="grid grid-cols-1 gap-6">
+            <div className="space-y-2">
+                <label className="text-sm font-bold text-neutral-700">Headline</label>
+                <input 
+                    type="text" 
+                    value={localConfig.heroHeadline || "Product Designer"}
+                    onChange={(e) => handleConfigChange('heroHeadline', e.target.value)}
+                    className="w-full px-4 py-2 bg-white border border-neutral-300 rounded-lg focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+                    placeholder="e.g. Product Designer"
+                />
+            </div>
+            
+             <div className="space-y-2">
+                <label className="text-sm font-bold text-neutral-700">Subheadline (Accent)</label>
+                <input 
+                    type="text" 
+                    value={localConfig.heroSubheadline || "& Creative Dev."}
+                    onChange={(e) => handleConfigChange('heroSubheadline', e.target.value)}
+                    className="w-full px-4 py-2 bg-white border border-neutral-300 rounded-lg focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+                    placeholder="e.g. & Creative Dev."
+                />
+                <p className="text-xs text-neutral-500">This text appears in a lighter gray color below or next to the main headline.</p>
+            </div>
+
+            <div className="space-y-2">
+                <label className="text-sm font-bold text-neutral-700">Introduction Text</label>
+                <textarea 
+                    value={localConfig.heroDescription || "Building digital products that blend aesthetics with function..."}
+                    onChange={(e) => handleConfigChange('heroDescription', e.target.value)}
+                    rows={3}
+                    className="w-full px-4 py-2 bg-white border border-neutral-300 rounded-lg focus:ring-2 focus:ring-neutral-900 focus:outline-none resize-none"
+                    placeholder="Brief intro text..."
+                />
+            </div>
+        </div>
+      </section>
+
       {/* General Configuration */}
       <section className="space-y-6">
         <h3 className="text-lg font-medium border-b border-neutral-200 pb-2">General Information</h3>

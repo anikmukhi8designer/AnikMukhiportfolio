@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Menu, X } from 'lucide-react';
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
 
@@ -10,29 +10,34 @@ interface NavBarProps {
 const NavBar: React.FC<NavBarProps> = ({ isMenuOpen, setIsMenuOpen }) => {
   const [isVisible, setIsVisible] = useState(true);
   const { scrollY, scrollYProgress } = useScroll();
-  const [lastScrollY, setLastScrollY] = useState(0);
+  const lastScrollY = useRef(0);
 
   useMotionValueEvent(scrollY, "change", (latest) => {
-    const previous = lastScrollY;
-    setLastScrollY(latest);
+    const previous = lastScrollY.current;
+    const current = latest;
+    lastScrollY.current = current;
 
     // If menu is open, always keep navbar visible
     if (isMenuOpen) {
-      setIsVisible(true);
+      if (!isVisible) setIsVisible(true);
       return;
     }
 
-    // Show if near top
-    if (latest < 50) {
-      setIsVisible(true);
+    // Always show if near top (threshold 50px)
+    if (current < 50) {
+      if (!isVisible) setIsVisible(true);
       return;
     }
 
-    // Hide if scrolling down, Show if scrolling up
-    if (latest > previous && latest > 50) {
-      setIsVisible(false);
-    } else {
-      setIsVisible(true);
+    // Determine scroll direction
+    const direction = current - previous;
+
+    if (direction > 0) {
+      // Scrolling down -> Hide
+      if (isVisible) setIsVisible(false);
+    } else if (direction < -5) { // Small threshold to prevent jitter
+      // Scrolling up -> Show
+      if (!isVisible) setIsVisible(true);
     }
   });
 
@@ -41,7 +46,7 @@ const NavBar: React.FC<NavBarProps> = ({ isMenuOpen, setIsMenuOpen }) => {
       <motion.header 
         initial={{ y: 0 }}
         animate={{ y: isVisible ? 0 : -100 }}
-        transition={{ duration: 0.3, ease: "easeInOut" }}
+        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
         className="fixed top-0 left-0 right-0 z-50 mix-blend-difference text-white pointer-events-none"
       >
         <div className="max-w-screen-xl mx-auto px-4 md:px-8 h-20 flex items-center justify-between pointer-events-auto relative">
@@ -83,7 +88,7 @@ const NavBar: React.FC<NavBarProps> = ({ isMenuOpen, setIsMenuOpen }) => {
         </div>
       </motion.header>
 
-      {/* Scroll Progress Bar - Static at Top */}
+      {/* Scroll Progress Bar - Static at Top (independent of header visibility) */}
       <motion.div 
         className="fixed top-0 left-0 right-0 h-[3px] bg-white origin-left z-50 mix-blend-difference pointer-events-none"
         style={{ scaleX: scrollYProgress }}

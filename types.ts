@@ -60,4 +60,7 @@ export interface SkillCategory {
 export interface GlobalConfig {
   resumeUrl: string;
   email: string;
+  heroHeadline: string;
+  heroSubheadline: string;
+  heroDescription: string;
 }

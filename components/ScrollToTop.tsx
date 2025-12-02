@@ -7,6 +7,7 @@ const ScrollToTop: React.FC = () => {
 
   useEffect(() => {
     const toggleVisibility = () => {
+      // Show button after scrolling down 500px
       if (window.scrollY > 500) {
         setIsVisible(true);
       } else {
@@ -34,10 +35,13 @@ const ScrollToTop: React.FC = () => {
           exit={{ opacity: 0, y: 20 }}
           transition={{ duration: 0.2 }}
           onClick={scrollToTop}
-          className="fixed bottom-8 right-8 z-40 p-4 bg-neutral-900 text-white rounded-full shadow-lg hover:bg-neutral-800 transition-colors group mix-blend-difference"
+          // Using bg-white with mix-blend-difference ensures:
+          // - On White BG: Inverts to Black button
+          // - On Black BG: Inverts to White button
+          className="fixed bottom-8 right-8 z-40 p-4 bg-white text-black rounded-full shadow-lg transition-transform hover:scale-110 active:scale-95 mix-blend-difference pointer-events-auto"
           title="Go to top"
         >
-          <ArrowUp className="w-5 h-5 group-hover:-translate-y-1 transition-transform duration-300" />
+          <ArrowUp className="w-5 h-5" />
         </motion.button>
       )}
     </AnimatePresence>

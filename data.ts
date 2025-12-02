@@ -7,7 +7,10 @@ export const LAST_UPDATED = new Date().toISOString();
 
 export const INITIAL_CONFIG: GlobalConfig = {
     resumeUrl: "/resume.pdf",
-    email: "hello@mukhianik.com"
+    email: "hello@mukhianik.com",
+    heroHeadline: "Product Designer",
+    heroSubheadline: "& Creative Dev.",
+    heroDescription: "Building digital products that blend aesthetics with function. Currently crafting experiences in San Francisco."
 };
 
 export const PROJECTS: Project[] = [

@@ -79,7 +79,7 @@ const AppContent: React.FC = () => {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Use data from context for footer
+  // Use data from context for footer AND HERO
   const { socials, config } = useData();
 
   // Parallax Animations for Hero
@@ -143,8 +143,8 @@ const AppContent: React.FC = () => {
               transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
               className="text-5xl sm:text-7xl md:text-9xl font-bold tracking-tighter max-w-6xl mb-12 relative z-10 leading-[0.9] cursor-default"
             >
-              Product Designer <br />
-              <span className="text-neutral-400">& Creative Dev.</span>
+              {config.heroHeadline || "Product Designer"} <br />
+              <span className="text-neutral-400">{config.heroSubheadline || "& Creative Dev."}</span>
             </motion.h1>
 
             <motion.div 
@@ -155,7 +155,7 @@ const AppContent: React.FC = () => {
             >
                 <div className="cursor-default">
                     <p className="text-lg md:text-2xl text-neutral-600 leading-relaxed max-w-xl">
-                    Building digital products that blend aesthetics with function. Currently crafting experiences in San Francisco.
+                    {config.heroDescription || "Building digital products that blend aesthetics with function. Currently crafting experiences in San Francisco."}
                     </p>
                 </div>
                 
@@ -196,8 +196,8 @@ const AppContent: React.FC = () => {
               </a>
             </div>
             <div className="flex flex-col justify-end items-start md:items-end gap-4">
-              {socials.map(social => (
-                <a key={social.platform} href={social.url} className="text-lg hover:text-white transition-colors" target="_blank" rel="noopener noreferrer">
+              {socials.map((social, index) => (
+                <a key={`${social.platform}-${index}`} href={social.url} className="text-lg hover:text-white transition-colors" target="_blank" rel="noopener noreferrer">
                   {social.platform}
                 </a>
               ))}
@@ -206,7 +206,7 @@ const AppContent: React.FC = () => {
           <div className="flex flex-col md:flex-row justify-between items-center text-sm border-t border-neutral-800 pt-8">
             <p>&copy; {new Date().getFullYear()} Mukhi Anik. All rights reserved.</p>
             <div className="flex gap-4">
-                <p>Designed by Anik Mukhi.</p>
+                <p>Designed with New Genre Principles.</p>
             </div>
           </div>
         </div>
