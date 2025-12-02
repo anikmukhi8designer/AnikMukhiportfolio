@@ -13,6 +13,7 @@ interface DataContextType {
   experience: Experience[];
   clients: Client[];
   skills: SkillCategory[];
+  lastUpdated: Date | null;
   
   updateProject: (id: string, data: Partial<Project>) => void;
   addProject: (project: Project) => void;
@@ -42,6 +43,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [experience, setExperience] = useState<Experience[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [skills, setSkills] = useState<SkillCategory[]>([]);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
   // Unique ID for this session to identify self-broadcasts
   const clientId = useRef(Math.random().toString(36).substring(7)).current;
@@ -156,8 +158,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setGlobalChannel(syncChannel);
 
         // 2. Setup Database Change Listeners
-        // Note: We might want to throttle these or check origin if possible to avoid overwriting active edits
-        // For now, we keep them active for multi-user collab, but the Live Sync button won't trigger self-overwrite.
         const channels = [
           supabase.channel('work_items_changes')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'work_items' }, () => fetchData())
@@ -188,7 +188,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // --- Broadcast Action ---
   const refreshAllClients = async () => {
       // 1. Force Sync current state to DB (Repository Update)
-      // This ensures that whatever is in the admin UI is effectively "saved" to the DB
       console.log("Syncing all data to repository...");
       
       try {
@@ -206,6 +205,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           await supabase.from('skills').upsert(skills);
           
           console.log("Repository updated successfully.");
+          setLastUpdated(new Date());
       } catch (e) {
           console.error("Failed to sync to repository:", e);
       }
@@ -241,20 +241,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
   
   const addProject = async (project: Project) => {
-    // Optimistic Update: Add immediately to local state
     setProjects(prev => [project, ...prev]);
-
     try {
         const dbData = mapProjectToDB(project);
         const { error } = await supabase.from('work_items').insert([dbData]);
-        
-        // Silent failure - we keep the local state for demo purposes
-        if (error) {
-            console.warn("Supabase Sync Error (Add Project):", error.message);
-        }
-    } catch (e) {
-        console.warn("Sync failed", e);
-    }
+        if (error) console.warn("Supabase Sync Error (Add Project):", error.message);
+    } catch (e) { console.warn("Sync failed", e); }
   };
   
   const deleteProject = async (id: string) => {
@@ -340,36 +332,30 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // --- Reset / Seed ---
   const resetData = async () => {
     if (confirm("⚠️ WARNING: This will WIPE the Supabase Database and seed with demo data. Continue?")) {
-      
       try {
-          // Clear all tables
           await supabase.from('work_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
           await supabase.from('experience_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
           await supabase.from('clients').delete().neq('id', '00000000-0000-0000-0000-000000000000');
           await supabase.from('skills').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
-          // Seed Projects
           const projectsPayload = INITIAL_PROJECTS.map(p => {
             const { id, ...rest } = p;
             return mapProjectToDB({ ...rest, published: true });
           });
           await supabase.from('work_items').insert(projectsPayload);
 
-          // Seed Experience
           const expPayload = INITIAL_EXPERIENCE.map(e => {
             const { id, ...rest } = e;
             return { ...rest, published: true };
           });
           await supabase.from('experience_items').insert(expPayload);
 
-          // Seed Clients
           const clientsPayload = INITIAL_CLIENTS.map(c => {
             const { id, ...rest } = c;
             return rest;
           });
           await supabase.from('clients').insert(clientsPayload);
 
-          // Seed Skills
           const skillsPayload = INITIAL_SKILLS.map(s => {
             const { id, ...rest } = s;
             return rest;
@@ -378,8 +364,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
           alert("Database reset complete.");
           fetchData();
+          setLastUpdated(new Date());
       } catch (e: any) {
-          // Silent fallback for demo
           console.warn("Reset failed", e);
       }
     }
@@ -387,7 +373,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   return (
     <DataContext.Provider value={{
-      projects, experience, clients, skills,
+      projects, experience, clients, skills, lastUpdated,
       updateProject, addProject, deleteProject,
       updateExperience, addExperience, deleteExperience, reorderExperience,
       updateClient, addClient, deleteClient,

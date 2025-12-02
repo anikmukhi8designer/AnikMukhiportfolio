@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Database, Radio } from 'lucide-react';
+import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Radio, RefreshCw } from 'lucide-react';
 import WorkTable from './WorkTable';
 import ExperienceTable from './ExperienceTable';
 import SkillsTable from './SkillsTable';
@@ -14,7 +14,7 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   const [activeTab, setActiveTab] = useState<'work' | 'experience' | 'skills' | 'clients'>('work');
-  const { resetData, refreshAllClients } = useData();
+  const { resetData, refreshAllClients, lastUpdated } = useData();
   const [isBroadcasting, setIsBroadcasting] = useState(false);
 
   const handleLogout = async () => {
@@ -36,27 +36,42 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
         <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <span className="font-bold text-neutral-900 text-lg">New Genre CMS</span>
-            <div className="h-4 w-px bg-neutral-300"></div>
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-green-100 text-green-700">
-                <Database className="w-3 h-3" />
-                Supabase Connected
-            </div>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
+            
+            {/* Sync Status Text */}
+            <div className="text-right flex flex-col items-end">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                    Repository Status
+                </span>
+                <div className="flex items-center gap-1.5">
+                    <div className={`w-2 h-2 rounded-full ${lastUpdated ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                    <span className={`text-xs font-bold ${lastUpdated ? 'text-neutral-900' : 'text-neutral-500'}`}>
+                        {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : 'Not Updated'}
+                    </span>
+                </div>
+            </div>
+
             <button 
                 onClick={handleBroadcast}
                 disabled={isBroadcasting}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-sm ${
                     isBroadcasting 
-                    ? 'bg-red-50 text-red-600 border border-red-100' 
-                    : 'bg-white text-neutral-600 hover:text-neutral-900 border border-neutral-200 hover:border-neutral-400'
+                    ? 'bg-neutral-100 text-neutral-400 border border-neutral-200' 
+                    : 'bg-neutral-900 text-white border border-neutral-900 hover:bg-neutral-800'
                 }`}
                 title="Force update on all visitor screens"
             >
-                <Radio className={`w-4 h-4 ${isBroadcasting ? 'animate-pulse' : ''}`} />
-                {isBroadcasting ? 'Broadcasting...' : 'Live Sync'}
+                {isBroadcasting ? (
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                ) : (
+                    <Radio className="w-3 h-3" />
+                )}
+                {isBroadcasting ? 'Updating...' : 'Update Repository'}
             </button>
+
+            <div className="h-6 w-px bg-neutral-200"></div>
 
             <button onClick={handleLogout} className="p-2 text-neutral-400 hover:text-neutral-900 transition-colors" title="Logout">
                 <LogOut className="w-5 h-5" />
