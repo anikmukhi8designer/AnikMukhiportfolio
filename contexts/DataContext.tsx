@@ -80,13 +80,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         headers: {
           'Authorization': `Bearer ${GITHUB_TOKEN}`,
           'Accept': 'application/vnd.github.v3+json',
-          // Add cache busting to ensure we get fresh data
-          'If-None-Match': '' 
+          'If-None-Match': '' // Disable caching
         }
       });
 
       if (response.ok) {
         const data = await response.json();
+        // Decode base64 content
         const content = JSON.parse(decodeURIComponent(escape(atob(data.content))));
         
         setProjects(content.projects || INITIAL_PROJECTS);
@@ -102,8 +102,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       } else if (response.status === 404) {
         console.log("Data file not found on GitHub. Initializing with default data...");
-        // If file doesn't exist, we'll create it on the first save
-        saveToGitHub(INITIAL_PROJECTS, INITIAL_EXPERIENCE, INITIAL_CLIENTS, INITIAL_SKILLS);
+        // Use default data if file doesn't exist yet
+        setProjects(INITIAL_PROJECTS);
+        setExperience(INITIAL_EXPERIENCE);
+        setClients(INITIAL_CLIENTS);
+        setSkills(INITIAL_SKILLS);
       }
     } catch (error) {
       console.error("Failed to fetch from GitHub:", error);
@@ -130,7 +133,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       lastUpdated: now.toISOString()
     };
 
-    // UTF-8 safe base64 encoding
     const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(content, null, 2))));
 
     try {
@@ -160,11 +162,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.log("GitHub Sync Successful");
       } else {
         const err = await response.json();
-        // If we get a 409 Conflict, it means SHA didn't match (someone else updated). 
-        // In a real app, we'd refetch and merge. Here we just alert.
         console.error("GitHub Save Failed:", err);
-        if (response.status === 409) {
-            alert("Sync Conflict: The data on GitHub has changed since you loaded the page. Please refresh and try again.");
+        // If 409 Conflict (SHA mismatch), usually implies someone else pushed.
+        // In this simple CMS, we might warn the user.
+        if (response.status === 409 || response.status === 422) {
+             // If we don't have the SHA or it's wrong, we might need to fetch first.
+             console.warn("SHA mismatch or missing. Fetching latest to resolve...");
+             await fetchFromGitHub();
         }
       }
     } catch (error) {
@@ -177,11 +181,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     fetchFromGitHub();
   }, []);
 
-  // --- Action Helpers ---
-  // We update local state immediately for UI responsiveness, then trigger background save.
+  // --- Actions ---
 
   const triggerSave = (p: Project[], e: Experience[], c: Client[], s: SkillCategory[]) => {
-      // Debounce could be added here, but direct call is fine for low volume
       saveToGitHub(p, e, c, s);
   };
 
@@ -268,14 +270,30 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setExperience(INITIAL_EXPERIENCE);
         setClients(INITIAL_CLIENTS);
         setSkills(INITIAL_SKILLS);
-        saveToGitHub(INITIAL_PROJECTS, INITIAL_EXPERIENCE, INITIAL_CLIENTS, INITIAL_SKILLS);
+        await saveToGitHub(INITIAL_PROJECTS, INITIAL_EXPERIENCE, INITIAL_CLIENTS, INITIAL_SKILLS);
         alert("Data reset to defaults.");
     }
   };
 
-  // In GitHub mode, refresh is just fetching
+  // Forces a Push to GitHub to ensure the file in the repo matches the current App state
   const refreshAllClients = async () => {
-      await fetchFromGitHub();
+      if (!GITHUB_TOKEN) {
+          alert("GitHub Token not configured.");
+          return;
+      }
+
+      try {
+          // If we don't have a file SHA yet (e.g. didn't load successfully), try fetching first
+          if (!fileSha) {
+             await fetchFromGitHub();
+          }
+
+          await saveToGitHub(projects, experience, clients, skills);
+          alert("Data successfully synced to GitHub!");
+      } catch (e) {
+          console.error(e);
+          alert("Sync failed. See console.");
+      }
   };
 
   return (
