@@ -56,3 +56,8 @@ export interface SkillCategory {
   title: string;
   items: SkillItem[];
 }
+
+export interface GlobalConfig {
+  resumeUrl: string;
+  email: string;
+}

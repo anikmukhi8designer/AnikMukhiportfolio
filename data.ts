@@ -1,9 +1,14 @@
-import { Project, Experience, SocialLink, Client, SkillCategory } from './types';
+import { Project, Experience, SocialLink, Client, SkillCategory, GlobalConfig } from './types';
 
 // Placeholder data simulating extraction from mukhianik.framer.website
 // Images are from Unsplash/Picsum to ensure visibility in this demo environment.
 
 export const LAST_UPDATED = new Date().toISOString();
+
+export const INITIAL_CONFIG: GlobalConfig = {
+    resumeUrl: "/resume.pdf",
+    email: "hello@mukhianik.com"
+};
 
 export const PROJECTS: Project[] = [
   {

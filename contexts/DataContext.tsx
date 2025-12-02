@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Project, Experience, Client, SkillCategory } from '../types';
+import { Project, Experience, Client, SkillCategory, GlobalConfig, SocialLink } from '../types';
 import { 
   PROJECTS as INITIAL_PROJECTS, 
   EXPERIENCE as INITIAL_EXPERIENCE, 
   CLIENTS as INITIAL_CLIENTS, 
-  SKILLS as INITIAL_SKILLS
+  SKILLS as INITIAL_SKILLS,
+  INITIAL_CONFIG,
+  SOCIALS as INITIAL_SOCIALS
 } from '../data';
 
 interface DataContextType {
@@ -12,6 +14,8 @@ interface DataContextType {
   experience: Experience[];
   clients: Client[];
   skills: SkillCategory[];
+  config: GlobalConfig;
+  socials: SocialLink[];
   lastUpdated: Date | null;
   
   updateProject: (id: string, data: Partial<Project>) => void;
@@ -30,6 +34,9 @@ interface DataContextType {
   updateSkill: (id: string, data: Partial<SkillCategory>) => void;
   addSkill: (skill: SkillCategory) => void;
   deleteSkill: (id: string) => void;
+
+  updateConfig: (data: Partial<GlobalConfig>) => void;
+  updateSocials: (data: SocialLink[]) => void;
 
   resetData: () => void;
   refreshAllClients: () => Promise<void>;
@@ -56,6 +63,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [experience, setExperience] = useState<Experience[]>(INITIAL_EXPERIENCE);
   const [clients, setClients] = useState<Client[]>(INITIAL_CLIENTS);
   const [skills, setSkills] = useState<SkillCategory[]>(INITIAL_SKILLS);
+  const [config, setConfig] = useState<GlobalConfig>(INITIAL_CONFIG);
+  const [socials, setSocials] = useState<SocialLink[]>(INITIAL_SOCIALS);
   
   const [lastUpdated, setLastUpdated] = useState<Date | null>(() => {
     const saved = localStorage.getItem('cms_last_updated');
@@ -137,6 +146,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (content.experience) setExperience(content.experience);
       if (content.clients) setClients(content.clients);
       if (content.skills) setSkills(content.skills);
+      if (content.config) setConfig(content.config);
+      if (content.socials) setSocials(content.socials);
       
       if (content.lastUpdated) {
           const date = new Date(content.lastUpdated);
@@ -149,7 +160,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     p: Project[], 
     e: Experience[], 
     c: Client[], 
-    s: SkillCategory[]
+    s: SkillCategory[],
+    cfg: GlobalConfig,
+    soc: SocialLink[]
   ) => {
     const token = getGitHubToken();
     if (!token) {
@@ -163,6 +176,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       experience: e,
       clients: c,
       skills: s,
+      config: cfg,
+      socials: soc,
       lastUpdated: now.toISOString()
     };
 
@@ -215,85 +230,103 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // --- Actions ---
 
-  const triggerSave = (p: Project[], e: Experience[], c: Client[], s: SkillCategory[]) => {
-      saveToGitHub(p, e, c, s);
+  const triggerSave = (
+      p: Project[], 
+      e: Experience[], 
+      c: Client[], 
+      s: SkillCategory[],
+      cfg: GlobalConfig,
+      soc: SocialLink[]
+  ) => {
+      saveToGitHub(p, e, c, s, cfg, soc);
   };
 
   const updateProject = (id: string, data: Partial<Project>) => {
     const newProjects = projects.map(p => p.id === id ? { ...p, ...data } : p);
     setProjects(newProjects);
-    triggerSave(newProjects, experience, clients, skills);
+    triggerSave(newProjects, experience, clients, skills, config, socials);
   };
   
   const addProject = (project: Project) => {
     const newProjects = [project, ...projects];
     setProjects(newProjects);
-    triggerSave(newProjects, experience, clients, skills);
+    triggerSave(newProjects, experience, clients, skills, config, socials);
   };
   
   const deleteProject = (id: string) => {
     const newProjects = projects.filter(p => p.id !== id);
     setProjects(newProjects);
-    triggerSave(newProjects, experience, clients, skills);
+    triggerSave(newProjects, experience, clients, skills, config, socials);
   };
 
   const updateExperience = (id: string, data: Partial<Experience>) => {
     const newExp = experience.map(e => e.id === id ? { ...e, ...data } : e);
     setExperience(newExp);
-    triggerSave(projects, newExp, clients, skills);
+    triggerSave(projects, newExp, clients, skills, config, socials);
   };
   
   const addExperience = (exp: Experience) => {
     const newExp = [exp, ...experience];
     setExperience(newExp);
-    triggerSave(projects, newExp, clients, skills);
+    triggerSave(projects, newExp, clients, skills, config, socials);
   };
   
   const deleteExperience = (id: string) => {
     const newExp = experience.filter(e => e.id !== id);
     setExperience(newExp);
-    triggerSave(projects, newExp, clients, skills);
+    triggerSave(projects, newExp, clients, skills, config, socials);
   };
   
   const reorderExperience = (items: Experience[]) => {
     setExperience(items);
-    triggerSave(projects, items, clients, skills);
+    triggerSave(projects, items, clients, skills, config, socials);
   };
 
   const updateClient = (id: string, data: Partial<Client>) => {
     const newClients = clients.map(c => c.id === id ? { ...c, ...data } : c);
     setClients(newClients);
-    triggerSave(projects, experience, newClients, skills);
+    triggerSave(projects, experience, newClients, skills, config, socials);
   };
   
   const addClient = (client: Client) => {
     const newClients = [client, ...clients];
     setClients(newClients);
-    triggerSave(projects, experience, newClients, skills);
+    triggerSave(projects, experience, newClients, skills, config, socials);
   };
   
   const deleteClient = (id: string) => {
     const newClients = clients.filter(c => c.id !== id);
     setClients(newClients);
-    triggerSave(projects, experience, newClients, skills);
+    triggerSave(projects, experience, newClients, skills, config, socials);
   };
 
   const updateSkill = (id: string, data: Partial<SkillCategory>) => {
     const newSkills = skills.map(s => s.id === id ? { ...s, ...data } : s);
     setSkills(newSkills);
-    triggerSave(projects, experience, clients, newSkills);
+    triggerSave(projects, experience, clients, newSkills, config, socials);
   };
   
   const addSkill = (skill: SkillCategory) => {
     const newSkills = [...skills, skill];
     setSkills(newSkills);
-    triggerSave(projects, experience, clients, newSkills);
+    triggerSave(projects, experience, clients, newSkills, config, socials);
   };
   
   const deleteSkill = (id: string) => {
     const newSkills = skills.filter(s => s.id !== id);
     setSkills(newSkills);
-    triggerSave(projects, experience, clients, newSkills);
+    triggerSave(projects, experience, clients, newSkills, config, socials);
+  };
+
+  const updateConfig = (data: Partial<GlobalConfig>) => {
+      const newConfig = { ...config, ...data };
+      setConfig(newConfig);
+      triggerSave(projects, experience, clients, skills, newConfig, socials);
+  };
+
+  const updateSocials = (data: SocialLink[]) => {
+      setSocials(data);
+      triggerSave(projects, experience, clients, skills, config, data);
   };
 
   const resetData = async () => {
@@ -302,7 +335,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setExperience(INITIAL_EXPERIENCE);
         setClients(INITIAL_CLIENTS);
         setSkills(INITIAL_SKILLS);
-        await saveToGitHub(INITIAL_PROJECTS, INITIAL_EXPERIENCE, INITIAL_CLIENTS, INITIAL_SKILLS);
+        setConfig(INITIAL_CONFIG);
+        setSocials(INITIAL_SOCIALS);
+        await saveToGitHub(INITIAL_PROJECTS, INITIAL_EXPERIENCE, INITIAL_CLIENTS, INITIAL_SKILLS, INITIAL_CONFIG, INITIAL_SOCIALS);
         alert("Data reset to defaults.");
     }
   };
@@ -332,7 +367,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
              await fetchFromGitHub(false);
           }
 
-          await saveToGitHub(projects, experience, clients, skills);
+          await saveToGitHub(projects, experience, clients, skills, config, socials);
           alert("Data successfully synced to GitHub!");
       } catch (e) {
           console.error(e);
@@ -342,11 +377,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   return (
     <DataContext.Provider value={{
-      projects, experience, clients, skills, lastUpdated,
+      projects, experience, clients, skills, lastUpdated, config, socials,
       updateProject, addProject, deleteProject,
       updateExperience, addExperience, deleteExperience, reorderExperience,
       updateClient, addClient, deleteClient,
       updateSkill, addSkill, deleteSkill,
+      updateConfig, updateSocials,
       resetData, refreshAllClients
     }}>
       {children}

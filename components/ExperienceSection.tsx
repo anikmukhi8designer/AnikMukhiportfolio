@@ -4,7 +4,7 @@ import { ArrowUpRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const ExperienceSection: React.FC = () => {
-  const { experience } = useData();
+  const { experience, config } = useData();
   const publishedExperience = experience.filter(e => e.published);
 
   return (
@@ -16,7 +16,7 @@ const ExperienceSection: React.FC = () => {
             <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-400">
                 Experience
             </h2>
-            <a href="/resume.pdf" className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-neutral-900 hover:text-neutral-500 transition-colors">
+            <a href={config.resumeUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-neutral-900 hover:text-neutral-500 transition-colors">
                 Download Resume <ArrowUpRight className="w-4 h-4" />
             </a>
         </div>

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Radio, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Radio, RefreshCw, UserCircle } from 'lucide-react';
 import WorkTable from './WorkTable';
 import ExperienceTable from './ExperienceTable';
 import SkillsTable from './SkillsTable';
 import ClientsTable from './ClientsTable';
+import ProfileSettings from './ProfileSettings';
 import { useData } from '../../contexts/DataContext';
 
 interface DashboardProps {
@@ -12,7 +13,7 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
-  const [activeTab, setActiveTab] = useState<'work' | 'experience' | 'skills' | 'clients'>('work');
+  const [activeTab, setActiveTab] = useState<'work' | 'experience' | 'skills' | 'clients' | 'settings'>('work');
   const { resetData, refreshAllClients, lastUpdated } = useData();
   const [isBroadcasting, setIsBroadcasting] = useState(false);
 
@@ -117,6 +118,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
             >
                 <Users className="w-4 h-4" /> Clients
             </button>
+            <button 
+                onClick={() => setActiveTab('settings')}
+                className={`flex items-center gap-2 px-4 md:px-6 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex-shrink-0 ${
+                    activeTab === 'settings' 
+                    ? 'bg-white text-neutral-900 shadow-sm' 
+                    : 'text-neutral-500 hover:text-neutral-900'
+                }`}
+            >
+                <UserCircle className="w-4 h-4" /> Settings
+            </button>
         </div>
 
         {/* Tab Content */}
@@ -124,6 +135,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
         {activeTab === 'experience' && <ExperienceTable />}
         {activeTab === 'skills' && <SkillsTable />}
         {activeTab === 'clients' && <ClientsTable />}
+        {activeTab === 'settings' && <ProfileSettings />}
 
         {/* Footer Actions */}
         <div className="mt-12 pt-8 border-t border-neutral-200 flex flex-col sm:flex-row justify-between items-center text-sm text-neutral-500 gap-4">

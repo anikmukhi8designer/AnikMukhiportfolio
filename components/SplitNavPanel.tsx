@@ -43,7 +43,7 @@ const columnVariants: Variants = {
 
 const SplitNavPanel: React.FC<SplitNavPanelProps> = ({ isOpen, onClose, onProjectClick }) => {
   const [hoveredProject, setHoveredProject] = useState<string | null>(null);
-  const { projects, experience } = useData();
+  const { projects, experience, config } = useData();
 
   const visibleProjects = projects.filter(p => p.published).slice(0, 6); // Limit to 6 for menu
   const visibleExperience = experience.filter(e => e.published).slice(0, 4);
@@ -141,7 +141,7 @@ const SplitNavPanel: React.FC<SplitNavPanelProps> = ({ isOpen, onClose, onProjec
               </div>
 
               <div className="mt-auto pt-12">
-                 <a href="mailto:hello@mukhianik.com" className="text-2xl md:text-3xl font-bold hover:text-neutral-400 transition-colors inline-flex items-center gap-2">
+                 <a href={`mailto:${config.email}`} className="text-2xl md:text-3xl font-bold hover:text-neutral-400 transition-colors inline-flex items-center gap-2">
                     Let's Talk <ArrowUpRight className="w-6 h-6" />
                  </a>
               </div>
