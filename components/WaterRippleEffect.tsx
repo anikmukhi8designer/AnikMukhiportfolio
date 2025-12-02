@@ -13,8 +13,6 @@ const WaterRippleEffect: React.FC = () => {
   const buffer1Ref = useRef<Int16Array>(new Int16Array(0));
   const buffer2Ref = useRef<Int16Array>(new Int16Array(0));
   
-  const damping = 0.96; // Wave decay
-  
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -25,7 +23,6 @@ const WaterRippleEffect: React.FC = () => {
 
     const init = () => {
       // Lower resolution for performance and "soft" water look
-      // We process at a smaller scale then scale up via CSS to keep it fast
       const processScale = 0.5; 
       
       const w = Math.floor(container.clientWidth * processScale);
@@ -39,8 +36,6 @@ const WaterRippleEffect: React.FC = () => {
       heightRef.current = h;
 
       const size = w * h;
-      // Only re-allocate if size changed to avoid GC thrashing, 
-      // but strictly necessary for resize logic.
       if (buffer1Ref.current.length !== size) {
           buffer1Ref.current = new Int16Array(size);
           buffer2Ref.current = new Int16Array(size);
@@ -51,7 +46,6 @@ const WaterRippleEffect: React.FC = () => {
       const w = widthRef.current;
       const h = heightRef.current;
 
-      // Guard against 0 dimensions (e.g. before layout)
       if (w <= 0 || h <= 0) {
         animationFrameRef.current = requestAnimationFrame(process);
         return;
@@ -59,27 +53,24 @@ const WaterRippleEffect: React.FC = () => {
       
       const buffer1 = buffer1Ref.current;
       const buffer2 = buffer2Ref.current;
-      
-      // Ensure buffers match current dimensions (safety check)
-      if (buffer1.length !== w * h || buffer2.length !== w * h) {
-          init(); // Attempt to re-init if mismatch
+      const size = w * h;
+
+      if (buffer1.length !== size || buffer2.length !== size) {
+          init();
           animationFrameRef.current = requestAnimationFrame(process);
           return;
       }
 
       // Wave propagation algorithm
-      // For each pixel, new height is average of neighbors minus current height (velocity)
-      // Optimized loop: avoid edge checking inside loop by iterating from w to size-w
-      const size = w * h;
       for (let i = w; i < size - w; i++) {
-        buffer2[i] = (
+        const val = (
           (buffer1[i - 1] +
            buffer1[i + 1] +
            buffer1[i - w] +
            buffer1[i + w]) >> 1
         ) - buffer2[i];
         
-        buffer2[i] -= (buffer2[i] >> 5); // Damping
+        buffer2[i] = val - (val >> 5); // Damping ~0.968
       }
 
       // Swap buffers
@@ -88,26 +79,31 @@ const WaterRippleEffect: React.FC = () => {
       buffer2Ref.current = temp;
 
       // Render to canvas
-      // Guard createImageView against 0
       try {
           const imgData = ctx.createImageData(w, h);
           const data = imgData.data;
-          const buffer = buffer1Ref.current; // The active buffer to draw
+          const buffer = buffer1Ref.current; 
 
           for (let i = 0; i < size; i++) {
-            let wave = buffer[i];
+            const wave = buffer[i];
             
-            // Background color is #fafafa (250, 250, 250)
-            let r = 250;
-            let g = 250;
-            let b = 250;
+            // Base white (255) so it's transparent in Multiply mode
+            let r = 255;
+            let g = 255;
+            let b = 255;
 
             if (wave !== 0) {
-              const intensity = wave; 
-              // Shadow
-              r = Math.max(0, 250 - intensity);
-              g = Math.max(0, 250 - intensity);
-              b = Math.max(0, 250 - intensity);
+              // Create shadow from wave height
+              // Clamped to avoid wrapping
+              const intensity = Math.max(0, Math.min(255, wave));
+              
+              if (intensity > 0) {
+                  // Subtract intensity to create shadow
+                  // Less subtraction from Blue channel = Blue Tint
+                  r = 255 - intensity;
+                  g = 255 - intensity;
+                  b = 255 - Math.floor(intensity * 0.8); 
+              }
             }
 
             data[i * 4 + 0] = r;
@@ -118,7 +114,7 @@ const WaterRippleEffect: React.FC = () => {
 
           ctx.putImageData(imgData, 0, 0);
       } catch (e) {
-          // Ignore transient resize errors
+          // Ignore resize race conditions
       }
       
       animationFrameRef.current = requestAnimationFrame(process);
@@ -132,10 +128,18 @@ const WaterRippleEffect: React.FC = () => {
     };
 
     const handleMouseMove = (e: MouseEvent) => {
-      // If canvas is not sized yet, ignore
       if (widthRef.current <= 0) return;
 
       const rect = canvas.getBoundingClientRect();
+      
+      // Check if mouse is within canvas bounds
+      if (
+          e.clientX < rect.left || 
+          e.clientX > rect.right || 
+          e.clientY < rect.top || 
+          e.clientY > rect.bottom
+      ) return;
+
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
 
@@ -145,15 +149,15 @@ const WaterRippleEffect: React.FC = () => {
       const w = widthRef.current;
       const h = heightRef.current;
       
-      const radius = 3;
-      const strength = 500; 
+      const radius = 2; // Smaller radius for sharper ripples
+      const strength = 600; // Amplitude
 
       for (let j = y - radius; j < y + radius; j++) {
         for (let k = x - radius; k < x + radius; k++) {
           if (j >= 0 && j < h && k >= 0 && k < w) {
-            // Safety check for array bounds
             const index = j * w + k;
             if (index >= 0 && index < buffer1Ref.current.length) {
+                // Add disturbance
                 buffer1Ref.current[index] = strength;
             }
           }
@@ -161,21 +165,19 @@ const WaterRippleEffect: React.FC = () => {
       }
     };
     
-    // Attach listener to window or a larger container if needed, 
-    // but attaching to canvas works if pointer-events allow.
-    // Ensure we clean up correctly.
-    canvas.addEventListener('mousemove', handleMouseMove);
+    // Attach to window to capture moves even over overlay text
+    window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('resize', handleResize);
 
     return () => {
       cancelAnimationFrame(animationFrameRef.current);
       window.removeEventListener('resize', handleResize);
-      canvas.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mousemove', handleMouseMove);
     };
   }, []);
 
   return (
-    <div ref={containerRef} className="absolute inset-0 z-0 overflow-hidden pointer-events-auto mix-blend-multiply opacity-60">
+    <div ref={containerRef} className="absolute inset-0 z-0 overflow-hidden pointer-events-none mix-blend-multiply opacity-80">
       <canvas 
         ref={canvasRef} 
         className="w-full h-full block"

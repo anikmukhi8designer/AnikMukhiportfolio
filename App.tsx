@@ -128,7 +128,7 @@ const AppContent: React.FC = () => {
             initial={{ opacity: 0, y: 40 }}
             animate={!isLoading ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
-            className="text-4xl sm:text-6xl md:text-8xl font-bold tracking-tighter max-w-5xl mb-8 relative z-10 pointer-events-none"
+            className="text-4xl sm:text-6xl md:text-8xl font-bold tracking-tighter max-w-5xl mb-8 relative z-10"
           >
             Product Designer & <br />
             <span className="text-neutral-400">Creative Developer.</span>
@@ -137,7 +137,7 @@ const AppContent: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={!isLoading ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 1, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className="text-lg md:text-2xl text-neutral-600 max-w-2xl leading-relaxed relative z-10 pointer-events-none"
+            className="text-lg md:text-2xl text-neutral-600 max-w-2xl leading-relaxed relative z-10"
           >
             I help startups and established companies build digital products that look good and work even better. Currently based in San Francisco.
           </motion.p>
