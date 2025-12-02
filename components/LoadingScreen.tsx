@@ -10,7 +10,6 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
 
   useEffect(() => {
     // Simulate loading time based on "resources"
-    // In a real app, you might tie this to document.readyState or specific asset loading
     const duration = 2000; // 2 seconds total load time
     const intervalTime = 20;
     const steps = duration / intervalTime;
@@ -31,7 +30,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
     const timeout = setTimeout(() => {
        clearInterval(timer);
        setCount(100);
-       setTimeout(onComplete, 800); // Slight delay after 100% before lifting curtain
+       setTimeout(onComplete, 800); 
     }, duration);
 
     return () => {
@@ -59,10 +58,10 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
                 </span>
             </div>
             
-            {/* Progress Bar */}
-            <div className="w-full h-[1px] bg-neutral-800 relative overflow-hidden">
+            {/* Colorful Progress Bar */}
+            <div className="w-full h-1 bg-neutral-800 rounded-full relative overflow-hidden">
                 <motion.div 
-                    className="absolute left-0 top-0 bottom-0 bg-white"
+                    className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"
                     style={{ width: `${count}%` }}
                 />
             </div>
