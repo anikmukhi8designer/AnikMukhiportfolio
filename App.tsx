@@ -206,7 +206,7 @@ const AppContent: React.FC = () => {
           <div className="flex flex-col md:flex-row justify-between items-center text-sm border-t border-neutral-800 pt-8">
             <p>&copy; {new Date().getFullYear()} Mukhi Anik. All rights reserved.</p>
             <div className="flex gap-4">
-                <p>Designed with New Genre Principles.</p>
+                <p>Designed by Anik Mukhi.</p>
             </div>
           </div>
         </div>
