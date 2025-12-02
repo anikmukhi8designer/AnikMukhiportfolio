@@ -31,6 +31,13 @@
         -webkit-font-smoothing: antialiased;
       }
       
+      /* Hide cursor on fine pointer devices (mouse) */
+      @media (pointer: fine) {
+        body, a, button, input, textarea, select {
+          cursor: none !important;
+        }
+      }
+
       /* Custom scrollbar to match minimal aesthetic */
       ::-webkit-scrollbar {
         width: 8px;

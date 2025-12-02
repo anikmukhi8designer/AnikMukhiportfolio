@@ -7,6 +7,7 @@ import SkillsSection from './components/SkillsSection';
 import Modal from './components/Modal';
 import NavBar from './components/NavBar';
 import SplitNavPanel from './components/SplitNavPanel';
+import CustomCursor from './components/CustomCursor';
 import { SOCIALS } from './data';
 import { ArrowDown } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -91,8 +92,11 @@ const AppContent: React.FC = () => {
   
   // Public Portfolio Route
   return (
-    <div className="min-h-screen bg-[#fafafa] text-neutral-900 font-sans selection:bg-neutral-900 selection:text-white">
+    <div className="min-h-screen bg-[#fafafa] text-neutral-900 font-sans selection:bg-neutral-900 selection:text-white cursor-none">
       
+      {/* Custom Cursor (Hidden on Touch Devices via CSS) */}
+      <CustomCursor />
+
       {/* Navigation System */}
       <NavBar isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
       

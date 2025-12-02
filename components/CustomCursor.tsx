@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { motion, useMotionValue, useSpring } from 'framer-motion';
+import { motion, useMotionValue, useSpring, Variants } from 'framer-motion';
 
 const CustomCursor: React.FC = () => {
-  const [isVisible, setIsVisible] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isClicked, setIsClicked] = useState(false);
+  
+  // Mouse position
   const cursorX = useMotionValue(-100);
   const cursorY = useMotionValue(-100);
-  
-  // Smooth spring animation for the movement
-  const springConfig = { damping: 25, stiffness: 700 };
+
+  // Smooth physics for the movement
+  const springConfig = { damping: 20, stiffness: 400, mass: 0.5 };
   const cursorXSpring = useSpring(cursorX, springConfig);
   const cursorYSpring = useSpring(cursorY, springConfig);
 
@@ -15,68 +18,97 @@ const CustomCursor: React.FC = () => {
     const moveCursor = (e: MouseEvent) => {
       cursorX.set(e.clientX);
       cursorY.set(e.clientY);
-      if (!isVisible) setIsVisible(true);
     };
 
-    const handleMouseEnter = () => setIsVisible(true);
-    const handleMouseLeave = () => setIsVisible(false);
+    const handleMouseDown = () => setIsClicked(true);
+    const handleMouseUp = () => setIsClicked(false);
+
+    // Global Hover Detection
+    const handleMouseOver = (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        const isInteractive = 
+            target.tagName.toLowerCase() === 'a' || 
+            target.tagName.toLowerCase() === 'button' || 
+            target.closest('a') || 
+            target.closest('button') ||
+            target.classList.contains('cursor-pointer');
+            
+        setIsHovered(!!isInteractive);
+    };
 
     window.addEventListener('mousemove', moveCursor);
-    document.body.addEventListener('mouseenter', handleMouseEnter);
-    document.body.addEventListener('mouseleave', handleMouseLeave);
+    window.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mouseover', handleMouseOver);
 
     return () => {
       window.removeEventListener('mousemove', moveCursor);
-      document.body.removeEventListener('mouseenter', handleMouseEnter);
-      document.body.removeEventListener('mouseleave', handleMouseLeave);
+      window.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mouseover', handleMouseOver);
     };
-  }, [cursorX, cursorY, isVisible]);
+  }, [cursorX, cursorY]);
+
+  // Animation Variants
+  const variants: Variants = {
+    default: {
+      height: 12,
+      width: 12,
+      backgroundColor: "#1a1a1a",
+      x: "-50%",
+      y: "-50%",
+      opacity: 1,
+      mixBlendMode: "normal"
+    },
+    hover: {
+      height: 64,
+      width: 64,
+      backgroundColor: "#1a1a1a",
+      x: "-50%",
+      y: "-50%",
+      opacity: 0.1, // Transparent bubble effect
+      mixBlendMode: "multiply"
+    },
+    click: {
+      height: 8,
+      width: 8,
+      backgroundColor: "#000000",
+      x: "-50%",
+      y: "-50%",
+    }
+  };
 
   return (
-    <motion.div
-      className="fixed top-0 left-0 pointer-events-none z-[9999] mix-blend-difference"
-      style={{
-        x: cursorXSpring,
-        y: cursorYSpring,
-        opacity: isVisible ? 1 : 0,
-        translateX: '-4px', // Slight offset to align pointer tip
-        translateY: '-2px'
-      }}
-    >
-      {/* 
-        Custom SVG Arrow 
-        Design: A sharp, angular navigation arrow with a purple-pink gradient.
-      */}
-      <svg 
-        width="32" 
-        height="32" 
-        viewBox="0 0 32 32" 
-        fill="none" 
-        xmlns="http://www.w3.org/2000/svg"
-        className="drop-shadow-lg"
-      >
-        <defs>
-          <linearGradient id="cursorGradient" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#8b5cf6" /> {/* Violet */}
-            <stop offset="50%" stopColor="#ec4899" /> {/* Pink */}
-            <stop offset="100%" stopColor="#a855f7" /> {/* Purple */}
-          </linearGradient>
-          <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="1.5" result="blur" />
-            <feComposite in="SourceGraphic" in2="blur" operator="over" />
-          </filter>
-        </defs>
-        
-        {/* Main Pointer Shape */}
-        <path 
-            d="M2 2L11.5 26.5L15.5 16.5L25.5 12.5L2 2Z" 
-            fill="url(#cursorGradient)" 
-            stroke="white" 
-            strokeWidth="1.5"
-            strokeLinejoin="round"
+    <>
+        {/* Main Cursor Dot */}
+        <motion.div
+            className="fixed top-0 left-0 pointer-events-none z-[9999] rounded-full hidden md:block"
+            style={{
+                left: cursorXSpring,
+                top: cursorYSpring,
+            }}
+            variants={variants}
+            animate={isClicked ? 'click' : isHovered ? 'hover' : 'default'}
+            transition={{ type: "spring", stiffness: 400, damping: 28 }}
         />
-      </svg>
-    </motion.div>
+        
+        {/* Optional: Second following ring for extra flair */}
+        <motion.div
+            className="fixed top-0 left-0 pointer-events-none z-[9998] rounded-full border border-neutral-900/20 hidden md:block"
+            style={{
+                left: cursorXSpring,
+                top: cursorYSpring,
+            }}
+            animate={{
+                width: isHovered ? 0 : 40,
+                height: isHovered ? 0 : 40,
+                x: "-50%",
+                y: "-50%",
+                opacity: isHovered ? 0 : 1
+            }}
+            transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.05 }}
+        />
+    </>
   );
 };
 
