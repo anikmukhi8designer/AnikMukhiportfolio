@@ -107,6 +107,19 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
     setShouldFocusId(newBlock.id);
   };
 
+  const duplicateBlock = (index: number) => {
+    const blockToDuplicate = blocks[index];
+    const newBlock: ContentBlock = {
+        ...blockToDuplicate,
+        id: generateId()
+    };
+    const newBlocks = [...blocks];
+    newBlocks.splice(index + 1, 0, newBlock);
+    setBlocks(newBlocks);
+    setHasUnsavedChanges(true);
+    setShouldFocusId(newBlock.id);
+  };
+
   const updateBlock = (id: string, content: string, caption?: string) => {
     setBlocks(blocks.map(b => b.id === id ? { ...b, content, caption } : b));
     setHasUnsavedChanges(true);
@@ -498,6 +511,9 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
                     <GripVertical className="w-4 h-4 text-neutral-300 cursor-grab active:cursor-grabbing" />
                     <button onClick={() => moveBlock(index, 'down')} className="p-1 hover:bg-white rounded text-neutral-400 hover:text-neutral-900">
                         <ArrowDown className="w-3 h-3" />
+                    </button>
+                    <button onClick={() => duplicateBlock(index)} className="p-1 hover:bg-white rounded text-neutral-400 hover:text-neutral-900 mt-1" title="Duplicate Block">
+                        <Copy className="w-3 h-3" />
                     </button>
                 </div>
 
