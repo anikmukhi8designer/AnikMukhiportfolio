@@ -11,6 +11,7 @@ import SplitNavPanel from './components/SplitNavPanel';
 import CustomCursor from './components/CustomCursor';
 import ScrollToTop from './components/ScrollToTop';
 import LoadingScreen from './components/LoadingScreen';
+import InteractiveGradient from './components/InteractiveGradient';
 import { ArrowDown } from 'lucide-react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 
@@ -128,6 +129,9 @@ const AppContent: React.FC = () => {
         {/* Hero Section */}
         <section className="min-h-[90vh] flex flex-col justify-center px-4 md:px-8 max-w-screen-xl mx-auto relative overflow-hidden group">
           
+          {/* Background Interactive Gradient */}
+          <InteractiveGradient />
+
           {/* Main Content with Parallax */}
           <motion.div 
             style={{ y: heroTextY, opacity: heroOpacity }}

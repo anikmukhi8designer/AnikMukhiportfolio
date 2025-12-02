@@ -54,27 +54,28 @@ const CustomCursor: React.FC = () => {
     default: {
       height: 12,
       width: 12,
-      backgroundColor: "#1a1a1a",
+      backgroundColor: "#ffffff",
       x: "-50%",
       y: "-50%",
       opacity: 1,
-      mixBlendMode: "normal"
+      mixBlendMode: "difference"
     },
     hover: {
       height: 64,
       width: 64,
-      backgroundColor: "#1a1a1a",
+      backgroundColor: "#ffffff",
       x: "-50%",
       y: "-50%",
-      opacity: 0.1, // Transparent bubble effect
-      mixBlendMode: "multiply"
+      opacity: 1,
+      mixBlendMode: "difference"
     },
     click: {
       height: 8,
       width: 8,
-      backgroundColor: "#000000",
+      backgroundColor: "#ffffff",
       x: "-50%",
       y: "-50%",
+      mixBlendMode: "difference"
     }
   };
 
@@ -92,9 +93,9 @@ const CustomCursor: React.FC = () => {
             transition={{ type: "spring", stiffness: 400, damping: 28 }}
         />
         
-        {/* Optional: Second following ring for extra flair */}
+        {/* Optional: Second following ring for extra flair - also using difference mode */}
         <motion.div
-            className="fixed top-0 left-0 pointer-events-none z-[9998] rounded-full border border-neutral-900/20 hidden md:block"
+            className="fixed top-0 left-0 pointer-events-none z-[9998] rounded-full border border-white mix-blend-difference hidden md:block"
             style={{
                 left: cursorXSpring,
                 top: cursorYSpring,
