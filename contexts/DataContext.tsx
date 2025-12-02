@@ -187,9 +187,29 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // --- Broadcast Action ---
   const refreshAllClients = async () => {
-      // 1. DO NOT fetch locally. We trust our optimistic state. 
-      // Fetching here risks overwriting unsaved/pending inputs with stale DB data.
+      // 1. Force Sync current state to DB (Repository Update)
+      // This ensures that whatever is in the admin UI is effectively "saved" to the DB
+      console.log("Syncing all data to repository...");
       
+      try {
+          // Projects
+          const projectsPayload = projects.map(p => mapProjectToDB(p));
+          await supabase.from('work_items').upsert(projectsPayload);
+
+          // Experience
+          await supabase.from('experience_items').upsert(experience);
+
+          // Clients
+          await supabase.from('clients').upsert(clients);
+
+          // Skills
+          await supabase.from('skills').upsert(skills);
+          
+          console.log("Repository updated successfully.");
+      } catch (e) {
+          console.error("Failed to sync to repository:", e);
+      }
+
       // 2. Send signal to the world
       if (globalChannel) {
           try {
