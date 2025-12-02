@@ -132,7 +132,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const response = await fetch(apiUrl, { headers });
 
       if (response.ok) {
-        const data = await response.json();
+        const data: any = await response.json();
         
         if (shouldApplyData) {
             // Decode base64 content
@@ -246,7 +246,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data: any = await response.json();
         setFileSha(data.content.sha);
         setLastUpdated(now);
         localStorage.setItem('cms_last_updated', now.toISOString());
@@ -263,7 +263,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                  }
              });
              if(shaRes.ok) {
-                 const shaData = await shaRes.json();
+                 const shaData: any = await shaRes.json();
                  setFileSha(shaData.sha);
                  body.sha = shaData.sha;
                  
@@ -277,7 +277,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                   });
                   
                   if (retryResponse.ok) {
-                      const retryData = await retryResponse.json();
+                      const retryData: any = await retryResponse.json();
                       setFileSha(retryData.content.sha);
                       setLastUpdated(now);
                       localStorage.setItem('cms_last_updated', now.toISOString());

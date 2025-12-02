@@ -11,10 +11,10 @@
   --c-text-secondary: #666666;
   --c-text-tertiary: #999999;
   
-  /* Accents (Subtle Mesh - Increased saturation for visibility) */
-  --c-accent-1: #e0e7ff; /* Indigo-100 */
-  --c-accent-2: #fae8ff; /* Fuchsia-100 */
-  --c-accent-3: #f3f4f6; /* Gray-100 */
+  /* Accents (Subtle Mesh - slightly darkened to allow white gradients to pop if needed, or colored ones to sit on top) */
+  --c-accent-1: #eef2ff; /* Indigo-50 */
+  --c-accent-2: #fdf4ff; /* Fuchsia-50 */
+  --c-accent-3: #f9fafb; /* Gray-50 */
   
   /* --- TYPOGRAPHY --- */
   --font-sans: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -26,10 +26,11 @@
   --duration-base: 0.6s;
   
   /* --- GRADIENTS --- */
-  --g-mesh: radial-gradient(at 0% 0%, var(--c-accent-1) 0px, transparent 50%),
-            radial-gradient(at 100% 0%, var(--c-accent-2) 0px, transparent 50%),
-            radial-gradient(at 100% 100%, var(--c-accent-1) 0px, transparent 50%),
-            radial-gradient(at 0% 100%, var(--c-accent-3) 0px, transparent 50%);
+  /* Reduced opacity of the static mesh so the interactive gradient is the star */
+  --g-mesh: radial-gradient(at 0% 0%, var(--c-accent-1) 0px, transparent 40%),
+            radial-gradient(at 100% 0%, var(--c-accent-2) 0px, transparent 40%),
+            radial-gradient(at 100% 100%, var(--c-accent-1) 0px, transparent 40%),
+            radial-gradient(at 0% 100%, var(--c-accent-3) 0px, transparent 40%);
 }
 
 /* GLOBAL RESET & BASE */
@@ -74,9 +75,9 @@ body {
 .bg-\[\#fafafa\] {
   background-color: var(--c-bg) !important;
   background-image: var(--g-mesh) !important;
-  background-size: 140% 140% !important;
+  background-size: 120% 120% !important;
   background-attachment: fixed;
-  animation: gradient-drift 20s ease-in-out infinite alternate;
+  animation: gradient-drift 30s ease-in-out infinite alternate;
 }
 
 @keyframes gradient-drift {

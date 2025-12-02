@@ -73,7 +73,7 @@ const SkillsTable: React.FC = () => {
             }
         });
         const data = await response.json();
-        setSearchResults(data);
+        setSearchResults(data as any[]);
     } catch (error) {
         console.error("Brandfetch search error:", error);
     } finally {
