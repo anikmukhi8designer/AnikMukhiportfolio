@@ -43,7 +43,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [experience, setExperience] = useState<Experience[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [skills, setSkills] = useState<SkillCategory[]>([]);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  
+  // Initialize lastUpdated from localStorage to persist status across reloads
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(() => {
+    const saved = localStorage.getItem('cms_last_updated');
+    return saved ? new Date(saved) : null;
+  });
   
   // Unique ID for this session to identify self-broadcasts
   const clientId = useRef(Math.random().toString(36).substring(7)).current;
@@ -68,6 +73,79 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       ...rest,
       ...(heroImage && { hero_image: heroImage })
     };
+  };
+
+  // --- GitHub Sync Logic ---
+  const syncToGitHub = async (
+    currProjects: Project[], 
+    currExp: Experience[], 
+    currClients: Client[], 
+    currSkills: SkillCategory[]
+  ) => {
+    const GITHUB_TOKEN = import.meta.env.VITE_GITHUB_TOKEN;
+    const GITHUB_OWNER = import.meta.env.VITE_GITHUB_OWNER;
+    const GITHUB_REPO = import.meta.env.VITE_GITHUB_REPO;
+    const FILE_PATH = 'src/data_backup.json'; // We'll save a backup JSON file
+
+    if (!GITHUB_TOKEN || !GITHUB_OWNER || !GITHUB_REPO) {
+        console.log("GitHub Sync skipped: Missing env variables (VITE_GITHUB_TOKEN, VITE_GITHUB_OWNER, VITE_GITHUB_REPO)");
+        return;
+    }
+
+    try {
+        console.log("Attempting GitHub Sync...");
+        
+        const content = {
+            projects: currProjects,
+            experience: currExp,
+            clients: currClients,
+            skills: currSkills,
+            lastUpdated: new Date().toISOString()
+        };
+
+        const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(content, null, 2))));
+        
+        // 1. Get current file SHA (if it exists)
+        let sha = '';
+        try {
+            const getResponse = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${FILE_PATH}`, {
+                headers: { 
+                    'Authorization': `Bearer ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+            if (getResponse.ok) {
+                const data = await getResponse.json();
+                sha = data.sha;
+            }
+        } catch (e) {
+            console.log("File likely doesn't exist yet, creating new.");
+        }
+
+        // 2. Upload/Update file
+        const putResponse = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${FILE_PATH}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${GITHUB_TOKEN}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                message: `CMS Update: ${new Date().toLocaleString()}`,
+                content: contentBase64,
+                sha: sha || undefined
+            })
+        });
+
+        if (!putResponse.ok) {
+            const err = await putResponse.json();
+            throw new Error(err.message || 'GitHub Upload Failed');
+        }
+
+        console.log("GitHub Sync Successful");
+    } catch (error) {
+        console.error("GitHub Sync Error:", error);
+        alert("GitHub Sync failed. Check console for details.");
+    }
   };
 
   // --- Real-time Sync & Fetch Logic ---
@@ -204,13 +282,21 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           // Skills
           await supabase.from('skills').upsert(skills);
           
-          console.log("Repository updated successfully.");
-          setLastUpdated(new Date());
+          console.log("Supabase repository updated successfully.");
+          
+          // 2. Attempt GitHub Sync (if configured)
+          await syncToGitHub(projects, experience, clients, skills);
+
+          // Update Status
+          const now = new Date();
+          setLastUpdated(now);
+          localStorage.setItem('cms_last_updated', now.toISOString());
+
       } catch (e) {
           console.error("Failed to sync to repository:", e);
       }
 
-      // 2. Send signal to the world
+      // 3. Send signal to the world
       if (globalChannel) {
           try {
               await globalChannel.send({
@@ -365,6 +451,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           alert("Database reset complete.");
           fetchData();
           setLastUpdated(new Date());
+          localStorage.setItem('cms_last_updated', new Date().toISOString());
       } catch (e: any) {
           console.warn("Reset failed", e);
       }
