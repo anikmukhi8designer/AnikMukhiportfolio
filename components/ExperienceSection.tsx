@@ -16,7 +16,7 @@ const ExperienceSection: React.FC = () => {
             <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-400">
                 Experience
             </h2>
-            <a href="/resume.pdf" className="text-sm font-bold text-neutral-900 hover:text-neutral-600 flex items-center gap-1 transition-colors">
+            <a href="/resume.pdf" className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-neutral-900 hover:text-neutral-500 transition-colors">
                 Download Resume <ArrowUpRight className="w-4 h-4" />
             </a>
         </div>

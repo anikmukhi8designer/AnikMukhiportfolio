@@ -126,7 +126,7 @@ const Modal: React.FC<ModalProps> = ({ project, onClose }) => {
                                 {project.link && (
                                     <a 
                                         href={project.link} 
-                                        className="inline-flex items-center gap-2 text-neutral-900 font-bold hover:gap-3 transition-all mt-4"
+                                        className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-neutral-900 hover:text-neutral-500 transition-colors mt-4"
                                     >
                                         Visit Live Site <ArrowUpRight className="w-4 h-4" />
                                     </a>

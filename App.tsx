@@ -145,17 +145,15 @@ const AppContent: React.FC = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={!isLoading ? { opacity: 1, y: 0 } : {}}
                 transition={{ duration: 1, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                className="flex flex-col md:flex-row gap-8 md:items-end max-w-4xl"
+                className="flex flex-col gap-12 items-start max-w-2xl"
             >
                 <p className="text-lg md:text-2xl text-neutral-600 leading-relaxed max-w-xl">
                   Building digital products that blend aesthetics with function. Currently crafting experiences in San Francisco.
                 </p>
                 
-                <div className="mb-2">
-                     <a href="#work" className="inline-flex items-center gap-3 text-sm font-bold uppercase tracking-widest text-neutral-900 hover:text-neutral-500 transition-colors">
-                        Explore Work <ArrowDown className="w-4 h-4 animate-bounce" />
-                    </a>
-                </div>
+                <a href="#work" className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-neutral-900 hover:text-neutral-500 transition-colors">
+                    Explore Work <ArrowDown className="w-4 h-4 animate-bounce" />
+                </a>
             </motion.div>
           </motion.div>
         </section>

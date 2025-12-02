@@ -78,7 +78,7 @@ const WorkSection: React.FC<WorkSectionProps> = ({ onProjectClick }) => {
         </div>
 
         <div className="mt-16 flex justify-center md:justify-start">
-           <a href="#contact" className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-neutral-900 hover:text-neutral-500 transition-colors border-b border-neutral-900 pb-1">
+           <a href="#contact" className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-neutral-900 hover:text-neutral-500 transition-colors">
               Start a project <ArrowRight className="w-4 h-4" />
            </a>
         </div>
