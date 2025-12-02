@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import './index.css'; // Import the new Design System
 import { Project } from './types';
 import WorkSection from './components/WorkSection';
 import ExperienceSection from './components/ExperienceSection';
@@ -78,10 +79,10 @@ const AppContent: React.FC = () => {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Scroll Animations for Hero
+  // Parallax Animations for Hero
   const { scrollY } = useScroll();
-  const heroY = useTransform(scrollY, [0, 1000], [0, 300]);
-  const heroOpacity = useTransform(scrollY, [0, 500], [1, 0]);
+  const heroTextY = useTransform(scrollY, [0, 500], [0, 150]); // Text moves slower
+  const heroOpacity = useTransform(scrollY, [0, 400], [1, 0]); // Fade out
 
   useEffect(() => {
     if (window.location.hash === '#admin') {
@@ -123,49 +124,39 @@ const AppContent: React.FC = () => {
 
       <main className="pt-20">
         {/* Hero Section */}
-        <section className="min-h-[85vh] flex flex-col justify-center px-4 md:px-8 max-w-screen-xl mx-auto relative overflow-hidden group">
+        <section className="min-h-[90vh] flex flex-col justify-center px-4 md:px-8 max-w-screen-xl mx-auto relative overflow-hidden group">
           
+          {/* Main Content with Parallax */}
           <motion.div 
-            style={{ y: heroY, opacity: heroOpacity }}
+            style={{ y: heroTextY, opacity: heroOpacity }}
             className="relative z-10"
           >
             <motion.h1 
-              initial={{ opacity: 0, y: 40 }}
+              initial={{ opacity: 0, y: 60 }}
               animate={!isLoading ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
-              className="text-4xl sm:text-6xl md:text-8xl font-bold tracking-tighter max-w-5xl mb-8 select-none"
+              transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+              className="text-5xl sm:text-7xl md:text-9xl font-bold tracking-tighter max-w-6xl mb-12 relative z-10 leading-[0.9]"
             >
-              <motion.span 
-                className="inline-block hover:text-neutral-500 hover:skew-x-2 transition-all duration-300 origin-left cursor-default"
-              >
-                Product Designer &
-              </motion.span> <br />
-              <motion.span 
-                className="text-neutral-400 inline-block hover:text-neutral-900 hover:skew-x-2 transition-all duration-300 origin-left cursor-default"
-              >
-                Creative Developer.
-              </motion.span>
+              Product Designer <br />
+              <span className="text-neutral-400">& Creative Dev.</span>
             </motion.h1>
-            
-            <motion.p 
-              initial={{ opacity: 0, y: 20 }}
-              animate={!isLoading ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 1, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              className="text-lg md:text-2xl text-neutral-600 max-w-2xl leading-relaxed"
-            >
-              I help startups and established companies build digital products that look good and work even better. Currently based in San Francisco.
-            </motion.p>
-          </motion.div>
 
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={!isLoading ? { opacity: 1 } : {}}
-            transition={{ duration: 1, delay: 0.8 }}
-            className="mt-12 relative z-10"
-          >
-            <a href="#work" className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-neutral-400 hover:text-neutral-900 transition-colors">
-              Scroll for work <ArrowDown className="w-4 h-4 animate-bounce" />
-            </a>
+            <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={!isLoading ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 1, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                className="flex flex-col md:flex-row gap-8 md:items-end max-w-4xl"
+            >
+                <p className="text-lg md:text-2xl text-neutral-600 leading-relaxed max-w-xl">
+                  Building digital products that blend aesthetics with function. Currently crafting experiences in San Francisco.
+                </p>
+                
+                <div className="mb-2">
+                     <a href="#work" className="inline-flex items-center gap-3 text-sm font-bold uppercase tracking-widest text-neutral-900 hover:text-neutral-500 transition-colors">
+                        Explore Work <ArrowDown className="w-4 h-4 animate-bounce" />
+                    </a>
+                </div>
+            </motion.div>
           </motion.div>
         </section>
 
@@ -190,7 +181,7 @@ const AppContent: React.FC = () => {
         <div className="max-w-screen-xl mx-auto px-4 md:px-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-24">
             <div>
-              <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Let's build something great together.</h2>
+              <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Let's build something great.</h2>
               <a href="mailto:hello@example.com" className="text-2xl md:text-3xl font-medium text-white border-b border-white/30 hover:border-white pb-2 transition-colors">
                 hello@mukhianik.com
               </a>
@@ -206,7 +197,7 @@ const AppContent: React.FC = () => {
           <div className="flex flex-col md:flex-row justify-between items-center text-sm border-t border-neutral-800 pt-8">
             <p>&copy; {new Date().getFullYear()} Mukhi Anik. All rights reserved.</p>
             <div className="flex gap-4">
-                <p>Designed & Built with React + Tailwind.</p>
+                <p>Designed with New Genre Principles.</p>
             </div>
           </div>
         </div>
