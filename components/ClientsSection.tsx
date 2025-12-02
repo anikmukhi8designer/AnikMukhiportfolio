@@ -49,13 +49,13 @@ const ClientsSection: React.FC = () => {
         </div>
 
         {/* Marquee Container */}
-        <div className="relative w-full flex overflow-hidden">
-            {/* 
-                Gradient Masks for smooth fade in/out at edges 
-            */}
-            <div className="absolute left-0 top-0 bottom-0 w-24 md:w-48 bg-gradient-to-r from-[#fafafa] to-transparent z-10 pointer-events-none" />
-            <div className="absolute right-0 top-0 bottom-0 w-24 md:w-48 bg-gradient-to-l from-[#fafafa] to-transparent z-10 pointer-events-none" />
-
+        <div 
+          className="relative w-full flex overflow-hidden"
+          style={{
+            maskImage: 'linear-gradient(to right, transparent, black 10%, black 90%, transparent)',
+            WebkitMaskImage: 'linear-gradient(to right, transparent, black 10%, black 90%, transparent)'
+          }}
+        >
             {/* Moving Track */}
             <motion.div 
                 className="flex items-center gap-8 md:gap-16 w-max"
