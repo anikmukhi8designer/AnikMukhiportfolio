@@ -9,6 +9,7 @@ import NavBar from './components/NavBar';
 import SplitNavPanel from './components/SplitNavPanel';
 import { SOCIALS } from './data';
 import { ArrowDown } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 // CMS Imports
 import { DataProvider, useData } from './contexts/DataContext';
@@ -104,18 +105,33 @@ const AppContent: React.FC = () => {
       <main className="pt-20">
         {/* Hero Section */}
         <section className="min-h-[85vh] flex flex-col justify-center px-4 md:px-8 max-w-screen-xl mx-auto relative">
-          <h1 className="text-4xl sm:text-6xl md:text-8xl font-bold tracking-tighter max-w-5xl mb-8">
+          <motion.h1 
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+            className="text-4xl sm:text-6xl md:text-8xl font-bold tracking-tighter max-w-5xl mb-8"
+          >
             Product Designer & <br />
             <span className="text-neutral-400">Creative Developer.</span>
-          </h1>
-          <p className="text-lg md:text-2xl text-neutral-600 max-w-2xl leading-relaxed">
+          </motion.h1>
+          <motion.p 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="text-lg md:text-2xl text-neutral-600 max-w-2xl leading-relaxed"
+          >
             I help startups and established companies build digital products that look good and work even better. Currently based in San Francisco.
-          </p>
-          <div className="mt-12">
+          </motion.p>
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1, delay: 0.6 }}
+            className="mt-12"
+          >
             <a href="#work" className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-neutral-400 hover:text-neutral-900 transition-colors">
               Scroll for work <ArrowDown className="w-4 h-4 animate-bounce" />
             </a>
-          </div>
+          </motion.div>
         </section>
 
         {/* Clients Section - Moved Here */}

@@ -9,7 +9,12 @@ interface NavBarProps {
 
 const NavBar: React.FC<NavBarProps> = ({ isMenuOpen, setIsMenuOpen }) => {
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 mix-blend-difference text-white">
+    <motion.header 
+      initial={{ y: -100 }}
+      animate={{ y: 0 }}
+      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+      className="fixed top-0 left-0 right-0 z-50 mix-blend-difference text-white"
+    >
       <div className="max-w-screen-xl mx-auto px-4 md:px-8 h-20 flex items-center justify-between">
         <a href="#" className="text-lg font-bold tracking-tight z-50">
           Mukhi Anik
@@ -47,7 +52,7 @@ const NavBar: React.FC<NavBarProps> = ({ isMenuOpen, setIsMenuOpen }) => {
           </div>
         </button>
       </div>
-    </header>
+    </motion.header>
   );
 };
 

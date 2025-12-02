@@ -31,7 +31,13 @@ const ClientsSection: React.FC = () => {
 
   return (
     <section className="py-24 bg-neutral-50 border-t border-neutral-200 overflow-hidden">
-      <div className="w-full">
+      <motion.div 
+        className="w-full"
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 1 }}
+      >
         {/* Minimal Section Header - Centered for the marquee style */}
         <div className="max-w-screen-xl mx-auto px-4 md:px-8 mb-16 flex flex-col md:flex-row md:items-baseline justify-between gap-4">
           <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-400">
@@ -70,7 +76,7 @@ const ClientsSection: React.FC = () => {
                 ))}
             </motion.div>
         </div>
-      </div>
+      </motion.div>
     </section>
   );
 };

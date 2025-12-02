@@ -1,6 +1,7 @@
 import React from 'react';
 import { useData } from '../contexts/DataContext';
 import { ArrowUpRight } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const ExperienceSection: React.FC = () => {
   const { experience } = useData();
@@ -30,9 +31,13 @@ const ExperienceSection: React.FC = () => {
           
           {/* Experience List */}
           <div className="lg:col-span-8 flex flex-col gap-12">
-            {publishedExperience.map((job) => (
-              <div 
+            {publishedExperience.map((job, index) => (
+              <motion.div 
                 key={job.id} 
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-50px" }}
+                transition={{ duration: 0.6, delay: index * 0.1, ease: "easeOut" }}
                 className="group flex flex-col md:flex-row gap-6 md:gap-12 pb-12 border-b border-neutral-200 last:border-0"
               >
                 <div className="md:w-1/3 pt-1">
@@ -46,7 +51,7 @@ const ExperienceSection: React.FC = () => {
                     {job.description}
                   </p>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
