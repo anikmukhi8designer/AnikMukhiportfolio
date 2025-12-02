@@ -11,10 +11,10 @@
   --c-text-secondary: #666666;
   --c-text-tertiary: #999999;
   
-  /* Accents (Subtle Mesh) */
-  --c-accent-1: #eef2ff; /* Soft Indigo */
-  --c-accent-2: #fdf4ff; /* Soft Fuchsia */
-  --c-accent-3: #f3f4f6; /* Cool Gray */
+  /* Accents (Subtle Mesh - Increased saturation for visibility) */
+  --c-accent-1: #e0e7ff; /* Indigo-100 */
+  --c-accent-2: #fae8ff; /* Fuchsia-100 */
+  --c-accent-3: #f3f4f6; /* Gray-100 */
   
   /* --- TYPOGRAPHY --- */
   --font-sans: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
