@@ -2,7 +2,7 @@ import React from 'react';
 import { 
   Code, PenTool, Layout, Terminal, Database, Globe, 
   Cpu, Layers, Command, Box, Image, Figma, Pen,
-  Hexagon, Codepen, GitBranch
+  Hexagon, Codepen, GitBranch, Wrench, Circle
 } from 'lucide-react';
 
 // Using Lucide icons for some, and custom SVG paths for brands where Lucide falls short.
@@ -42,9 +42,6 @@ export const SKILL_ICONS: Record<string, React.FC<{ className?: string }>> = {
   "Tools": Wrench,
   "Default": Circle
 };
-
-// Helper for the dropdown
-import { Wrench, Circle } from 'lucide-react';
 
 export const ICON_KEYS = Object.keys(SKILL_ICONS);
 

@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
 import { useData } from '../contexts/DataContext';
 import { Project } from '../types';
 import ProjectCard from './ProjectCard';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 
 interface WorkSectionProps {
@@ -12,48 +12,11 @@ interface WorkSectionProps {
 const WorkSection: React.FC<WorkSectionProps> = ({ onProjectClick }) => {
   const { projects } = useData();
   const publishedProjects = projects.filter(p => p.published);
-  const [hoveredProject, setHoveredProject] = useState<string | null>(null);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const listRef = useRef<HTMLDivElement>(null);
-
-  // Track mouse for the floating image effect
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePos({ x: e.clientX, y: e.clientY });
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
-
-  const activeImage = publishedProjects.find(p => p.id === hoveredProject)?.thumb;
 
   return (
     <section id="work" className="py-24 border-t border-neutral-200 bg-white relative z-10">
       
-      {/* Floating Image Preview (Desktop Only) */}
-      <AnimatePresence>
-        {hoveredProject && activeImage && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ 
-              opacity: 1, 
-              scale: 1, 
-              x: mousePos.x - 200, // Center the image on cursor (400px width / 2)
-              y: mousePos.y - 150  // Center the image on cursor (300px height / 2)
-            }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ type: "spring", stiffness: 150, damping: 15, mass: 0.1 }}
-            className="fixed top-0 left-0 w-[400px] h-[300px] rounded-lg overflow-hidden pointer-events-none z-50 hidden md:block shadow-2xl"
-          >
-            <img 
-              src={activeImage} 
-              alt="Preview" 
-              className="w-full h-full object-cover"
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <div className="max-w-screen-xl mx-auto px-4 md:px-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-baseline justify-between mb-16 gap-4">
@@ -79,8 +42,6 @@ const WorkSection: React.FC<WorkSectionProps> = ({ onProjectClick }) => {
               key={project.id}
               layoutId={`project-row-${project.id}`}
               onClick={() => onProjectClick(project)}
-              onMouseEnter={() => setHoveredProject(project.id)}
-              onMouseLeave={() => setHoveredProject(null)}
               className="group grid grid-cols-12 gap-4 py-8 border-b border-neutral-200 cursor-pointer items-center transition-colors hover:bg-neutral-50"
             >
               <div className="col-span-5">
