@@ -93,13 +93,21 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return localStorage.getItem('github_token') || '';
   };
 
-  const GITHUB_OWNER = getEnv('VITE_GITHUB_OWNER') || "anikmukhi8designer";
-  const GITHUB_REPO = getEnv('VITE_GITHUB_REPO') || "AnikMukhiportfolio";
+  // REMOVED HARDCODED DEFAULTS
+  // This ensures the app uses local data.ts by default, fixing "site not updated" issues
+  // and preventing 404/Network errors when fetching from a non-existent repo.
+  const GITHUB_OWNER = getEnv('VITE_GITHUB_OWNER') || "";
+  const GITHUB_REPO = getEnv('VITE_GITHUB_REPO') || "";
   const DATA_PATH = 'src/data.json';
 
   // --- GitHub Helpers ---
   
   const fetchFromGitHub = async (shouldApplyData = true) => {
+    // ABORT if no repo is configured. This relies on local data.
+    if (!GITHUB_OWNER || !GITHUB_REPO) {
+        return;
+    }
+
     const token = getGitHubToken();
     
     // Prepare headers. If token exists, use it. If not, try public API access.
@@ -135,8 +143,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 applyData(content);
             } catch (err) {
                 console.error("Error parsing GitHub data from API:", err);
-                // If parsing fails, we consider API fetch failed regarding content, but we got SHA.
-                // We'll let fallback try if needed, but usually this means data is corrupted.
             }
         }
         
@@ -144,24 +150,22 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         apiSuccess = true;
       }
     } catch (error) {
-      console.warn("GitHub API fetch failed (Network/CORS):", error);
+      // Quietly fail for API to allow fallback, but only warn if we expected it to work
+      if (token) console.warn("GitHub API fetch failed:", error);
     }
 
     // 2. Fallback to Raw URL if API failed (or threw error) AND we need data
     if (!apiSuccess && shouldApplyData) {
-        console.log("Falling back to Raw GitHub content...");
         try {
             const rawResponse = await fetch(rawUrl, { cache: 'no-store' });
             
             if (rawResponse.ok) {
                 const content = await rawResponse.json();
                 applyData(content);
-                console.log("Successfully fetched from Raw URL");
-            } else {
-                console.log("Could not fetch data from GitHub (API & Raw failed). Using default/initial data.");
+                console.log("Synced with GitHub Raw Data");
             }
         } catch (error) {
-            console.error("Failed to fetch from GitHub Raw:", error);
+            console.warn("Could not fetch data from GitHub (Using local data).");
         }
     }
   };
@@ -187,6 +191,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
+    }
+
+    if (!GITHUB_OWNER || !GITHUB_REPO) {
+        alert("GitHub Repository not configured in environment variables. Changes are local only.");
+        return;
     }
 
     const token = getGitHubToken();
@@ -220,7 +229,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const body: any = {
         message: `CMS Update: ${now.toLocaleString()}`,
         content: contentBase64,
-        branch: 'main' // Explicitly set branch
+        branch: 'main'
       };
 
       if (fileSha) {
@@ -245,10 +254,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } else {
         const err = await response.json();
         console.error("GitHub Save Failed:", err);
-        // If 409 Conflict (SHA mismatch), implies someone else pushed or we lost the SHA.
+        // Handle SHA mismatch retry
         if (response.status === 409 || response.status === 422) {
-             console.warn("SHA mismatch. Fetching latest SHA to resolve...");
-             // Retrieve ONLY the SHA without overwriting local data
              const shaRes = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${DATA_PATH}`, {
                  headers: { 
                     'Authorization': `Bearer ${token}`,
@@ -257,11 +264,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
              });
              if(shaRes.ok) {
                  const shaData = await shaRes.json();
-                 // Update SHA and try saving again immediately
                  setFileSha(shaData.sha);
-                 
-                 // Retry save with new SHA
                  body.sha = shaData.sha;
+                 
                  const retryResponse = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${DATA_PATH}`, {
                     method: 'PUT',
                     headers: {
@@ -290,20 +295,19 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // --- Initialization ---
   useEffect(() => {
-    fetchFromGitHub(true); // Initial load
+    fetchFromGitHub(true); // Initial load (will abort if no config)
   }, []);
 
   // --- Actions ---
 
   const triggerSave = () => {
-      // Debounce the save operation
       if (saveTimeoutRef.current) {
           clearTimeout(saveTimeoutRef.current);
       }
-      setIsSaving(true); // Indicate pending save
+      setIsSaving(true); 
       saveTimeoutRef.current = setTimeout(() => {
           saveToGitHub();
-      }, 2000); // 2 seconds delay
+      }, 2000); 
   };
 
   const updateProject = (id: string, data: Partial<Project>) => {
@@ -382,7 +386,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const resetData = async () => {
-    if (confirm("⚠️ WARNING: This will overwrite your GitHub data file with the default demo data. Continue?")) {
+    if (confirm("Reset to default data? This will overwrite your current changes.")) {
         setProjects(INITIAL_PROJECTS);
         setExperience(INITIAL_EXPERIENCE);
         setClients(INITIAL_CLIENTS);
@@ -390,7 +394,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setConfig(INITIAL_CONFIG);
         setSocials(INITIAL_SOCIALS);
         
-        // Immediate save for reset
         stateRef.current = { 
             projects: INITIAL_PROJECTS, 
             experience: INITIAL_EXPERIENCE, 
@@ -400,7 +403,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             socials: INITIAL_SOCIALS 
         };
         await saveToGitHub();
-        alert("Data reset to defaults.");
     }
   };
 
@@ -408,28 +410,23 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       let token = getGitHubToken();
 
       if (!token) {
-          const userInput = prompt("GitHub Token is missing.\n\nPlease enter your GitHub Personal Access Token (with 'repo' scope) to enable syncing:");
+          const userInput = prompt("GitHub Token required for sync. Enter your Personal Access Token:");
           if (userInput) {
               localStorage.setItem('github_token', userInput.trim());
               token = userInput.trim();
-              
-              // Try to fetch first to get the latest SHA
               await fetchFromGitHub(false);
           } else {
-              alert("Sync cancelled. Token is required.");
               return;
           }
       }
 
       try {
-          if (!fileSha) {
-             await fetchFromGitHub(false);
-          }
+          if (!fileSha) await fetchFromGitHub(false);
           await saveToGitHub();
-          alert("Data successfully synced to GitHub!");
+          alert("Data synced to GitHub!");
       } catch (e) {
           console.error(e);
-          alert("Sync failed. See console.");
+          alert("Sync failed.");
       }
   };
 
