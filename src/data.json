@@ -207,7 +207,7 @@
     },
     {
       "id": "fintech-dashboard-2024",
-      "title": "Demo-1",
+      "title": "Demo-2",
       "client": "Nova Inc.",
       "roles": [
         "Product Design",
@@ -563,5 +563,5 @@
       ]
     }
   ],
-  "lastUpdated": "2025-12-02T09:24:36.229Z"
+  "lastUpdated": "2025-12-02T09:24:44.715Z"
 }
