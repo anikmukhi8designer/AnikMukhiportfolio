@@ -378,7 +378,7 @@
   "experience": [
     {
       "id": "senior-pd-2023",
-      "role": "Senior Product Designer",
+      "role": "",
       "company": "TechFlow Systems",
       "period": "2023 — Present",
       "description": "Leading the design system team and overseeing core product UX.",
@@ -563,5 +563,5 @@
       ]
     }
   ],
-  "lastUpdated": "2025-12-02T05:33:47.819Z"
+  "lastUpdated": "2025-12-02T05:33:57.179Z"
 }
