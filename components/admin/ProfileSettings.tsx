@@ -1,32 +1,82 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Save, Plus, Trash2, Github, Linkedin, Mail, Twitter } from 'lucide-react';
+import { Save, Plus, Trash2, Loader2, Check } from 'lucide-react';
 
 const ProfileSettings: React.FC = () => {
-  const { config, socials, updateConfig, updateSocials } = useData();
+  const { config, socials, updateConfig, updateSocials, isSaving } = useData();
   
-  // Local state to manage form fields before saving to context if needed, 
-  // but for simplicity we'll update context directly which auto-saves to GitHub.
-  
-  const handleSocialChange = (index: number, field: keyof typeof socials[0], value: string) => {
-    const newSocials = [...socials];
+  // Local state to prevent rapid context updates while typing
+  const [localConfig, setLocalConfig] = useState(config);
+  const [localSocials, setLocalSocials] = useState(socials);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
+
+  // Sync with context on mount (or if external update happens)
+  useEffect(() => {
+    setLocalConfig(config);
+    setLocalSocials(socials);
+  }, [config, socials]);
+
+  const handleConfigChange = (field: keyof typeof config, value: string) => {
+      setLocalConfig(prev => ({ ...prev, [field]: value }));
+      setHasChanges(true);
+      setJustSaved(false);
+  };
+
+  const handleSocialChange = (index: number, field: keyof typeof localSocials[0], value: string) => {
+    const newSocials = [...localSocials];
     newSocials[index] = { ...newSocials[index], [field]: value };
-    updateSocials(newSocials);
+    setLocalSocials(newSocials);
+    setHasChanges(true);
+    setJustSaved(false);
   };
 
   const handleAddSocial = () => {
-    const newSocials = [...socials, { platform: "New Platform", url: "", label: "Link Label" }];
-    updateSocials(newSocials);
+    const newSocials = [...localSocials, { platform: "New Platform", url: "", label: "Link Label" }];
+    setLocalSocials(newSocials);
+    setHasChanges(true);
+    setJustSaved(false);
   };
 
   const handleDeleteSocial = (index: number) => {
-    const newSocials = socials.filter((_, i) => i !== index);
-    updateSocials(newSocials);
+    const newSocials = localSocials.filter((_, i) => i !== index);
+    setLocalSocials(newSocials);
+    setHasChanges(true);
+    setJustSaved(false);
+  };
+
+  const saveChanges = () => {
+      updateConfig(localConfig);
+      updateSocials(localSocials);
+      setHasChanges(false);
+      setJustSaved(true);
+      
+      // Reset success message after 3s
+      setTimeout(() => setJustSaved(false), 3000);
   };
 
   return (
-    <div className="space-y-12 max-w-4xl">
+    <div className="space-y-12 max-w-4xl pb-24">
       
+      {/* Header Actions */}
+      <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold text-neutral-900">Settings</h2>
+          <button 
+            onClick={saveChanges}
+            disabled={!hasChanges && !isSaving}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all shadow-sm ${
+                hasChanges 
+                ? 'bg-neutral-900 text-white hover:bg-neutral-800' 
+                : justSaved 
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-neutral-100 text-neutral-400 cursor-not-allowed'
+            }`}
+          >
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : justSaved ? <Check className="w-4 h-4"/> : <Save className="w-4 h-4" />}
+            {isSaving ? 'Saving...' : justSaved ? 'Saved' : 'Save Changes'}
+          </button>
+      </div>
+
       {/* General Configuration */}
       <section className="space-y-6">
         <h3 className="text-lg font-medium border-b border-neutral-200 pb-2">General Information</h3>
@@ -36,8 +86,8 @@ const ProfileSettings: React.FC = () => {
                 <label className="text-sm font-bold text-neutral-700">Contact Email</label>
                 <input 
                     type="email" 
-                    value={config.email}
-                    onChange={(e) => updateConfig({ email: e.target.value })}
+                    value={localConfig.email}
+                    onChange={(e) => handleConfigChange('email', e.target.value)}
                     className="w-full px-4 py-2 bg-white border border-neutral-300 rounded-lg focus:ring-2 focus:ring-neutral-900 focus:outline-none"
                     placeholder="hello@example.com"
                 />
@@ -49,8 +99,8 @@ const ProfileSettings: React.FC = () => {
                 <div className="flex gap-2">
                     <input 
                         type="text" 
-                        value={config.resumeUrl}
-                        onChange={(e) => updateConfig({ resumeUrl: e.target.value })}
+                        value={localConfig.resumeUrl}
+                        onChange={(e) => handleConfigChange('resumeUrl', e.target.value)}
                         className="w-full px-4 py-2 bg-white border border-neutral-300 rounded-lg focus:ring-2 focus:ring-neutral-900 focus:outline-none"
                         placeholder="/resume.pdf or https://..."
                     />
@@ -83,7 +133,7 @@ const ProfileSettings: React.FC = () => {
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
-                    {socials.map((social, index) => (
+                    {localSocials.map((social, index) => (
                         <tr key={index} className="hover:bg-neutral-50/50 transition-colors">
                             <td className="px-6 py-4">
                                 <input 
@@ -122,7 +172,7 @@ const ProfileSettings: React.FC = () => {
                     ))}
                 </tbody>
             </table>
-            {socials.length === 0 && (
+            {localSocials.length === 0 && (
                 <div className="p-8 text-center text-neutral-400 text-sm">
                     No social links added yet.
                 </div>

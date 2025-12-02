@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { Project, Experience, Client, SkillCategory, GlobalConfig, SocialLink } from '../types';
 import { 
   PROJECTS as INITIAL_PROJECTS, 
@@ -17,6 +17,7 @@ interface DataContextType {
   config: GlobalConfig;
   socials: SocialLink[];
   lastUpdated: Date | null;
+  isSaving: boolean;
   
   updateProject: (id: string, data: Partial<Project>) => void;
   addProject: (project: Project) => void;
@@ -65,6 +66,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [skills, setSkills] = useState<SkillCategory[]>(INITIAL_SKILLS);
   const [config, setConfig] = useState<GlobalConfig>(INITIAL_CONFIG);
   const [socials, setSocials] = useState<SocialLink[]>(INITIAL_SOCIALS);
+  const [isSaving, setIsSaving] = useState(false);
   
   const [lastUpdated, setLastUpdated] = useState<Date | null>(() => {
     const saved = localStorage.getItem('cms_last_updated');
@@ -73,6 +75,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Store the SHA of the data.json file to handle GitHub atomic updates
   const [fileSha, setFileSha] = useState<string | null>(null);
+  
+  // Ref to hold the timeout ID for debouncing
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Refs to access latest state inside the debounced function
+  const stateRef = useRef({ projects, experience, clients, skills, config, socials });
+  useEffect(() => {
+      stateRef.current = { projects, experience, clients, skills, config, socials };
+  }, [projects, experience, clients, skills, config, socials]);
+
 
   // Helper to get token from Env OR LocalStorage
   const getGitHubToken = () => {
@@ -111,16 +123,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
         if (shouldApplyData) {
             // Decode base64 content
-            const content = JSON.parse(decodeURIComponent(escape(atob(data.content))));
-            applyData(content);
+            try {
+                const content = JSON.parse(decodeURIComponent(escape(atob(data.content))));
+                applyData(content);
+            } catch (err) {
+                console.error("Error parsing GitHub data:", err);
+            }
         }
         
         setFileSha(data.sha);
       } else {
         // 2. Fallback to Raw URL if API fails (e.g. Rate Limit exceeded for public user)
-        // Note: Raw content has a CDN cache delay of ~5 mins usually.
-        // Only fallback if we strictly need the data (shouldApplyData=true).
-        
         if (shouldApplyData) {
             console.warn("GitHub API request failed (likely rate limit or private repo). Falling back to Raw content.");
             
@@ -156,31 +169,31 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
   };
 
-  const saveToGitHub = async (
-    p: Project[], 
-    e: Experience[], 
-    c: Client[], 
-    s: SkillCategory[],
-    cfg: GlobalConfig,
-    soc: SocialLink[]
-  ) => {
+  const saveToGitHub = async () => {
     const token = getGitHubToken();
     if (!token) {
         console.warn("Missing GitHub Token - cannot save.");
+        setIsSaving(false);
         return;
     }
 
+    setIsSaving(true);
     const now = new Date();
+    
+    // Use the latest state from ref
+    const { projects, experience, clients, skills, config, socials } = stateRef.current;
+
     const content = {
-      projects: p,
-      experience: e,
-      clients: c,
-      skills: s,
-      config: cfg,
-      socials: soc,
+      projects,
+      experience,
+      clients,
+      skills,
+      config,
+      socials,
       lastUpdated: now.toISOString()
     };
 
+    // Safe Base64 encoding for UTF-8 characters
     const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(content, null, 2))));
 
     try {
@@ -215,11 +228,22 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (response.status === 409 || response.status === 422) {
              console.warn("SHA mismatch or missing. Fetching latest SHA to resolve...");
              // Pass false to avoid overwriting local changes with remote data
-             await fetchFromGitHub(false);
+             // We just want to get the new SHA so the next save succeeds
+             // await fetchFromGitHub(false); // Can lead to loop if not careful, just refresh SHA
+             const shaRes = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${DATA_PATH}`, {
+                 headers: { 'Authorization': `Bearer ${token}` }
+             });
+             if(shaRes.ok) {
+                 const shaData = await shaRes.json();
+                 setFileSha(shaData.sha);
+                 // We don't retry immediately to avoid loops, next user action will succeed
+             }
         }
       }
     } catch (error) {
       console.error("Error saving to GitHub:", error);
+    } finally {
+        setIsSaving(false);
     }
   };
 
@@ -230,103 +254,90 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // --- Actions ---
 
-  const triggerSave = (
-      p: Project[], 
-      e: Experience[], 
-      c: Client[], 
-      s: SkillCategory[],
-      cfg: GlobalConfig,
-      soc: SocialLink[]
-  ) => {
-      saveToGitHub(p, e, c, s, cfg, soc);
+  const triggerSave = () => {
+      // Debounce the save operation to prevent API rate limiting
+      if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+      }
+      setIsSaving(true); // Indicate pending save
+      saveTimeoutRef.current = setTimeout(() => {
+          saveToGitHub();
+      }, 2000); // Wait 2 seconds of inactivity before saving
   };
 
   const updateProject = (id: string, data: Partial<Project>) => {
-    const newProjects = projects.map(p => p.id === id ? { ...p, ...data } : p);
-    setProjects(newProjects);
-    triggerSave(newProjects, experience, clients, skills, config, socials);
+    setProjects(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
+    triggerSave();
   };
   
   const addProject = (project: Project) => {
-    const newProjects = [project, ...projects];
-    setProjects(newProjects);
-    triggerSave(newProjects, experience, clients, skills, config, socials);
+    setProjects(prev => [project, ...prev]);
+    triggerSave();
   };
   
   const deleteProject = (id: string) => {
-    const newProjects = projects.filter(p => p.id !== id);
-    setProjects(newProjects);
-    triggerSave(newProjects, experience, clients, skills, config, socials);
+    setProjects(prev => prev.filter(p => p.id !== id));
+    triggerSave();
   };
 
   const updateExperience = (id: string, data: Partial<Experience>) => {
-    const newExp = experience.map(e => e.id === id ? { ...e, ...data } : e);
-    setExperience(newExp);
-    triggerSave(projects, newExp, clients, skills, config, socials);
+    setExperience(prev => prev.map(e => e.id === id ? { ...e, ...data } : e));
+    triggerSave();
   };
   
   const addExperience = (exp: Experience) => {
-    const newExp = [exp, ...experience];
-    setExperience(newExp);
-    triggerSave(projects, newExp, clients, skills, config, socials);
+    setExperience(prev => [exp, ...prev]);
+    triggerSave();
   };
   
   const deleteExperience = (id: string) => {
-    const newExp = experience.filter(e => e.id !== id);
-    setExperience(newExp);
-    triggerSave(projects, newExp, clients, skills, config, socials);
+    setExperience(prev => prev.filter(e => e.id !== id));
+    triggerSave();
   };
   
   const reorderExperience = (items: Experience[]) => {
     setExperience(items);
-    triggerSave(projects, items, clients, skills, config, socials);
+    triggerSave();
   };
 
   const updateClient = (id: string, data: Partial<Client>) => {
-    const newClients = clients.map(c => c.id === id ? { ...c, ...data } : c);
-    setClients(newClients);
-    triggerSave(projects, experience, newClients, skills, config, socials);
+    setClients(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
+    triggerSave();
   };
   
   const addClient = (client: Client) => {
-    const newClients = [client, ...clients];
-    setClients(newClients);
-    triggerSave(projects, experience, newClients, skills, config, socials);
+    setClients(prev => [client, ...prev]);
+    triggerSave();
   };
   
   const deleteClient = (id: string) => {
-    const newClients = clients.filter(c => c.id !== id);
-    setClients(newClients);
-    triggerSave(projects, experience, newClients, skills, config, socials);
+    setClients(prev => prev.filter(c => c.id !== id));
+    triggerSave();
   };
 
   const updateSkill = (id: string, data: Partial<SkillCategory>) => {
-    const newSkills = skills.map(s => s.id === id ? { ...s, ...data } : s);
-    setSkills(newSkills);
-    triggerSave(projects, experience, clients, newSkills, config, socials);
+    setSkills(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
+    triggerSave();
   };
   
   const addSkill = (skill: SkillCategory) => {
-    const newSkills = [...skills, skill];
-    setSkills(newSkills);
-    triggerSave(projects, experience, clients, newSkills, config, socials);
+    setSkills(prev => [...prev, skill]);
+    triggerSave();
   };
   
   const deleteSkill = (id: string) => {
-    const newSkills = skills.filter(s => s.id !== id);
-    setSkills(newSkills);
-    triggerSave(projects, experience, clients, newSkills, config, socials);
+    setSkills(prev => prev.filter(s => s.id !== id));
+    triggerSave();
   };
 
   const updateConfig = (data: Partial<GlobalConfig>) => {
-      const newConfig = { ...config, ...data };
-      setConfig(newConfig);
-      triggerSave(projects, experience, clients, skills, newConfig, socials);
+      setConfig(prev => ({ ...prev, ...data }));
+      triggerSave();
   };
 
   const updateSocials = (data: SocialLink[]) => {
       setSocials(data);
-      triggerSave(projects, experience, clients, skills, config, data);
+      triggerSave();
   };
 
   const resetData = async () => {
@@ -337,7 +348,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setSkills(INITIAL_SKILLS);
         setConfig(INITIAL_CONFIG);
         setSocials(INITIAL_SOCIALS);
-        await saveToGitHub(INITIAL_PROJECTS, INITIAL_EXPERIENCE, INITIAL_CLIENTS, INITIAL_SKILLS, INITIAL_CONFIG, INITIAL_SOCIALS);
+        
+        // Immediate save for reset
+        stateRef.current = { 
+            projects: INITIAL_PROJECTS, 
+            experience: INITIAL_EXPERIENCE, 
+            clients: INITIAL_CLIENTS, 
+            skills: INITIAL_SKILLS, 
+            config: INITIAL_CONFIG, 
+            socials: INITIAL_SOCIALS 
+        };
+        await saveToGitHub();
         alert("Data reset to defaults.");
     }
   };
@@ -363,11 +384,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       try {
           if (!fileSha) {
-             // Pass false to avoid overwriting local data with remote data if SHA is missing
              await fetchFromGitHub(false);
           }
-
-          await saveToGitHub(projects, experience, clients, skills, config, socials);
+          await saveToGitHub();
           alert("Data successfully synced to GitHub!");
       } catch (e) {
           console.error(e);
@@ -377,7 +396,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   return (
     <DataContext.Provider value={{
-      projects, experience, clients, skills, lastUpdated, config, socials,
+      projects, experience, clients, skills, lastUpdated, config, socials, isSaving,
       updateProject, addProject, deleteProject,
       updateExperience, addExperience, deleteExperience, reorderExperience,
       updateClient, addClient, deleteClient,

@@ -7,6 +7,66 @@ interface AdminLoginProps {
 
 type AuthStep = 'LOGIN' | 'FORGOT' | 'OTP' | 'RESET';
 
+interface InputFieldProps {
+  label: string;
+  type?: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  isPassword?: boolean;
+  showPassword?: boolean;
+  setShowPassword?: (show: boolean) => void;
+}
+
+const InputField: React.FC<InputFieldProps> = ({ 
+    label, 
+    type = "text", 
+    value, 
+    onChange, 
+    placeholder,
+    isPassword = false,
+    showPassword = false,
+    setShowPassword
+}) => (
+    <div className="space-y-2">
+        <label className="block text-sm text-neutral-600">{label}</label>
+        <div className="relative">
+            <input 
+                type={isPassword ? (showPassword ? "text" : "password") : type}
+                required
+                className="w-full px-4 py-3 border border-neutral-200 rounded-lg text-sm focus:ring-1 focus:ring-[#005F99] focus:border-[#005F99] outline-none transition-all placeholder:text-neutral-300"
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder={placeholder}
+            />
+            {isPassword && setShowPassword && (
+                <button 
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
+                >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+            )}
+        </div>
+    </div>
+);
+
+interface SubmitButtonProps {
+    loading: boolean;
+    children: React.ReactNode;
+}
+
+const SubmitButton: React.FC<SubmitButtonProps> = ({ loading, children }) => (
+    <button 
+      type="submit"
+      disabled={loading}
+      className="w-full py-3 bg-[#005F99] hover:bg-[#004d7a] text-white font-medium rounded-lg transition-colors disabled:opacity-70 disabled:cursor-not-allowed mt-6"
+    >
+      {loading ? 'Please wait...' : children}
+    </button>
+);
+
 const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
   const [step, setStep] = useState<AuthStep>('LOGIN');
   
@@ -98,50 +158,6 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
       setLoading(false);
   };
 
-  // --- Render Helpers ---
-
-  const InputField = ({ 
-      label, 
-      type = "text", 
-      value, 
-      onChange, 
-      placeholder,
-      isPassword = false 
-  }: any) => (
-      <div className="space-y-2">
-          <label className="block text-sm text-neutral-600">{label}</label>
-          <div className="relative">
-              <input 
-                  type={isPassword ? (showPassword ? "text" : "password") : type}
-                  required
-                  className="w-full px-4 py-3 border border-neutral-200 rounded-lg text-sm focus:ring-1 focus:ring-[#005F99] focus:border-[#005F99] outline-none transition-all placeholder:text-neutral-300"
-                  value={value}
-                  onChange={(e) => onChange(e.target.value)}
-                  placeholder={placeholder}
-              />
-              {isPassword && (
-                  <button 
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
-                  >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-              )}
-          </div>
-      </div>
-  );
-
-  const SubmitButton = ({ children }: { children: React.ReactNode }) => (
-      <button 
-        type="submit"
-        disabled={loading}
-        className="w-full py-3 bg-[#005F99] hover:bg-[#004d7a] text-white font-medium rounded-lg transition-colors disabled:opacity-70 disabled:cursor-not-allowed mt-6"
-      >
-        {loading ? 'Please wait...' : children}
-      </button>
-  );
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-white p-4 font-sans">
       <div className="w-full max-w-[480px] bg-white p-8 sm:p-12 rounded-2xl border border-neutral-100 shadow-2xl shadow-neutral-100/50">
@@ -166,6 +182,8 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                     <InputField 
                         label="Password" 
                         isPassword
+                        showPassword={showPassword}
+                        setShowPassword={setShowPassword}
                         value={password} 
                         onChange={setPassword} 
                         placeholder="Enter your password" 
@@ -183,7 +201,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
 
                 {error && <p className="text-red-500 text-sm">{error}</p>}
 
-                <SubmitButton>Submit</SubmitButton>
+                <SubmitButton loading={loading}>Submit</SubmitButton>
 
                 {/* Hint for demo purposes */}
                 <div className="mt-8 pt-6 border-t border-neutral-100 text-center text-xs text-neutral-400">
@@ -213,7 +231,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                     placeholder="Enter your email ID" 
                 />
 
-                <SubmitButton>Send OTP</SubmitButton>
+                <SubmitButton loading={loading}>Send OTP</SubmitButton>
             </form>
         )}
 
@@ -245,7 +263,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
 
                 {error && <p className="text-red-500 text-sm">{error}</p>}
 
-                <SubmitButton>Verify OTP</SubmitButton>
+                <SubmitButton loading={loading}>Verify OTP</SubmitButton>
             </form>
         )}
 
@@ -260,6 +278,8 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                 <InputField 
                     label="New Password" 
                     isPassword
+                    showPassword={showPassword}
+                    setShowPassword={setShowPassword}
                     value={newPassword} 
                     onChange={setNewPassword} 
                     placeholder="Enter New Password" 
@@ -279,6 +299,8 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                 <InputField 
                     label="Confirm Password" 
                     isPassword
+                    showPassword={showPassword}
+                    setShowPassword={setShowPassword}
                     value={confirmPassword} 
                     onChange={setConfirmPassword} 
                     placeholder="Enter Confirm Password" 
@@ -286,7 +308,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
 
                 {error && <p className="text-red-500 text-sm">{error}</p>}
 
-                <SubmitButton>Submit</SubmitButton>
+                <SubmitButton loading={loading}>Submit</SubmitButton>
             </form>
         )}
 
