@@ -8,6 +8,7 @@ import Modal from './components/Modal';
 import NavBar from './components/NavBar';
 import SplitNavPanel from './components/SplitNavPanel';
 import CustomCursor from './components/CustomCursor';
+import ScrollToTop from './components/ScrollToTop';
 import { SOCIALS } from './data';
 import { ArrowDown } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -96,6 +97,7 @@ const AppContent: React.FC = () => {
       
       {/* Custom Cursor (Hidden on Touch Devices via CSS) */}
       <CustomCursor />
+      <ScrollToTop />
 
       {/* Navigation System */}
       <NavBar isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
