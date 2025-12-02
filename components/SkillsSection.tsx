@@ -7,7 +7,7 @@ const SkillsSection: React.FC = () => {
   const { skills } = useData();
 
   return (
-    <section className="py-24 border-t border-neutral-200 bg-neutral-50">
+    <section className="py-24 border-t border-neutral-200 bg-transparent relative z-10">
       <div className="max-w-screen-xl mx-auto px-4 md:px-8">
         
         {/* Minimal Section Header */}
@@ -25,7 +25,7 @@ const SkillsSection: React.FC = () => {
                 <div key={category.id}>
                     <h3 className="text-lg font-bold text-neutral-900 mb-6 border-b border-neutral-200 pb-2">{category.title}</h3>
                     {/* Grid Layout mimicking ClientsSection */}
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 border-l border-t border-neutral-200 bg-white">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 border-l border-t border-neutral-200 bg-white/40 backdrop-blur-sm">
                         {category.items.map((item, idx) => (
                             <motion.div 
                                 key={idx}

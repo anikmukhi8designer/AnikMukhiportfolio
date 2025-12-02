@@ -30,7 +30,7 @@ const ClientsSection: React.FC = () => {
   const marqueeClients = [...CLIENTS, ...CLIENTS, ...CLIENTS];
 
   return (
-    <section className="py-24 bg-neutral-50 border-t border-neutral-200 overflow-hidden">
+    <section className="py-24 bg-transparent border-t border-neutral-200 overflow-hidden relative z-10">
       <motion.div 
         className="w-full"
         initial={{ opacity: 0 }}
@@ -53,8 +53,8 @@ const ClientsSection: React.FC = () => {
             {/* 
                 Gradient Masks for smooth fade in/out at edges 
             */}
-            <div className="absolute left-0 top-0 bottom-0 w-24 md:w-48 bg-gradient-to-r from-neutral-50 to-transparent z-10 pointer-events-none" />
-            <div className="absolute right-0 top-0 bottom-0 w-24 md:w-48 bg-gradient-to-l from-neutral-50 to-transparent z-10 pointer-events-none" />
+            <div className="absolute left-0 top-0 bottom-0 w-24 md:w-48 bg-gradient-to-r from-[#fafafa] to-transparent z-10 pointer-events-none" />
+            <div className="absolute right-0 top-0 bottom-0 w-24 md:w-48 bg-gradient-to-l from-[#fafafa] to-transparent z-10 pointer-events-none" />
 
             {/* Moving Track */}
             <motion.div 

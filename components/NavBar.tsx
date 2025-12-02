@@ -47,7 +47,7 @@ const NavBar: React.FC<NavBarProps> = ({ isMenuOpen, setIsMenuOpen }) => {
         initial={{ y: 0 }}
         animate={{ y: isVisible ? 0 : -100 }}
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-        className="fixed top-0 left-0 right-0 z-50 mix-blend-difference text-white pointer-events-none"
+        className="fixed top-0 left-0 right-0 z-50 bg-white/70 backdrop-blur-md border-b border-neutral-200/50 text-neutral-900 pointer-events-none"
       >
         <div className="max-w-screen-xl mx-auto px-4 md:px-8 h-20 flex items-center justify-between pointer-events-auto relative">
           <a href="#" className="text-lg font-bold tracking-tight z-50">
@@ -90,7 +90,7 @@ const NavBar: React.FC<NavBarProps> = ({ isMenuOpen, setIsMenuOpen }) => {
 
       {/* Scroll Progress Bar - Static at Top (independent of header visibility) */}
       <motion.div 
-        className="fixed top-0 left-0 right-0 h-[3px] bg-white origin-left z-50 mix-blend-difference pointer-events-none"
+        className="fixed top-0 left-0 right-0 h-[3px] bg-neutral-900 origin-left z-50 pointer-events-none"
         style={{ scaleX: scrollYProgress }}
       />
     </>

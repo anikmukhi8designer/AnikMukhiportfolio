@@ -31,7 +31,7 @@ const InteractiveGradient: React.FC = () => {
   }, [mouseX, mouseY]);
 
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none select-none z-0">
+    <div className="fixed inset-0 overflow-hidden pointer-events-none select-none z-0">
       
       {/* Top Left - Enhanced Indigo/Purple Haze for visibility */}
       <motion.div 

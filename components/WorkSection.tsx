@@ -15,7 +15,7 @@ const WorkSection: React.FC<WorkSectionProps> = ({ onProjectClick }) => {
   const listRef = useRef<HTMLDivElement>(null);
 
   return (
-    <section id="work" className="py-24 border-t border-neutral-200 bg-white relative z-10">
+    <section id="work" className="py-24 border-t border-neutral-200 bg-transparent relative z-10">
       
       <div className="max-w-screen-xl mx-auto px-4 md:px-8">
         {/* Header */}
@@ -42,7 +42,7 @@ const WorkSection: React.FC<WorkSectionProps> = ({ onProjectClick }) => {
               key={project.id}
               layoutId={`project-row-${project.id}`}
               onClick={() => onProjectClick(project)}
-              className="group grid grid-cols-12 gap-4 py-8 border-b border-neutral-200 cursor-pointer items-center transition-colors hover:bg-neutral-50"
+              className="group grid grid-cols-12 gap-4 py-8 border-b border-neutral-200 cursor-pointer items-center transition-colors hover:bg-white/40"
             >
               <div className="col-span-5">
                 <h3 className="text-3xl font-medium text-neutral-900 group-hover:translate-x-2 transition-transform duration-300">

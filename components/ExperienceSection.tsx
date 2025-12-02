@@ -8,7 +8,7 @@ const ExperienceSection: React.FC = () => {
   const publishedExperience = experience.filter(e => e.published);
 
   return (
-    <section className="py-24 border-t border-neutral-200 bg-neutral-50">
+    <section className="py-24 border-t border-neutral-200 bg-transparent relative z-10">
       <div className="max-w-screen-xl mx-auto px-4 md:px-8">
         
         {/* Section Header */}

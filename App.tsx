@@ -105,12 +105,15 @@ const AppContent: React.FC = () => {
   
   // Public Portfolio Route
   return (
-    <div className="min-h-screen bg-[#fafafa] text-neutral-900 font-sans selection:bg-neutral-900 selection:text-white cursor-none">
+    <div className="min-h-screen bg-[#fafafa] text-neutral-900 font-sans selection:bg-neutral-900 selection:text-white cursor-none relative">
       
       {/* Loading Screen */}
       <AnimatePresence>
         {isLoading && <LoadingScreen onComplete={() => setIsLoading(false)} />}
       </AnimatePresence>
+
+      {/* Global Background Interactive Gradient */}
+      <InteractiveGradient />
 
       {/* Custom Cursor (Hidden on Touch Devices via CSS) */}
       <CustomCursor />
@@ -125,13 +128,10 @@ const AppContent: React.FC = () => {
         onProjectClick={setSelectedProject}
       />
 
-      <main className="pt-20">
+      <main className="pt-20 relative z-10">
         {/* Hero Section */}
         <section className="min-h-[90vh] flex flex-col justify-center px-4 md:px-8 max-w-screen-xl mx-auto relative overflow-hidden group">
           
-          {/* Background Interactive Gradient */}
-          <InteractiveGradient />
-
           {/* Main Content with Parallax */}
           <motion.div 
             style={{ y: heroTextY, opacity: heroOpacity }}
@@ -186,7 +186,7 @@ const AppContent: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer id="contact" className="py-24 bg-neutral-900 text-neutral-400">
+      <footer id="contact" className="py-24 bg-neutral-900 text-neutral-400 relative z-10">
         <div className="max-w-screen-xl mx-auto px-4 md:px-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-24">
             <div>
