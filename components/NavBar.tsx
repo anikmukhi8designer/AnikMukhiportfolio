@@ -90,7 +90,7 @@ const NavBar: React.FC<NavBarProps> = ({ isMenuOpen, setIsMenuOpen }) => {
 
       {/* Scroll Progress Bar - Static at Top (independent of header visibility) */}
       <motion.div 
-        className="fixed top-0 left-0 right-0 h-[3px] bg-neutral-900 origin-left z-50 pointer-events-none"
+        className="fixed top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 origin-left z-50 pointer-events-none"
         style={{ scaleX: scrollYProgress }}
       />
     </>
