@@ -112,7 +112,7 @@ const AppContent: React.FC = () => {
         {isLoading && <LoadingScreen onComplete={() => setIsLoading(false)} />}
       </AnimatePresence>
 
-      {/* Global Background Interactive Gradient */}
+      {/* Global Background Interactive Gradient - z-index 1 */}
       <InteractiveGradient />
 
       {/* Custom Cursor (Hidden on Touch Devices via CSS) */}
@@ -128,6 +128,7 @@ const AppContent: React.FC = () => {
         onProjectClick={setSelectedProject}
       />
 
+      {/* Main Content - z-index 10 to float above gradient */}
       <main className="pt-20 relative z-10">
         {/* Hero Section */}
         <section className="min-h-[90vh] flex flex-col justify-center px-4 md:px-8 max-w-screen-xl mx-auto relative overflow-hidden group">
