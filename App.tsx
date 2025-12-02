@@ -9,9 +9,11 @@ import NavBar from './components/NavBar';
 import SplitNavPanel from './components/SplitNavPanel';
 import CustomCursor from './components/CustomCursor';
 import ScrollToTop from './components/ScrollToTop';
+import LoadingScreen from './components/LoadingScreen';
+import WaterRippleEffect from './components/WaterRippleEffect';
 import { SOCIALS } from './data';
 import { ArrowDown } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // CMS Imports
 import { DataProvider, useData } from './contexts/DataContext';
@@ -75,10 +77,12 @@ const AppContent: React.FC = () => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAdminMode, setIsAdminMode] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (window.location.hash === '#admin') {
       setIsAdminMode(true);
+      setIsLoading(false); // No loader for admin
     }
     const handleHashChange = () => {
         if (window.location.hash === '#admin') setIsAdminMode(true);
@@ -95,6 +99,11 @@ const AppContent: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#fafafa] text-neutral-900 font-sans selection:bg-neutral-900 selection:text-white cursor-none">
       
+      {/* Loading Screen */}
+      <AnimatePresence>
+        {isLoading && <LoadingScreen onComplete={() => setIsLoading(false)} />}
+      </AnimatePresence>
+
       {/* Custom Cursor (Hidden on Touch Devices via CSS) */}
       <CustomCursor />
       <ScrollToTop />
@@ -110,29 +119,33 @@ const AppContent: React.FC = () => {
 
       <main className="pt-20">
         {/* Hero Section */}
-        <section className="min-h-[85vh] flex flex-col justify-center px-4 md:px-8 max-w-screen-xl mx-auto relative">
+        <section className="min-h-[85vh] flex flex-col justify-center px-4 md:px-8 max-w-screen-xl mx-auto relative overflow-hidden group">
+          
+          {/* Water Ripple Background */}
+          {!isLoading && <WaterRippleEffect />}
+
           <motion.h1 
             initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
-            className="text-4xl sm:text-6xl md:text-8xl font-bold tracking-tighter max-w-5xl mb-8"
+            animate={!isLoading ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+            className="text-4xl sm:text-6xl md:text-8xl font-bold tracking-tighter max-w-5xl mb-8 relative z-10 pointer-events-none"
           >
             Product Designer & <br />
             <span className="text-neutral-400">Creative Developer.</span>
           </motion.h1>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="text-lg md:text-2xl text-neutral-600 max-w-2xl leading-relaxed"
+            animate={!isLoading ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 1, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="text-lg md:text-2xl text-neutral-600 max-w-2xl leading-relaxed relative z-10 pointer-events-none"
           >
             I help startups and established companies build digital products that look good and work even better. Currently based in San Francisco.
           </motion.p>
           <motion.div 
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 1, delay: 0.6 }}
-            className="mt-12"
+            animate={!isLoading ? { opacity: 1 } : {}}
+            transition={{ duration: 1, delay: 0.8 }}
+            className="mt-12 relative z-10"
           >
             <a href="#work" className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-neutral-400 hover:text-neutral-900 transition-colors">
               Scroll for work <ArrowDown className="w-4 h-4 animate-bounce" />
@@ -140,7 +153,7 @@ const AppContent: React.FC = () => {
           </motion.div>
         </section>
 
-        {/* Clients Section - Moved Here */}
+        {/* Clients Section */}
         <ClientsSection />
 
         {/* Work Section */}
