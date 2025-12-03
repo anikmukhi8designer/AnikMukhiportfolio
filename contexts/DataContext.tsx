@@ -78,6 +78,25 @@ const getEnv = (key: string) => {
     return '';
 };
 
+// --- UTILITY: Retry Logic for Robustness ---
+async function fetchWithRetry(url: string, options: RequestInit, retries = 3, backoff = 500): Promise<Response> {
+    try {
+        const res = await fetch(url, options);
+        // If 409 Conflict, don't retry blindly, return immediately to handle logic
+        if (res.status === 409) return res; 
+        // If 5xx Server Error, retry
+        if (res.status >= 500 && retries > 0) {
+            throw new Error(`Server Error: ${res.status}`);
+        }
+        return res;
+    } catch (err: any) {
+        if (retries <= 0) throw err;
+        console.log(`Retrying... (${retries} attempts left)`);
+        await new Promise(r => setTimeout(r, backoff));
+        return fetchWithRetry(url, options, retries - 1, backoff * 2);
+    }
+}
+
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
   const [experience, setExperience] = useState<Experience[]>(INITIAL_EXPERIENCE);
@@ -130,7 +149,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const getGitHubConfig = () => {
       const owner = getEnv('VITE_GITHUB_OWNER') || localStorage.getItem('github_owner') || "";
       const repo = getEnv('VITE_GITHUB_REPO') || localStorage.getItem('github_repo') || "";
-      return { owner, repo };
+      return { owner: owner.trim(), repo: repo.trim() };
   };
 
   // --- GitHub Helpers ---
@@ -144,12 +163,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (!token) return { success: false, message: "Missing GitHub Token" };
 
       try {
-          const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+          const res = await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}`, {
               headers: { 
                   'Authorization': `Bearer ${token}`,
                   'Accept': 'application/vnd.github.v3+json'
               }
-          });
+          }, 1); // 1 retry for verification
           
           if (res.ok) return { success: true, message: "Connection Successful" };
           
@@ -188,13 +207,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             // Attempt 1: Try current active path
             let apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?t=${fetchTimestamp}`;
-            let response = await fetch(apiUrl, { headers });
+            let response = await fetchWithRetry(apiUrl, { headers });
 
             // Attempt 2: Fallback logic for path
             if (response.status === 404 && path === 'src/data.json') {
                 path = 'data.json';
                 apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?t=${fetchTimestamp}`;
-                response = await fetch(apiUrl, { headers });
+                response = await fetchWithRetry(apiUrl, { headers });
             }
 
             if (response.ok) {
@@ -324,9 +343,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           let existingLogs: SyncLogEntry[] = [];
           let logSha = '';
 
-          const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}`, {
+          const getRes = await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}`, {
               headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
-          });
+          }, 1);
 
           if (getRes.ok) {
               const data = await getRes.json();
@@ -356,14 +375,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           };
           if (logSha) body.sha = logSha;
 
-          await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}`, {
+          await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}`, {
               method: 'PUT',
               headers: {
                   'Authorization': `Bearer ${token}`,
                   'Content-Type': 'application/json',
               },
               body: JSON.stringify(body)
-          });
+          }, 2); // Retry log updates
           
       } catch (e) {
           console.error("Failed to update sync log:", e);
@@ -395,49 +414,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const contentBase64 = btoa(unescape(encodeURIComponent(contentString)));
 
     try {
-      // --- CRITICAL SHA DISCOVERY ---
-      // We must explicitly find the SHA of the existing file. 
-      // If we don't send a SHA for an existing file, GitHub returns "sha wasn't supplied".
+      // Optimistic Path: Try to save with current known SHA
+      // If SHA is missing, we try to discover it first (one-time fetch)
+      // If request fails with 409 (Conflict), we fetch fresh SHA and retry
       
-      let shaToUse = null;
+      let shaToUse = fileShaRef.current;
       let finalPath = activeDataPath;
 
-      // Check Path A: src/data.json
-      const resA = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/src/data.json`, {
-          method: 'GET',
-          headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
-      });
-
-      if (resA.ok) {
-          const dataA = await resA.json();
-          shaToUse = dataA.sha;
-          finalPath = 'src/data.json';
-          setActiveDataPath('src/data.json');
-      } else if (resA.status === 404) {
-           // Check Path B: data.json (root)
-           const resB = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/data.json`, {
-                method: 'GET',
-                headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
-           });
-
-           if (resB.ok) {
-               const dataB = await resB.json();
-               shaToUse = dataB.sha;
-               finalPath = 'data.json';
-               setActiveDataPath('data.json');
-           } else if (resB.status !== 404) {
-               // If it's not 404, it's a real error (403, 500 etc)
-               throw new Error(`GitHub API Error checking root data.json: ${resB.status}`);
-           }
-      } else {
-          // Real error checking src/data.json
-          throw new Error(`GitHub API Error checking src/data.json: ${resA.status}`);
-      }
-
-      // At this point:
-      // if shaToUse is set -> We update existing file.
-      // if shaToUse is null -> We assume NEW file creation (both paths 404).
-
+      // Prepare Body
       const body: any = {
         message: `CMS Update: ${now.toLocaleString()}`,
         content: contentBase64,
@@ -448,11 +432,58 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           body.sha = shaToUse;
       }
 
-      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${finalPath}`, {
+      // 1. Attempt Save
+      let response = await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/contents/${finalPath}`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
-      });
+      }, 2);
+
+      // 2. Handle Conflict or Missing SHA (409 or 422) by Fetching Latest
+      if (response.status === 409 || response.status === 422 || (response.status === 404 && !shaToUse)) {
+          console.log("Conflict or missing SHA detected. Fetching latest...");
+          
+          // Try fetching src/data.json first
+          let getRes = await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/contents/src/data.json`, {
+              headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
+          });
+          
+          // Fallback to data.json
+          if (getRes.status === 404) {
+               getRes = await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/contents/data.json`, {
+                  headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
+              });
+              if (getRes.ok) {
+                  finalPath = 'data.json';
+                  setActiveDataPath('data.json');
+              }
+          } else {
+              finalPath = 'src/data.json';
+              setActiveDataPath('src/data.json');
+          }
+
+          if (getRes.ok) {
+              const getData = await getRes.json();
+              shaToUse = getData.sha;
+              setFileSha(shaToUse); // Update local state
+              
+              // Retry Save with new SHA
+              body.sha = shaToUse;
+              response = await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/contents/${finalPath}`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+              }, 2);
+          } else if (getRes.status === 404) {
+              // Both paths 404 - Create New File
+              delete body.sha; // Ensure no SHA for new file
+              response = await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/contents/${finalPath}`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+              }, 2);
+          }
+      }
 
       let redirectUrl: string | null = null;
 
@@ -466,9 +497,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const previewUrl = `${window.location.origin}/preview?update=${now.getTime()}`;
             setLatestPreviewUrl(previewUrl);
             await updateSyncLog(previewUrl);
-            // Don't auto-redirect, return the URL
             redirectUrl = previewUrl;
         } else {
+             // Trigger a silent read to ensure proxies catch up
              try { fetch(`/api/data?path=${finalPath}&t=${Date.now()}`, { cache: 'no-store' }); } catch(e){}
         }
         return redirectUrl;
@@ -481,7 +512,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             throw new Error("Invalid GitHub Token. Please re-authenticate.");
         }
         if (response.status === 409) {
-            throw new Error("Sync Conflict. Please refresh the page and try again.");
+            throw new Error("Sync Conflict. Data changed on server during save. Please try again.");
         }
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData.message || `GitHub Error: ${response.status} ${response.statusText}`);
@@ -503,7 +534,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (!owner || !repo || !token) return [];
 
       try {
-          const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/public/admin/sync-log.json`, {
+          const res = await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/contents/public/admin/sync-log.json`, {
               headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
           });
           if (res.ok) {
@@ -525,7 +556,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (!owner || !repo || !token) return [];
 
       try {
-          const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits?path=${activeDataPath}&per_page=10`, {
+          const response = await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/commits?path=${activeDataPath}&per_page=10`, {
               headers: {
                   'Authorization': `Bearer ${token}`,
                   'Accept': 'application/vnd.github.v3+json',
@@ -551,7 +582,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const token = getGitHubToken();
       if (!owner || !repo || !token) throw new Error("Config missing");
 
-      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${activeDataPath}?ref=${sha}`, {
+      const response = await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/contents/${activeDataPath}?ref=${sha}`, {
           headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' }
       });
 
@@ -578,10 +609,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     fetchFromGitHub(true, false);
     getSyncHistory(); 
 
-    // 2. Poll for updates every 30s
+    // 2. Poll for updates every 15s (Faster polling for real-time feel)
     const pollInterval = setInterval(() => {
         fetchFromGitHub(true, true); // Silent fetch
-    }, 30000);
+    }, 15000);
 
     // 3. Re-fetch on Window Focus (User switches back to tab)
     const onFocus = () => {
