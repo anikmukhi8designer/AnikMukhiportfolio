@@ -174,11 +174,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // --- Strategy 1: Direct GitHub API (Admin Mode) ---
     if (owner && repo && token) {
         try {
+            // REMOVED EXTRA HEADERS TO PREVENT CORS ISSUES
+            // Cache busting is handled by ?t= timestamp
             const headers: HeadersInit = {
                 'Accept': 'application/vnd.github.v3+json',
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0',
                 'Authorization': `Bearer ${token}`
             };
 
@@ -216,7 +215,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 return true;
             } else {
                  if (response.status === 404) {
-                     setError(`File not found in repo: ${path}. Please ensure you have synced at least once.`);
+                     // HANDLE 404 AS FRESH START - NOT ERROR
+                     console.log("No data file found in repo. Using initial default data.");
+                     setFileSha(null); // No file yet
+                     setIsLoading(false);
+                     return true; // Return success so app loads
                  } else if (response.status === 401) {
                      setError("GitHub Token invalid or expired.");
                  } else {
@@ -227,7 +230,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
         } catch (error: any) {
             console.warn("GitHub Admin API fetch failed", error);
-            setError(error.message || "Network error fetching from GitHub");
+            // CHECK IF OFFLINE
+            if (!navigator.onLine) {
+                 setError("You are offline. Please check your internet connection.");
+            } else {
+                 setError(error.message || "Network error fetching from GitHub");
+            }
             setIsLoading(false);
             return false;
         }
@@ -383,7 +391,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Check Path A: src/data.json
       const resA = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/src/data.json`, {
           method: 'GET',
-          headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
+          headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (resA.ok) {
@@ -395,7 +403,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
            // Check Path B: data.json (root)
            const resB = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/data.json`, {
                 method: 'GET',
-                headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
+                headers: { 'Authorization': `Bearer ${token}` }
            });
 
            if (resB.ok) {
