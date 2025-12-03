@@ -92,10 +92,10 @@ const SkillsSection: React.FC = () => {
         
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-baseline justify-between mb-16 gap-4">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-400">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-600">
                 Skills & Tools
             </h2>
-            <span className="text-sm text-neutral-400 font-medium hidden md:block">
+            <span className="text-sm text-neutral-600 font-medium hidden md:block">
                 My Tech Stack
             </span>
         </div>
