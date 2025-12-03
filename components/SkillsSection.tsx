@@ -36,16 +36,22 @@ interface SkillCardProps {
 }
 
 const SkillCard: React.FC<SkillCardProps> = ({ item, index }) => {
-    // Determine the best image URL
+    // 1. Determine the image URL
+    // Priority: CMS Image -> Domain Map -> Null (Fallback to Icon)
     let imageUrl = item.image;
 
-    // 1. Try DOMAIN_MAP first for consistent high-res icons
-    if (DOMAIN_MAP[item.name]) {
-        imageUrl = `https://cdn.brandfetch.io/${DOMAIN_MAP[item.name]}/icon/theme/light/h/200/w/200?c=${BRANDFETCH_KEY}`;
-    } 
-    // 2. If existing image is from Brandfetch but missing key, append it
-    else if (imageUrl && imageUrl.includes('brandfetch.io') && !imageUrl.includes('c=')) {
-         imageUrl = `${imageUrl}?c=${BRANDFETCH_KEY}`;
+    // If no CMS image, try to resolve via Domain Map
+    if (!imageUrl && DOMAIN_MAP[item.name]) {
+        imageUrl = `https://cdn.brandfetch.io/${DOMAIN_MAP[item.name]}/icon/theme/light/h/200/w/200`;
+    }
+
+    // 2. Optimize Brandfetch URLs
+    if (imageUrl && imageUrl.includes('brandfetch.io')) {
+        // Ensure API Key is attached
+        if (!imageUrl.includes('c=')) {
+             const separator = imageUrl.includes('?') ? '&' : '?';
+             imageUrl = `${imageUrl}${separator}c=${BRANDFETCH_KEY}`;
+        }
     }
     
     return (
@@ -71,7 +77,9 @@ const SkillCard: React.FC<SkillCardProps> = ({ item, index }) => {
                 ) : (
                     <SkillIcon icon={item.icon || 'Default'} className="w-full h-full text-neutral-500 group-hover:text-neutral-900 transition-colors duration-300" />
                 )}
-                 <div className="fallback-icon hidden w-full h-full text-neutral-500 group-hover:text-neutral-900">
+                 
+                 {/* Fallback Icon (Hidden by default, shown on error or if no image) */}
+                 <div className={`fallback-icon w-full h-full text-neutral-500 group-hover:text-neutral-900 ${imageUrl ? 'hidden' : 'block'}`}>
                     <SkillIcon icon={item.icon || 'Default'} className="w-full h-full" />
                 </div>
             </div>
