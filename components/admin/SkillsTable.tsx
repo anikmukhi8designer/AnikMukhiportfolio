@@ -1,10 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Trash2, Plus, X, Check, Search, Loader2 } from 'lucide-react';
+import { Trash2, Plus, X, Check, Search, Loader2, Upload } from 'lucide-react';
 import { ICON_KEYS, SkillIcon } from '../SkillIcons';
 
 // Use the provided Brandfetch API Key
 const BRANDFETCH_API_KEY = "xcgD6C-HsoohCTMkqg3DR0i9wYmaqUB2nVktAG16TWiSgYr32T7dDkfOVBVc-DXgPyODc3hx2IgCr0Y3urqLrA";
+
+// --- Helpers for Upload (Copied to keep component self-contained) ---
+const getEnv = (key: string) => {
+    try {
+        // @ts-ignore
+        if (typeof import.meta !== 'undefined' && import.meta.env) {
+            // @ts-ignore
+            return import.meta.env[key];
+        }
+    } catch(e) {}
+    return '';
+};
+
+const getGitHubToken = () => {
+    const env = getEnv('VITE_GITHUB_TOKEN');
+    if (env) return env;
+    return localStorage.getItem('github_token') || '';
+};
+
+const getGitHubConfig = () => ({
+    owner: getEnv('VITE_GITHUB_OWNER') || localStorage.getItem('github_owner') || "",
+    repo: getEnv('VITE_GITHUB_REPO') || localStorage.getItem('github_repo') || ""
+});
 
 const SkillsTable: React.FC = () => {
   const { skills, updateSkill, deleteSkill, addSkill } = useData();
@@ -19,6 +42,10 @@ const SkillsTable: React.FC = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showResults, setShowResults] = useState(false);
+
+  // Upload State
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleAddNewCategory = () => {
     const newId = self.crypto.randomUUID();
@@ -84,19 +111,107 @@ const SkillsTable: React.FC = () => {
 
   const selectBrand = (brand: any) => {
       setNewItemName(brand.name);
-      
-      // Construct a secure/auth URL for saving or just save the icon URL directly
-      // Note: Ideally, we should proxy this or just save the domain and let frontend build the URL.
-      // However, to satisfy "reconnect admin", we will save the full usable URL if possible, or just the icon URL.
-      // Brandfetch API returns an icon URL. We should ensure the frontend appends the key if needed, 
-      // OR we append it here if it's not a generic CDN link.
-      
       setNewItemImage(brand.icon); 
       setShowResults(false);
   };
 
+  // Upload Logic
+  const triggerUpload = () => {
+      fileInputRef.current?.click();
+  };
+
+  const processUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    let token = getGitHubToken();
+    let { owner, repo } = getGitHubConfig();
+
+    if (!owner || !repo) {
+         const userOwner = prompt("GitHub Repository Owner (e.g. 'username'):");
+         if (!userOwner) return;
+         const userRepo = prompt("GitHub Repository Name (e.g. 'portfolio'):");
+         if (!userRepo) return;
+         
+         localStorage.setItem('github_owner', userOwner);
+         localStorage.setItem('github_repo', userRepo);
+         owner = userOwner;
+         repo = userRepo;
+    }
+    
+    if (!token) {
+        const userInput = prompt("GitHub Token is required for uploads. Please enter your GitHub Personal Access Token:");
+        if (userInput) {
+            localStorage.setItem('github_token', userInput.trim());
+            token = userInput.trim();
+        } else {
+            return;
+        }
+    }
+
+    setIsUploading(true);
+    
+    try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `skill_${Date.now()}.${fileExt}`;
+        const filePath = `public/uploads/${fileName}`;
+
+        // Convert file to Base64
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        
+        reader.onload = async () => {
+            const base64Content = (reader.result as string).split(',')[1];
+
+            try {
+                const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: `Upload skill icon: ${fileName}`,
+                        content: base64Content
+                    })
+                });
+
+                if (!response.ok) throw new Error("GitHub Upload Failed");
+
+                // Use Raw URL
+                const publicUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${filePath}`;
+                
+                setNewItemImage(publicUrl);
+                // If name is empty, try to use filename (minus ext)
+                if (!newItemName) {
+                    setNewItemName(file.name.replace(`.${fileExt}`, ''));
+                }
+
+            } catch (err) {
+                console.error(err);
+                alert("Upload failed. Verify permissions.");
+            } finally {
+                setIsUploading(false);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            }
+        };
+
+    } catch (error) {
+        console.error("Upload failed", error);
+        setIsUploading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        className="hidden" 
+        accept="image/*,image/svg+xml"
+        onChange={processUpload}
+      />
+
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">Skills & Tools ({skills.length} Categories)</h3>
         <button 
@@ -171,7 +286,7 @@ const SkillsTable: React.FC = () => {
                                             }
                                             if (e.key === 'Escape') resetForm();
                                         }}
-                                        placeholder="Type brand name..."
+                                        placeholder="Type name..."
                                         className="text-sm border border-neutral-200 rounded px-2 py-1.5 focus:border-neutral-400 focus:ring-0 w-full bg-transparent"
                                     />
                                     {isSearching && (
@@ -208,6 +323,15 @@ const SkillsTable: React.FC = () => {
                                     )}
 
                                     {/* Actions */}
+                                    <button 
+                                        onClick={triggerUpload} 
+                                        disabled={isUploading}
+                                        className="p-1.5 bg-neutral-100 hover:bg-neutral-200 rounded text-neutral-600 transition-colors flex-shrink-0"
+                                        title="Upload Image/SVG"
+                                    >
+                                        {isUploading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Upload className="w-4 h-4"/>}
+                                    </button>
+
                                     <button 
                                         onClick={() => searchBrandfetch(newItemName)} 
                                         className="p-1.5 bg-neutral-100 hover:bg-neutral-200 rounded text-neutral-600 transition-colors flex-shrink-0"

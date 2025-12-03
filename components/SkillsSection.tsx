@@ -8,7 +8,6 @@ import { SkillItem } from '../types';
 const BRANDFETCH_KEY = "xcgD6C-HsoohCTMkqg3DR0i9wYmaqUB2nVktAG16TWiSgYr32T7dDkfOVBVc-DXgPyODc3hx2IgCr0Y3urqLrA";
 
 // Map Skill Names to Domains for Brandfetch API
-// Using the standard logo endpoint is more reliable than the icon endpoint
 const DOMAIN_MAP: Record<string, string> = {
     "Figma": "figma.com",
     "Adobe": "adobe.com",
@@ -39,66 +38,70 @@ interface SkillCardProps {
 
 const SkillCard: React.FC<SkillCardProps> = ({ item, index }) => {
     // 1. Resolve effective image URL
-    // We prioritize the DOMAIN_MAP because it uses the authenticated Brandfetch API 
-    // with a reliable endpoint, overriding potentially stale URLs in the data.
     let imageUrl = item.image;
     const domain = DOMAIN_MAP[item.name];
 
     if (domain) {
-         // Use the standard logo endpoint (/w/200/h/200) which is robust.
-         // We don't use /icon because it frequently returns 404s for dev tools.
          imageUrl = `https://cdn.brandfetch.io/${domain}/w/200/h/200?c=${BRANDFETCH_KEY}`;
     } 
     else if (imageUrl && imageUrl.includes('brandfetch.io') && !imageUrl.includes('c=')) {
-         // Fix up other Brandfetch URLs if they are missing the key
          const separator = imageUrl.includes('?') ? '&' : '?';
          imageUrl = `${imageUrl}${separator}c=${BRANDFETCH_KEY}`;
     }
     
     return (
         <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ delay: index * 0.05, duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
-            className="group relative flex flex-col items-center justify-center p-6 bg-white/40 dark:bg-white/5 backdrop-blur-xl border border-white/60 dark:border-white/10 rounded-[2rem] hover:bg-white/60 dark:hover:bg-white/10 transition-all duration-500 aspect-square shadow-sm hover:shadow-xl hover:shadow-purple-500/10"
+            transition={{ delay: index * 0.05, duration: 0.4, ease: "easeOut" }}
+            className="group relative flex flex-col items-center justify-center p-6 
+                       bg-white/60 dark:bg-white/5 
+                       backdrop-blur-xl border border-neutral-200 dark:border-white/5
+                       rounded-3xl
+                       hover:bg-white dark:hover:bg-white/10 
+                       hover:border-neutral-300 dark:hover:border-white/20
+                       hover:shadow-2xl dark:hover:shadow-purple-500/10 
+                       transition-all duration-500 ease-out aspect-square cursor-default overflow-hidden"
         >
-            {/* Circular Icon Container */}
-            <div className="w-20 h-20 mb-6 rounded-full border-[3px] border-neutral-200 dark:border-neutral-700 group-hover:border-neutral-900 dark:group-hover:border-white transition-colors duration-500 flex items-center justify-center relative bg-white dark:bg-white/90 overflow-hidden shadow-sm p-4">
+            {/* 
+                Icon Container 
+                - Starts at w-10 (40px)
+                - Scales 1.8x on hover (~72px)
+                - Translates up slightly to stay centered visually if text remains or moves
+            */}
+            <div className="w-10 h-10 mb-4 flex items-center justify-center relative z-10 transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.8] group-hover:-translate-y-2">
                  {imageUrl ? (
                     <img 
                         src={imageUrl} 
                         alt={item.name} 
                         loading="lazy"
-                        className="w-full h-full object-contain transition-all duration-500 transform group-hover:scale-110"
+                        className="w-full h-full object-contain drop-shadow-sm filter grayscale group-hover:grayscale-0 transition-all duration-500 opacity-70 group-hover:opacity-100"
                         onError={(e) => {
-                            // Hide broken image
                             e.currentTarget.style.display = 'none';
-                            // Show fallback icon
                             const fallback = e.currentTarget.parentElement?.querySelector('.fallback-icon');
                             if (fallback) (fallback as HTMLElement).style.display = 'flex';
                         }}
                     />
                 ) : (
-                    <div className="text-neutral-500 group-hover:text-neutral-900 transition-colors duration-500 w-full h-full">
+                    <div className="w-full h-full text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-white transition-colors duration-500">
                         <SkillIcon icon={item.icon || item.name || 'Default'} className="w-full h-full" />
                     </div>
                 )}
                  
-                 {/* Fallback container: Initially hidden, shown via onError */}
-                 <div className="fallback-icon hidden absolute inset-0 items-center justify-center text-neutral-500 group-hover:text-neutral-900 p-4">
+                 {/* Fallback Icon */}
+                 <div className="fallback-icon hidden absolute inset-0 items-center justify-center text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-white transition-colors">
                     <SkillIcon icon={item.icon || item.name || 'Default'} className="w-full h-full" />
                 </div>
             </div>
 
             {/* Label */}
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-neutral-500 dark:text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-white transition-colors duration-500 text-center">
+            <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-neutral-500 dark:text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-white transition-all duration-300 text-center relative z-10 group-hover:translate-y-2 group-hover:opacity-80">
                 {item.name}
             </span>
 
-            {/* Active Indicator */}
-            <div className="absolute top-6 right-6 w-2 h-2 bg-green-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-glow" />
-            
+            {/* Shine/Glare Effect on Hover */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
         </motion.div>
     );
 }
@@ -111,7 +114,7 @@ const SkillsSection: React.FC = () => {
       <div className="max-w-screen-xl mx-auto px-4 md:px-8">
         
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-baseline justify-between mb-16 gap-4">
+        <div className="flex flex-col md:flex-row md:items-baseline justify-between mb-20 gap-4">
             <h2 className="text-3xl md:text-5xl font-medium tracking-tight text-neutral-900 dark:text-white transition-colors">
                 Design & Tech
             </h2>
@@ -123,8 +126,9 @@ const SkillsSection: React.FC = () => {
         <div className="space-y-24">
             {skills.map((category) => (
                 <div key={category.id}>
-                    <h3 className="text-sm font-bold uppercase tracking-widest text-neutral-400 dark:text-neutral-600 mb-10 pl-2 transition-colors">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400 dark:text-neutral-600 mb-8 pl-1 transition-colors flex items-center gap-4">
                         {category.title}
+                        <div className="h-px bg-neutral-200 dark:bg-white/10 flex-grow"></div>
                     </h3>
                     
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
