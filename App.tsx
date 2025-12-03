@@ -23,7 +23,9 @@ import BlockEditor from './components/admin/BlockEditor';
 
 const AdminRoute = () => {
     const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
-        return localStorage.getItem('cms_authenticated') === 'true';
+        // Check for the actual token, not just a boolean flag
+        const token = localStorage.getItem('github_token');
+        return !!token && token.length > 0;
     });
     
     const [currentView, setCurrentView] = useState<'dashboard' | 'editor'>('dashboard');
@@ -32,7 +34,7 @@ const AdminRoute = () => {
 
     if (!isAdminLoggedIn) {
         return <AdminLogin onLogin={() => {
-            localStorage.setItem('cms_authenticated', 'true');
+            // Token is already set in localStorage by AdminLogin
             setIsAdminLoggedIn(true);
         }} />;
     }
@@ -58,7 +60,8 @@ const AdminRoute = () => {
     return (
         <Dashboard 
             onLogout={() => { 
-                localStorage.removeItem('cms_authenticated');
+                localStorage.removeItem('github_token');
+                // We keep owner/repo for convenience, but remove token to logout
                 setIsAdminLoggedIn(false); 
                 window.location.hash = '';
                 window.location.reload();

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Save, Plus, Trash2, Loader2, Check, Github, Key, Database, Eye, EyeOff } from 'lucide-react';
+import { Save, Plus, Trash2, Loader2, Check, Github, Key, Database, Lock } from 'lucide-react';
 
 const ProfileSettings: React.FC = () => {
   const { config, socials, updateConfig, updateSocials, isSaving } = useData();
@@ -15,7 +15,6 @@ const ProfileSettings: React.FC = () => {
       repo: '',
       token: ''
   });
-  const [showToken, setShowToken] = useState(false);
 
   const [hasChanges, setHasChanges] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -27,7 +26,7 @@ const ProfileSettings: React.FC = () => {
     setGhConfig({
         owner: localStorage.getItem('github_owner') || '',
         repo: localStorage.getItem('github_repo') || '',
-        token: localStorage.getItem('github_token') || ''
+        token: localStorage.getItem('github_token') || '' // Read directly from storage
     });
   }, [config, socials]);
 
@@ -71,10 +70,11 @@ const ProfileSettings: React.FC = () => {
       updateSocials(localSocials);
       
       // Save GitHub Config
+      // Note: We don't save token here if it's masked, but since we are showing the active session state
+      // we mostly care about Repo Name updates here.
       localStorage.setItem('github_owner', ghConfig.owner);
       localStorage.setItem('github_repo', ghConfig.repo);
-      localStorage.setItem('github_token', ghConfig.token);
-
+      
       setHasChanges(false);
       setJustSaved(true);
       
@@ -112,7 +112,7 @@ const ProfileSettings: React.FC = () => {
             </div>
             <div>
                 <h3 className="text-lg font-bold text-neutral-900">CMS Configuration</h3>
-                <p className="text-xs text-neutral-500">Connect to your GitHub repository to enable content saving.</p>
+                <p className="text-xs text-neutral-500">Connected via Active Session.</p>
             </div>
         </div>
         
@@ -124,9 +124,8 @@ const ProfileSettings: React.FC = () => {
                 <input 
                     type="text" 
                     value={ghConfig.owner}
-                    onChange={(e) => handleGhChange('owner', e.target.value)}
-                    className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-neutral-900 focus:bg-white focus:outline-none transition-all"
-                    placeholder="e.g. your-username"
+                    disabled
+                    className="w-full px-4 py-2.5 bg-neutral-100 border border-neutral-200 rounded-lg text-sm font-medium text-neutral-500 cursor-not-allowed"
                 />
             </div>
             <div className="space-y-2">
@@ -147,22 +146,15 @@ const ProfileSettings: React.FC = () => {
                 </label>
                 <div className="relative">
                     <input 
-                        type={showToken ? "text" : "password"}
-                        value={ghConfig.token}
-                        onChange={(e) => handleGhChange('token', e.target.value)}
-                        className="w-full pl-4 pr-10 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-neutral-900 focus:bg-white focus:outline-none transition-all"
-                        placeholder="ghp_..."
+                        type="password"
+                        value="********************************"
+                        disabled
+                        className="w-full pl-10 pr-4 py-2.5 bg-neutral-100 border border-neutral-200 rounded-lg text-sm font-medium text-neutral-500 cursor-not-allowed"
                     />
-                    <button 
-                        type="button"
-                        onClick={() => setShowToken(!showToken)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
-                    >
-                        {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                 </div>
                 <p className="text-[10px] text-neutral-400">
-                    Token requires <strong>repo</strong> (Contents) permissions. Saved locally to your browser.
+                    To change the token, please <button onClick={() => { localStorage.removeItem('github_token'); window.location.reload(); }} className="text-blue-600 hover:underline">logout</button> and authenticate again.
                 </p>
             </div>
         </div>
