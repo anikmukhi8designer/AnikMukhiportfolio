@@ -13,7 +13,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
   return (
     <motion.div
       layoutId={`project-card-${project.id}`}
-      className="group relative border-b border-neutral-200 py-12 cursor-pointer transition-colors hover:border-neutral-400"
+      className="group relative border-b border-neutral-200 py-12 px-6 md:px-10 cursor-pointer transition-all duration-300 hover:bg-white hover:border-transparent hover:shadow-xl hover:shadow-neutral-200/40 rounded-3xl"
       onClick={() => onClick(project)}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}

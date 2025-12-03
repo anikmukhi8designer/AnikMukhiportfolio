@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Save, Plus, Trash2, Loader2, Check } from 'lucide-react';
+import { Save, Plus, Trash2, Loader2, Check, Github, Key, Database, Eye, EyeOff } from 'lucide-react';
 
 const ProfileSettings: React.FC = () => {
   const { config, socials, updateConfig, updateSocials, isSaving } = useData();
@@ -8,17 +8,37 @@ const ProfileSettings: React.FC = () => {
   // Local state to prevent rapid context updates while typing
   const [localConfig, setLocalConfig] = useState(config);
   const [localSocials, setLocalSocials] = useState(socials);
+  
+  // GitHub Config State
+  const [ghConfig, setGhConfig] = useState({
+      owner: '',
+      repo: '',
+      token: ''
+  });
+  const [showToken, setShowToken] = useState(false);
+
   const [hasChanges, setHasChanges] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
 
-  // Sync with context on mount (or if external update happens)
+  // Sync with context and localStorage on mount
   useEffect(() => {
     setLocalConfig(config);
     setLocalSocials(socials);
+    setGhConfig({
+        owner: localStorage.getItem('github_owner') || '',
+        repo: localStorage.getItem('github_repo') || '',
+        token: localStorage.getItem('github_token') || ''
+    });
   }, [config, socials]);
 
   const handleConfigChange = (field: keyof typeof config, value: string) => {
       setLocalConfig(prev => ({ ...prev, [field]: value }));
+      setHasChanges(true);
+      setJustSaved(false);
+  };
+
+  const handleGhChange = (field: keyof typeof ghConfig, value: string) => {
+      setGhConfig(prev => ({ ...prev, [field]: value }));
       setHasChanges(true);
       setJustSaved(false);
   };
@@ -46,8 +66,15 @@ const ProfileSettings: React.FC = () => {
   };
 
   const saveChanges = () => {
+      // Save Data
       updateConfig(localConfig);
       updateSocials(localSocials);
+      
+      // Save GitHub Config
+      localStorage.setItem('github_owner', ghConfig.owner);
+      localStorage.setItem('github_repo', ghConfig.repo);
+      localStorage.setItem('github_token', ghConfig.token);
+
       setHasChanges(false);
       setJustSaved(true);
       
@@ -59,7 +86,7 @@ const ProfileSettings: React.FC = () => {
     <div className="space-y-12 max-w-4xl pb-24">
       
       {/* Header Actions */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center sticky top-0 bg-neutral-100 py-4 z-10 border-b border-neutral-200/50">
           <h2 className="text-2xl font-bold text-neutral-900">Settings</h2>
           <button 
             onClick={saveChanges}
@@ -69,13 +96,77 @@ const ProfileSettings: React.FC = () => {
                 ? 'bg-neutral-900 text-white hover:bg-neutral-800' 
                 : justSaved 
                     ? 'bg-green-100 text-green-700'
-                    : 'bg-neutral-100 text-neutral-400 cursor-not-allowed'
+                    : 'bg-neutral-200 text-neutral-400 cursor-not-allowed'
             }`}
           >
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : justSaved ? <Check className="w-4 h-4"/> : <Save className="w-4 h-4" />}
             {isSaving ? 'Saving...' : justSaved ? 'Saved' : 'Save Changes'}
           </button>
       </div>
+
+      {/* GitHub CMS Configuration */}
+      <section className="space-y-6 bg-white p-6 rounded-xl border border-neutral-200 shadow-sm">
+        <div className="flex items-center gap-3 border-b border-neutral-100 pb-4">
+            <div className="p-2 bg-neutral-100 rounded-lg text-neutral-600">
+                <Database className="w-5 h-5" />
+            </div>
+            <div>
+                <h3 className="text-lg font-bold text-neutral-900">CMS Configuration</h3>
+                <p className="text-xs text-neutral-500">Connect to your GitHub repository to enable content saving.</p>
+            </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 flex items-center gap-2">
+                    <Github className="w-3 h-3" /> Repository Owner
+                </label>
+                <input 
+                    type="text" 
+                    value={ghConfig.owner}
+                    onChange={(e) => handleGhChange('owner', e.target.value)}
+                    className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-neutral-900 focus:bg-white focus:outline-none transition-all"
+                    placeholder="e.g. your-username"
+                />
+            </div>
+            <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 flex items-center gap-2">
+                    <Database className="w-3 h-3" /> Repository Name
+                </label>
+                <input 
+                    type="text" 
+                    value={ghConfig.repo}
+                    onChange={(e) => handleGhChange('repo', e.target.value)}
+                    className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-neutral-900 focus:bg-white focus:outline-none transition-all"
+                    placeholder="e.g. portfolio"
+                />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 flex items-center gap-2">
+                    <Key className="w-3 h-3" /> Personal Access Token (PAT)
+                </label>
+                <div className="relative">
+                    <input 
+                        type={showToken ? "text" : "password"}
+                        value={ghConfig.token}
+                        onChange={(e) => handleGhChange('token', e.target.value)}
+                        className="w-full pl-4 pr-10 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-neutral-900 focus:bg-white focus:outline-none transition-all"
+                        placeholder="ghp_..."
+                    />
+                    <button 
+                        type="button"
+                        onClick={() => setShowToken(!showToken)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
+                    >
+                        {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                </div>
+                <p className="text-[10px] text-neutral-400">
+                    Token requires <strong>repo</strong> (Contents) permissions. Saved locally to your browser.
+                </p>
+            </div>
+        </div>
+      </section>
 
       {/* Hero Section Configuration */}
       <section className="space-y-6">

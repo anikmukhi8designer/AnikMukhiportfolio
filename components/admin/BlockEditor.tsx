@@ -31,6 +31,11 @@ const getGitHubToken = () => {
     return localStorage.getItem('github_token') || '';
 };
 
+const getGitHubConfig = () => ({
+    owner: getEnv('VITE_GITHUB_OWNER') || localStorage.getItem('github_owner') || "",
+    repo: getEnv('VITE_GITHUB_REPO') || localStorage.getItem('github_repo') || ""
+});
+
 const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) => {
   const [formData, setFormData] = useState<Project>(project);
   const [blocks, setBlocks] = useState<ContentBlock[]>(project.content || []);
@@ -45,9 +50,6 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [pendingUploadHandler, setPendingUploadHandler] = useState<((url: string) => void) | null>(null);
-
-  const GITHUB_OWNER = getEnv('VITE_GITHUB_OWNER') || "anikmukhi8designer";
-  const GITHUB_REPO = getEnv('VITE_GITHUB_REPO') || "AnikMukhiportfolio";
 
   // Focus effect when shouldFocusId changes
   useEffect(() => {
@@ -207,6 +209,19 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
     if (!file || !pendingUploadHandler) return;
     
     let token = getGitHubToken();
+    let { owner, repo } = getGitHubConfig();
+
+    if (!owner || !repo) {
+         const userOwner = prompt("GitHub Repository Owner (e.g. 'username'):");
+         if (!userOwner) return;
+         const userRepo = prompt("GitHub Repository Name (e.g. 'portfolio'):");
+         if (!userRepo) return;
+         
+         localStorage.setItem('github_owner', userOwner);
+         localStorage.setItem('github_repo', userRepo);
+         owner = userOwner;
+         repo = userRepo;
+    }
     
     if (!token) {
         const userInput = prompt("GitHub Token is required for uploads. Please enter your GitHub Personal Access Token:");
@@ -234,7 +249,7 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
             const base64Content = (reader.result as string).split(',')[1];
 
             try {
-                const response = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${filePath}`, {
+                const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`, {
                     method: 'PUT',
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -250,7 +265,7 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
 
                 // Construct public URL
                 // Use Raw URL for immediate feedback in preview
-                const publicUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${filePath}`;
+                const publicUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${filePath}`;
                 
                 pendingUploadHandler(publicUrl);
             } catch (err) {

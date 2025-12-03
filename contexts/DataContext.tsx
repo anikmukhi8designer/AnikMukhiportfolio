@@ -4,7 +4,7 @@ import {
   PROJECTS as INITIAL_PROJECTS, 
   EXPERIENCE as INITIAL_EXPERIENCE, 
   CLIENTS as INITIAL_CLIENTS, 
-  SKILLS as INITIAL_SKILLS,
+  SKILLS as INITIAL_SKILLS, 
   INITIAL_CONFIG,
   SOCIALS as INITIAL_SOCIALS
 } from '../data';
@@ -93,18 +93,22 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return localStorage.getItem('github_token') || '';
   };
 
-  // REMOVED HARDCODED DEFAULTS
-  // This ensures the app uses local data.ts by default, fixing "site not updated" issues
-  // and preventing 404/Network errors when fetching from a non-existent repo.
-  const GITHUB_OWNER = getEnv('VITE_GITHUB_OWNER') || "";
-  const GITHUB_REPO = getEnv('VITE_GITHUB_REPO') || "";
+  // Helper to get Repo Config from Env OR LocalStorage
+  const getGitHubConfig = () => {
+      const owner = getEnv('VITE_GITHUB_OWNER') || localStorage.getItem('github_owner') || "";
+      const repo = getEnv('VITE_GITHUB_REPO') || localStorage.getItem('github_repo') || "";
+      return { owner, repo };
+  };
+
   const DATA_PATH = 'src/data.json';
 
   // --- GitHub Helpers ---
   
   const fetchFromGitHub = async (shouldApplyData = true) => {
+    const { owner, repo } = getGitHubConfig();
+
     // ABORT if no repo is configured. This relies on local data.
-    if (!GITHUB_OWNER || !GITHUB_REPO) {
+    if (!owner || !repo) {
         return;
     }
 
@@ -122,8 +126,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${DATA_PATH}?t=${Date.now()}`;
-    const rawUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${DATA_PATH}?t=${Date.now()}`;
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${DATA_PATH}?t=${Date.now()}`;
+    const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${DATA_PATH}?t=${Date.now()}`;
 
     let apiSuccess = false;
 
@@ -193,9 +197,28 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         saveTimeoutRef.current = null;
     }
 
-    if (!GITHUB_OWNER || !GITHUB_REPO) {
-        alert("GitHub Repository not configured in environment variables. Changes are local only.");
-        return;
+    let { owner, repo } = getGitHubConfig();
+
+    if (!owner || !repo) {
+        const userOwner = prompt("GitHub Repository Owner not configured. Please enter it (e.g. 'username'):");
+        if (!userOwner) {
+            alert("GitHub Repository not configured. Changes are local only.");
+            setIsSaving(false);
+            return;
+        }
+        
+        const userRepo = prompt("GitHub Repository Name not configured. Please enter it (e.g. 'portfolio'):");
+        if (!userRepo) {
+             alert("GitHub Repository not configured. Changes are local only.");
+             setIsSaving(false);
+             return;
+        }
+
+        // Save to local storage for persistence
+        localStorage.setItem('github_owner', userOwner);
+        localStorage.setItem('github_repo', userRepo);
+        owner = userOwner;
+        repo = userRepo;
     }
 
     const token = getGitHubToken();
@@ -236,7 +259,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         body.sha = fileSha;
       }
 
-      const response = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${DATA_PATH}`, {
+      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${DATA_PATH}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -256,7 +279,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.error("GitHub Save Failed:", err);
         // Handle SHA mismatch retry
         if (response.status === 409 || response.status === 422) {
-             const shaRes = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${DATA_PATH}`, {
+             const shaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${DATA_PATH}`, {
                  headers: { 
                     'Authorization': `Bearer ${token}`,
                     'Cache-Control': 'no-cache'
@@ -267,7 +290,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                  setFileSha(shaData.sha);
                  body.sha = shaData.sha;
                  
-                 const retryResponse = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${DATA_PATH}`, {
+                 const retryResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${DATA_PATH}`, {
                     method: 'PUT',
                     headers: {
                       'Authorization': `Bearer ${token}`,
@@ -426,7 +449,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           alert("Data synced to GitHub!");
       } catch (e) {
           console.error(e);
-          alert("Sync failed.");
+          alert("Sync failed. Check console.");
       }
   };
 

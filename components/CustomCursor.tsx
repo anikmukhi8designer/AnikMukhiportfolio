@@ -10,7 +10,7 @@ const CustomCursor: React.FC = () => {
   const cursorY = useMotionValue(-100);
 
   // Smooth physics for the movement
-  const springConfig = { damping: 20, stiffness: 400, mass: 0.5 };
+  const springConfig = { damping: 20, stiffness: 450, mass: 0.5 };
   const cursorXSpring = useSpring(cursorX, springConfig);
   const cursorYSpring = useSpring(cursorY, springConfig);
 
@@ -29,6 +29,8 @@ const CustomCursor: React.FC = () => {
         const isInteractive = 
             target.tagName.toLowerCase() === 'a' || 
             target.tagName.toLowerCase() === 'button' || 
+            target.tagName.toLowerCase() === 'input' || 
+            target.tagName.toLowerCase() === 'textarea' || 
             target.closest('a') || 
             target.closest('button') ||
             target.classList.contains('cursor-pointer');
@@ -52,64 +54,38 @@ const CustomCursor: React.FC = () => {
   // Animation Variants
   const variants: Variants = {
     default: {
-      height: 12,
-      width: 12,
-      backgroundColor: "#ffffff",
+      height: 20,
+      width: 20,
       x: "-50%",
       y: "-50%",
       opacity: 1,
-      mixBlendMode: "difference"
     },
     hover: {
-      height: 64,
-      width: 64,
-      backgroundColor: "#ffffff",
+      height: 48,
+      width: 48,
       x: "-50%",
       y: "-50%",
       opacity: 1,
-      mixBlendMode: "difference"
     },
     click: {
-      height: 8,
-      width: 8,
-      backgroundColor: "#ffffff",
+      height: 16,
+      width: 16,
       x: "-50%",
       y: "-50%",
-      mixBlendMode: "difference"
     }
   };
 
   return (
-    <>
-        {/* Main Cursor Dot */}
-        <motion.div
-            className="fixed top-0 left-0 pointer-events-none z-[9999] rounded-full hidden md:block"
-            style={{
-                left: cursorXSpring,
-                top: cursorYSpring,
-            }}
-            variants={variants}
-            animate={isClicked ? 'click' : isHovered ? 'hover' : 'default'}
-            transition={{ type: "spring", stiffness: 400, damping: 28 }}
-        />
-        
-        {/* Optional: Second following ring for extra flair - also using difference mode */}
-        <motion.div
-            className="fixed top-0 left-0 pointer-events-none z-[9998] rounded-full border border-white mix-blend-difference hidden md:block"
-            style={{
-                left: cursorXSpring,
-                top: cursorYSpring,
-            }}
-            animate={{
-                width: isHovered ? 0 : 40,
-                height: isHovered ? 0 : 40,
-                x: "-50%",
-                y: "-50%",
-                opacity: isHovered ? 0 : 1
-            }}
-            transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.05 }}
-        />
-    </>
+    <motion.div
+        className="fixed top-0 left-0 pointer-events-none z-[9999] rounded-full hidden md:block mix-blend-difference bg-white"
+        style={{
+            left: cursorXSpring,
+            top: cursorYSpring,
+        }}
+        variants={variants}
+        animate={isClicked ? 'click' : isHovered ? 'hover' : 'default'}
+        transition={{ type: "spring", stiffness: 400, damping: 28 }}
+    />
   );
 };
 
