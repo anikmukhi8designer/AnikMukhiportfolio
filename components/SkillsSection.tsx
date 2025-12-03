@@ -6,7 +6,7 @@ import { SkillIcon } from './SkillIcons';
 // Brandfetch Public Key
 const BRANDFETCH_KEY = "xcgD6C-HsoohCTMkqg3DR0i9wYmaqUB2nVktAG16TWiSgYr32T7dDkfOVBVc-DXgPyODc3hx2IgCr0Y3urqLrA";
 
-// Map Skill Names to Domains for Brandfetch API
+// Map Skill Names to Domains for Brandfetch API (Preferred high-quality mapping)
 const DOMAIN_MAP: Record<string, string> = {
     "Figma": "figma.com",
     "Adobe": "adobe.com",
@@ -36,10 +36,17 @@ interface SkillCardProps {
 }
 
 const SkillCard: React.FC<SkillCardProps> = ({ item, index }) => {
-    const domain = DOMAIN_MAP[item.name];
-    const imageUrl = domain 
-        ? `https://cdn.brandfetch.io/${domain}/icon/theme/light/h/200/w/200?c=${BRANDFETCH_KEY}` 
-        : item.image;
+    // Determine the best image URL
+    let imageUrl = item.image;
+
+    // 1. Try DOMAIN_MAP first for consistent high-res icons
+    if (DOMAIN_MAP[item.name]) {
+        imageUrl = `https://cdn.brandfetch.io/${DOMAIN_MAP[item.name]}/icon/theme/light/h/200/w/200?c=${BRANDFETCH_KEY}`;
+    } 
+    // 2. If existing image is from Brandfetch but missing key, append it
+    else if (imageUrl && imageUrl.includes('brandfetch.io') && !imageUrl.includes('c=')) {
+         imageUrl = `${imageUrl}?c=${BRANDFETCH_KEY}`;
+    }
     
     return (
         <motion.div 
@@ -47,14 +54,14 @@ const SkillCard: React.FC<SkillCardProps> = ({ item, index }) => {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             transition={{ delay: index * 0.02, duration: 0.4 }}
-            className="group relative flex flex-col items-center justify-center p-8 bg-white/5 backdrop-blur-sm hover:bg-white/20 transition-all duration-300 aspect-square border border-neutral-200/40 rounded-2xl hover:border-neutral-300 hover:shadow-lg hover:z-10"
+            className="group relative flex flex-col items-center justify-center p-8 bg-white/10 backdrop-blur-md hover:bg-white/30 transition-all duration-300 aspect-square border border-white/20 rounded-2xl hover:border-white/40 hover:shadow-xl hover:z-10"
         >
             <div className="w-12 h-12 mb-6 relative flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:-translate-y-1">
                  {imageUrl ? (
                     <img 
                         src={imageUrl} 
                         alt={item.name} 
-                        className="w-full h-full object-contain filter grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300"
+                        className="w-full h-full object-contain filter grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300"
                         onError={(e) => {
                             e.currentTarget.style.display = 'none';
                             const fallback = e.currentTarget.parentElement?.querySelector('.fallback-icon');
@@ -62,14 +69,14 @@ const SkillCard: React.FC<SkillCardProps> = ({ item, index }) => {
                         }}
                     />
                 ) : (
-                    <SkillIcon icon={item.icon || 'Default'} className="w-full h-full text-neutral-400 group-hover:text-neutral-900 transition-colors duration-300" />
+                    <SkillIcon icon={item.icon || 'Default'} className="w-full h-full text-neutral-500 group-hover:text-neutral-900 transition-colors duration-300" />
                 )}
-                 <div className="fallback-icon hidden w-full h-full text-neutral-400 group-hover:text-neutral-900">
+                 <div className="fallback-icon hidden w-full h-full text-neutral-500 group-hover:text-neutral-900">
                     <SkillIcon icon={item.icon || 'Default'} className="w-full h-full" />
                 </div>
             </div>
 
-            <span className="text-xs font-bold uppercase tracking-widest text-neutral-400 group-hover:text-neutral-900 transition-colors text-center">
+            <span className="text-xs font-bold uppercase tracking-widest text-neutral-500 group-hover:text-neutral-900 transition-colors text-center">
                 {item.name}
             </span>
         </motion.div>
@@ -80,7 +87,7 @@ const SkillsSection: React.FC = () => {
   const { skills } = useData();
 
   return (
-    <section className="py-24 border-t border-neutral-200 bg-transparent relative z-10">
+    <section className="py-24 border-t border-neutral-200/50 bg-transparent relative z-10">
       <div className="max-w-screen-xl mx-auto px-4 md:px-8">
         
         {/* Header */}

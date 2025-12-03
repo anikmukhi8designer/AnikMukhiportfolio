@@ -26,14 +26,17 @@ const CustomCursor: React.FC = () => {
     // Global Hover Detection
     const handleMouseOver = (e: MouseEvent) => {
         const target = e.target as HTMLElement;
+        
+        // Enhanced detection for interactive elements using closest() 
+        // to handle nested elements (e.g., text inside a button)
         const isInteractive = 
-            target.tagName.toLowerCase() === 'a' || 
-            target.tagName.toLowerCase() === 'button' || 
-            target.tagName.toLowerCase() === 'input' || 
-            target.tagName.toLowerCase() === 'textarea' || 
             target.closest('a') || 
             target.closest('button') ||
-            target.classList.contains('cursor-pointer');
+            target.closest('[role="button"]') ||
+            target.closest('input') || 
+            target.closest('textarea') || 
+            target.closest('select') ||
+            target.closest('.cursor-pointer');
             
         setIsHovered(!!isInteractive);
     };
@@ -54,22 +57,22 @@ const CustomCursor: React.FC = () => {
   // Animation Variants
   const variants: Variants = {
     default: {
-      height: 20,
-      width: 20,
+      height: 16,
+      width: 16,
       x: "-50%",
       y: "-50%",
       opacity: 1,
     },
     hover: {
-      height: 48,
-      width: 48,
+      height: 60, // Increased size for better visibility
+      width: 60,
       x: "-50%",
       y: "-50%",
       opacity: 1,
     },
     click: {
-      height: 16,
-      width: 16,
+      height: 12,
+      width: 12,
       x: "-50%",
       y: "-50%",
     }
