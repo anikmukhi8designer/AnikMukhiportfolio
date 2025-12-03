@@ -234,8 +234,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     // --- Strategy 2: Proxy API (Public/Preview Mode) ---
-    // If we are here, we probably don't have admin tokens, OR admin fetch failed network-wise (but catch block handles that above)
-    // Actually, if token is missing, we are likely a public visitor.
     try {
         const proxyUrl = `/api/data?path=${path}&t=${fetchTimestamp}`;
         const response = await fetch(proxyUrl, { 
@@ -274,7 +272,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     
     // If both fail, we are falling back to INITIAL_DATA
-    // In Admin mode, this is bad, but Error state should handle it.
     setIsLoading(false);
     return false;
   };
@@ -302,7 +299,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (!owner || !repo || !token) return;
 
       try {
-          // 1. Fetch existing log
           let existingLogs: SyncLogEntry[] = [];
           let logSha = '';
 
@@ -318,10 +314,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                   existingLogs = JSON.parse(content);
               } catch (e) { console.warn("Failed to parse sync log", e); }
           } else if (getRes.status === 404) {
-              console.log("Creating new sync log file...");
+              // Creating new
           }
 
-          // 2. Append new entry
           const newEntry: SyncLogEntry = {
               id: self.crypto.randomUUID(),
               timestamp: new Date().toISOString(),
@@ -329,10 +324,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               author: localStorage.getItem('github_owner') || 'Admin'
           };
           
-          const updatedLogs = [newEntry, ...existingLogs].slice(0, 50); // Keep last 50
+          const updatedLogs = [newEntry, ...existingLogs].slice(0, 50); 
           const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(updatedLogs, null, 2))));
 
-          // 3. Save log
           const body: any = {
               message: `Sync Log Update: ${newEntry.timestamp}`,
               content: contentBase64,
@@ -379,39 +373,48 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const contentBase64 = btoa(unescape(encodeURIComponent(contentString)));
 
     try {
-      // FORCE FRESH SHA CHECK to solve "sha wasn't supplied"
-      let targetPath = activeDataPath; 
+      // --- CRITICAL SHA DISCOVERY ---
+      // We must explicitly find the SHA of the existing file. 
+      // If we don't send a SHA for an existing file, GitHub returns "sha wasn't supplied".
+      
       let shaToUse = null;
+      let finalPath = activeDataPath;
 
-      try {
-          // 1. Check Primary Path
-          const res1 = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${targetPath}`, {
-              method: 'GET',
-              headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache, no-store' }
-          });
-          
-          if (res1.ok) {
-              const data = await res1.json();
-              shaToUse = data.sha;
-          } else if (res1.status === 404) {
-              // 2. If Primary is 'src/data.json' and not found, check Root 'data.json'
-              if (targetPath === 'src/data.json') {
-                  const res2 = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/data.json`, {
-                      method: 'GET',
-                      headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache, no-store' }
-                  });
-                  if (res2.ok) {
-                      const data = await res2.json();
-                      shaToUse = data.sha;
-                      targetPath = 'data.json';
-                      setActiveDataPath('data.json');
-                  }
-              }
-          }
-      } catch (e) {
-          console.warn("SHA Check Network Error", e);
-          shaToUse = fileSha; 
+      // Check Path A: src/data.json
+      const resA = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/src/data.json`, {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
+      });
+
+      if (resA.ok) {
+          const dataA = await resA.json();
+          shaToUse = dataA.sha;
+          finalPath = 'src/data.json';
+          setActiveDataPath('src/data.json');
+      } else if (resA.status === 404) {
+           // Check Path B: data.json (root)
+           const resB = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/data.json`, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
+           });
+
+           if (resB.ok) {
+               const dataB = await resB.json();
+               shaToUse = dataB.sha;
+               finalPath = 'data.json';
+               setActiveDataPath('data.json');
+           } else if (resB.status !== 404) {
+               // If it's not 404, it's a real error (403, 500 etc)
+               throw new Error(`GitHub API Error checking root data.json: ${resB.status}`);
+           }
+      } else {
+          // Real error checking src/data.json
+          throw new Error(`GitHub API Error checking src/data.json: ${resA.status}`);
       }
+
+      // At this point:
+      // if shaToUse is set -> We update existing file.
+      // if shaToUse is null -> We assume NEW file creation (both paths 404).
 
       const body: any = {
         message: `CMS Update: ${now.toLocaleString()}`,
@@ -423,7 +426,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           body.sha = shaToUse;
       }
 
-      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${targetPath}`, {
+      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${finalPath}`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -435,14 +438,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setLastUpdated(now);
         localStorage.setItem('cms_last_updated', now.toISOString());
         
-        // 3. Handle Sync Log & Redirect
         if (isManualSync) {
             const previewUrl = `${window.location.origin}/preview?update=${now.getTime()}`;
             setLatestPreviewUrl(previewUrl);
             await updateSyncLog(previewUrl);
             window.location.href = previewUrl;
         } else {
-             try { fetch(`/api/data?path=${targetPath}&t=${Date.now()}`, { cache: 'no-store' }); } catch(e){}
+             try { fetch(`/api/data?path=${finalPath}&t=${Date.now()}`, { cache: 'no-store' }); } catch(e){}
         }
         
       } else {
@@ -451,6 +453,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
         if (response.status === 401) {
             throw new Error("Invalid GitHub Token. Please re-authenticate.");
+        }
+        if (response.status === 409) {
+            throw new Error("Sync Conflict. Please refresh the page and try again.");
         }
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData.message || `GitHub Error: ${response.status} ${response.statusText}`);
