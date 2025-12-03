@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Radio, RefreshCw, UserCircle, Check, AlertCircle, History, ExternalLink, Clock } from 'lucide-react';
+import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Radio, RefreshCw, UserCircle, Check, AlertCircle, History, ExternalLink, Clock, Loader2, AlertTriangle } from 'lucide-react';
 import WorkTable from './WorkTable';
 import ExperienceTable from './ExperienceTable';
 import SkillsTable from './SkillsTable';
@@ -17,7 +17,7 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   const [activeTab, setActiveTab] = useState<'work' | 'experience' | 'skills' | 'clients' | 'settings' | 'history' | 'sync_logs'>('work');
-  const { resetData, refreshAllClients, lastUpdated, getSyncHistory, latestPreviewUrl, verifyConnection } = useData();
+  const { resetData, refreshAllClients, lastUpdated, getSyncHistory, latestPreviewUrl, verifyConnection, isLoading, error, fetchFromGitHub } = useData();
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   
@@ -70,9 +70,56 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
     }
   };
 
+  const handleRetryFetch = () => {
+      fetchFromGitHub(true);
+  };
+
   const formatDate = (iso: string) => {
       return new Date(iso).toLocaleString();
   };
+
+  // 1. Loading State Block
+  if (isLoading) {
+      return (
+          <div className="min-h-screen bg-neutral-100 flex items-center justify-center flex-col gap-4">
+              <Loader2 className="w-10 h-10 animate-spin text-neutral-400" />
+              <p className="text-neutral-500 text-sm font-medium">Fetching data from GitHub...</p>
+          </div>
+      );
+  }
+
+  // 2. Fatal Error Block (Prevent editing default data)
+  if (error && activeTab !== 'settings') {
+      return (
+          <div className="min-h-screen bg-neutral-100 flex items-center justify-center p-4">
+              <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
+                  <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <AlertTriangle className="w-8 h-8" />
+                  </div>
+                  <h2 className="text-xl font-bold text-neutral-900 mb-2">Failed to Load Data</h2>
+                  <p className="text-neutral-500 mb-6 text-sm">{error}</p>
+                  
+                  <div className="flex flex-col gap-3">
+                      <button 
+                          onClick={handleRetryFetch}
+                          className="w-full py-2.5 bg-neutral-900 text-white font-bold rounded-lg hover:bg-black transition-colors flex items-center justify-center gap-2"
+                      >
+                          <RefreshCw className="w-4 h-4" /> Retry
+                      </button>
+                      <button 
+                          onClick={() => setActiveTab('settings')}
+                          className="w-full py-2.5 bg-white border border-neutral-200 text-neutral-700 font-bold rounded-lg hover:bg-neutral-50 transition-colors"
+                      >
+                          Check Settings
+                      </button>
+                      <button onClick={onLogout} className="text-neutral-400 text-xs hover:text-neutral-600 mt-2">
+                          Logout
+                      </button>
+                  </div>
+              </div>
+          </div>
+      );
+  }
 
   return (
     <div className="min-h-screen bg-neutral-100 flex flex-col">
@@ -165,7 +212,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
       {/* Main Content */}
       <main className="flex-grow p-4 md:p-8 max-w-7xl mx-auto w-full overflow-hidden flex flex-col">
         
-        {/* Connection Error Banner */}
+        {/* Connection Error Banner (Non-fatal) */}
         {connectionError && (
              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-4 animate-in fade-in slide-in-from-top-4">
                  <div className="p-2 bg-red-100 rounded-lg text-red-600">
