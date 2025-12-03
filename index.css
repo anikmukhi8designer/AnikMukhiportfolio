@@ -4,17 +4,16 @@
 */
 
 :root {
-  /* --- COLORS --- */
-  /* Base */
+  /* --- COLORS (Light Mode Default) --- */
   --c-bg: #ffffff;
   --c-text-primary: #111111;
   --c-text-secondary: #666666;
   --c-text-tertiary: #999999;
   
-  /* Accents (Subtle Mesh - slightly darkened to allow white gradients to pop if needed, or colored ones to sit on top) */
-  --c-accent-1: #eef2ff; /* Indigo-50 */
-  --c-accent-2: #fdf4ff; /* Fuchsia-50 */
-  --c-accent-3: #f9fafb; /* Gray-50 */
+  /* Accents */
+  --c-accent-1: #eef2ff;
+  --c-accent-2: #fdf4ff;
+  --c-accent-3: #f9fafb;
   
   /* --- TYPOGRAPHY --- */
   --font-sans: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -22,15 +21,31 @@
   --tracking-normal: -0.01em;
 
   /* --- MOTION --- */
-  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1); /* Snappy but smooth */
+  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --duration-base: 0.6s;
   
   /* --- GRADIENTS --- */
-  /* Reduced opacity of the static mesh so the interactive gradient is the star */
   --g-mesh: radial-gradient(at 0% 0%, var(--c-accent-1) 0px, transparent 40%),
             radial-gradient(at 100% 0%, var(--c-accent-2) 0px, transparent 40%),
             radial-gradient(at 100% 100%, var(--c-accent-1) 0px, transparent 40%),
             radial-gradient(at 0% 100%, var(--c-accent-3) 0px, transparent 40%);
+}
+
+/* Dark Mode Overrides */
+.dark {
+  --c-bg: #050505;
+  --c-text-primary: #ffffff;
+  --c-text-secondary: #a3a3a3;
+  --c-text-tertiary: #525252;
+
+  --c-accent-1: #171717;
+  --c-accent-2: #262626;
+  --c-accent-3: #111111;
+  
+  --g-mesh: radial-gradient(at 0% 0%, #1a1a1a 0px, transparent 40%),
+            radial-gradient(at 100% 0%, #222222 0px, transparent 40%),
+            radial-gradient(at 100% 100%, #1a1a1a 0px, transparent 40%),
+            radial-gradient(at 0% 100%, #111111 0px, transparent 40%);
 }
 
 /* GLOBAL RESET & BASE */
@@ -45,6 +60,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  transition: background-color 0.5s ease, color 0.5s ease;
 }
 
 ::selection {
@@ -63,21 +79,27 @@ body {
   background: #e5e5e5;
   border-radius: 3px;
 }
+.dark ::-webkit-scrollbar-thumb {
+  background: #333;
+}
 ::-webkit-scrollbar-thumb:hover {
   background: #d4d4d4;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }
 
 /* 
    ANIMATED BACKGROUND 
-   Targeting the existing tailwind class to inject the gradient 
-   without modifying JSX structure.
+   Updated to use CSS variables for color adaptability
 */
-.bg-\[\#fafafa\] {
-  background-color: var(--c-bg) !important;
-  background-image: var(--g-mesh) !important;
-  background-size: 120% 120% !important;
+.gradient-bg {
+  background-color: var(--c-bg);
+  background-image: var(--g-mesh);
+  background-size: 120% 120%;
   background-attachment: fixed;
   animation: gradient-drift 30s ease-in-out infinite alternate;
+  transition: background-color 0.5s ease;
 }
 
 @keyframes gradient-drift {
@@ -102,6 +124,10 @@ p {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(0,0,0,0.03);
+}
+.dark .glass {
+  background: rgba(10, 10, 10, 0.7);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 
 /* Hover Reveals */

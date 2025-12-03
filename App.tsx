@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import './index.css'; // Import the new Design System
+import './index.css';
 import { Project } from './types';
 import WorkSection from './components/WorkSection';
 import ExperienceSection from './components/ExperienceSection';
@@ -22,7 +22,6 @@ import Dashboard from './components/admin/Dashboard';
 import BlockEditor from './components/admin/BlockEditor';
 
 const AdminRoute = () => {
-    // Check localStorage for persisted session
     const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
         return localStorage.getItem('cms_authenticated') === 'true';
     });
@@ -46,7 +45,6 @@ const AdminRoute = () => {
                     project={projectToEdit} 
                     onSave={(updated) => {
                         updateProject(updated.id, updated);
-                        // Optional: stay on page or go back
                     }}
                     onBack={() => {
                         setEditingProjectId(null);
@@ -79,18 +77,40 @@ const AppContent: React.FC = () => {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Use data from context for footer AND HERO
+  // Theme State
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window !== 'undefined') {
+        return localStorage.getItem('theme') as 'light' | 'dark' || 'light';
+    }
+    return 'light';
+  });
+
+  // Apply Theme
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (theme === 'dark') {
+        root.classList.add('dark');
+    } else {
+        root.classList.remove('dark');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
+  
   const { socials, config } = useData();
 
-  // Parallax Animations for Hero
+  // Parallax Animations
   const { scrollY } = useScroll();
-  const heroTextY = useTransform(scrollY, [0, 500], [0, 150]); // Text moves slower
-  const heroOpacity = useTransform(scrollY, [0, 400], [1, 0]); // Fade out
+  const heroTextY = useTransform(scrollY, [0, 500], [0, 150]);
+  const heroOpacity = useTransform(scrollY, [0, 400], [1, 0]);
 
   useEffect(() => {
     if (window.location.hash === '#admin') {
       setIsAdminMode(true);
-      setIsLoading(false); // No loader for admin
+      setIsLoading(false);
     }
     const handleHashChange = () => {
         if (window.location.hash === '#admin') setIsAdminMode(true);
@@ -111,24 +131,23 @@ const AppContent: React.FC = () => {
       return <AdminRoute />;
   }
   
-  // Public Portfolio Route
   return (
-    <div className="min-h-screen bg-[#fafafa] text-neutral-900 font-sans selection:bg-neutral-900 selection:text-white cursor-none relative">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-50 font-sans selection:bg-neutral-900 dark:selection:bg-white selection:text-white dark:selection:text-black cursor-none relative transition-colors duration-500 gradient-bg">
       
-      {/* Loading Screen */}
       <AnimatePresence>
         {isLoading && <LoadingScreen onComplete={() => setIsLoading(false)} />}
       </AnimatePresence>
 
-      {/* Global Background Interactive Gradient - z-index 1 */}
       <InteractiveGradient />
-
-      {/* Custom Cursor (Hidden on Touch Devices via CSS) */}
       <CustomCursor />
       <ScrollToTop />
 
-      {/* Navigation System */}
-      <NavBar isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
+      <NavBar 
+        isMenuOpen={isMenuOpen} 
+        setIsMenuOpen={setIsMenuOpen} 
+        theme={theme}
+        toggleTheme={toggleTheme}
+      />
       
       <SplitNavPanel 
         isOpen={isMenuOpen} 
@@ -136,12 +155,10 @@ const AppContent: React.FC = () => {
         onProjectClick={setSelectedProject}
       />
 
-      {/* Main Content - z-index 10 to float above gradient */}
       <main className="pt-20 relative z-10">
         {/* Hero Section */}
         <section className="min-h-[90vh] flex flex-col justify-center px-4 md:px-8 max-w-screen-xl mx-auto relative overflow-hidden group">
           
-          {/* Main Content with Parallax */}
           <motion.div 
             style={{ y: heroTextY, opacity: heroOpacity }}
             className="relative z-10"
@@ -150,10 +167,10 @@ const AppContent: React.FC = () => {
               initial={{ opacity: 0, y: 60 }}
               animate={!isLoading ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
-              className="text-5xl sm:text-7xl md:text-9xl font-bold tracking-tighter max-w-6xl mb-12 relative z-10 leading-[0.9] cursor-default"
+              className="text-5xl sm:text-7xl md:text-9xl font-bold tracking-tighter max-w-6xl mb-12 relative z-10 leading-[0.9] cursor-default text-neutral-900 dark:text-white"
             >
               {config.heroHeadline || "Product Designer"} <br />
-              <span className="text-neutral-400">{config.heroSubheadline || "& Creative Dev."}</span>
+              <span className="text-neutral-400 dark:text-neutral-600 transition-colors">{config.heroSubheadline || "& Creative Dev."}</span>
             </motion.h1>
 
             <motion.div 
@@ -163,7 +180,7 @@ const AppContent: React.FC = () => {
                 className="flex flex-col gap-12 items-start max-w-2xl"
             >
                 <div className="cursor-default">
-                    <p className="text-lg md:text-2xl text-neutral-600 leading-relaxed max-w-xl">
+                    <p className="text-lg md:text-2xl text-neutral-600 dark:text-neutral-400 leading-relaxed max-w-xl transition-colors">
                     {config.heroDescription || "Building digital products that blend aesthetics with function. Currently crafting experiences in San Francisco."}
                     </p>
                 </div>
@@ -171,7 +188,7 @@ const AppContent: React.FC = () => {
                 <a 
                     href="#work" 
                     onClick={(e) => handleSmoothScroll(e, 'work')}
-                    className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-neutral-900 hover:text-neutral-500 transition-colors z-20"
+                    className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-neutral-900 dark:text-white hover:text-neutral-500 dark:hover:text-neutral-300 transition-colors z-20"
                 >
                     Explore Work <ArrowDown className="w-4 h-4 animate-bounce" />
                 </a>
@@ -179,24 +196,20 @@ const AppContent: React.FC = () => {
           </motion.div>
         </section>
 
-        {/* Clients Section */}
         <ClientsSection />
 
-        {/* Work Section */}
         <WorkSection onProjectClick={setSelectedProject} />
 
-        {/* Experience Section */}
         <div id="experience">
           <ExperienceSection />
         </div>
 
-        {/* Skills Section */}
         <SkillsSection />
 
       </main>
 
       {/* Footer */}
-      <footer id="contact" className="py-24 bg-neutral-900 text-neutral-400 relative z-10">
+      <footer id="contact" className="py-24 bg-neutral-900 dark:bg-black text-neutral-400 relative z-10 transition-colors duration-500">
         <div className="max-w-screen-xl mx-auto px-4 md:px-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-24">
             <div>
@@ -222,7 +235,6 @@ const AppContent: React.FC = () => {
         </div>
       </footer>
 
-      {/* Case Study Modal */}
       <Modal 
         project={selectedProject} 
         onClose={() => setSelectedProject(null)} 
