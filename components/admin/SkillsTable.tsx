@@ -84,7 +84,14 @@ const SkillsTable: React.FC = () => {
 
   const selectBrand = (brand: any) => {
       setNewItemName(brand.name);
-      setNewItemImage(brand.icon);
+      
+      // Construct a secure/auth URL for saving or just save the icon URL directly
+      // Note: Ideally, we should proxy this or just save the domain and let frontend build the URL.
+      // However, to satisfy "reconnect admin", we will save the full usable URL if possible, or just the icon URL.
+      // Brandfetch API returns an icon URL. We should ensure the frontend appends the key if needed, 
+      // OR we append it here if it's not a generic CDN link.
+      
+      setNewItemImage(brand.icon); 
       setShowResults(false);
   };
 
@@ -127,7 +134,11 @@ const SkillsTable: React.FC = () => {
                             <div key={idx} className="flex items-center gap-2 bg-neutral-100 px-3 py-1.5 rounded-full border border-neutral-200 group">
                                 <div className="w-5 h-5 bg-white rounded-full p-0.5 flex items-center justify-center overflow-hidden border border-neutral-100">
                                     {item.image ? (
-                                        <img src={item.image} alt="" className="w-full h-full object-contain" />
+                                        <img 
+                                            src={item.image.includes('brandfetch') && !item.image.includes('c=') ? `${item.image}${item.image.includes('?') ? '&' : '?'}c=${BRANDFETCH_API_KEY}` : item.image} 
+                                            alt="" 
+                                            className="w-full h-full object-contain" 
+                                        />
                                     ) : (
                                         <SkillIcon icon={item.icon || 'Default'} className="w-full h-full" />
                                     )}
