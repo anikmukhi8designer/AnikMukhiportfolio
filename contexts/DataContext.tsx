@@ -346,41 +346,58 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const contentBase64 = btoa(unescape(encodeURIComponent(contentString)));
 
     try {
-      // 1. Get SHA for data file (handle atomic updates)
-      let currentSha = fileSha;
-      if (!currentSha) {
-          try {
-              const shaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${activeDataPath}`, {
-                 headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
-              });
-              if (shaRes.ok) {
-                  const shaData = await shaRes.json();
-                  currentSha = shaData.sha;
-              } else if (shaRes.status === 404 && activeDataPath === 'src/data.json') {
-                   // Double check if it exists at root
-                   const rootRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/data.json`, {
-                        headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
-                    });
-                    if (rootRes.ok) {
-                        const rootData = await rootRes.json();
-                        currentSha = rootData.sha;
-                        setActiveDataPath('data.json'); // Switch to root for saving
-                    }
+      // FORCE FRESH SHA CHECK
+      // We explicitly check for the file's existence and SHA before every write operation.
+      // This solves "sha wasn't supplied" errors caused by state mismatches.
+      
+      let targetPath = activeDataPath; 
+      let shaToUse = null;
+
+      try {
+          // 1. Check Primary Path (activeDataPath)
+          const res1 = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${targetPath}`, {
+              method: 'GET',
+              headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache, no-store' }
+          });
+          
+          if (res1.ok) {
+              const data = await res1.json();
+              shaToUse = data.sha;
+          } else if (res1.status === 404) {
+              // 2. If Primary is 'src/data.json' and not found, check Root 'data.json'
+              if (targetPath === 'src/data.json') {
+                  const res2 = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/data.json`, {
+                      method: 'GET',
+                      headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache, no-store' }
+                  });
+                  if (res2.ok) {
+                      const data = await res2.json();
+                      shaToUse = data.sha;
+                      targetPath = 'data.json';
+                      setActiveDataPath('data.json'); // Correct state for future
+                  }
               }
-          } catch(e) {
-              console.warn("Failed to fetch current SHA, proceeding with creation attempt...");
           }
+      } catch (e) {
+          console.warn("SHA Check Network Error", e);
+          // If network check fails, fallback to state as last resort
+          shaToUse = fileSha; 
       }
 
-      // 2. Save Data File
+      // Construct Payload
       const body: any = {
         message: `CMS Update: ${now.toLocaleString()}`,
         content: contentBase64,
         branch: 'main'
       };
-      if (currentSha) body.sha = currentSha;
+      
+      // CRITICAL: Attach SHA if we found one
+      if (shaToUse) {
+          body.sha = shaToUse;
+      }
 
-      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${activeDataPath}`, {
+      // Perform PUT
+      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${targetPath}`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -388,7 +405,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (response.ok) {
         const data: any = await response.json();
-        setFileSha(data.content.sha);
+        setFileSha(data.content.sha); // Update state with new SHA
         setLastUpdated(now);
         localStorage.setItem('cms_last_updated', now.toISOString());
         
@@ -404,7 +421,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             window.location.href = previewUrl;
         } else {
              // Warm up proxy silently for auto-saves
-             try { fetch(`/api/data?path=${activeDataPath}&t=${Date.now()}`, { cache: 'no-store' }); } catch(e){}
+             try { fetch(`/api/data?path=${targetPath}&t=${Date.now()}`, { cache: 'no-store' }); } catch(e){}
         }
         
       } else {
