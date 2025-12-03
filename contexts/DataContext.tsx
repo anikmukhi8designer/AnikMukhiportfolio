@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef, useCallback } from 'react';
 import { Project, Experience, Client, SkillCategory, GlobalConfig, SocialLink, SyncLogEntry } from '../types';
 import { 
   PROJECTS as INITIAL_PROJECTS, 
@@ -51,7 +51,7 @@ interface DataContextType {
   resetData: () => void;
   refreshAllClients: () => Promise<string | null>;
   verifyConnection: () => Promise<{ success: boolean; message: string }>;
-  fetchFromGitHub: (shouldApplyData?: boolean) => Promise<boolean>;
+  fetchFromGitHub: (shouldApplyData?: boolean, silent?: boolean) => Promise<boolean>;
   
   // New History Methods
   getHistory: () => Promise<CommitInfo[]>;
@@ -99,6 +99,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Store the SHA of the data.json file to handle GitHub atomic updates
   const [fileSha, setFileSha] = useState<string | null>(null);
+  const fileShaRef = useRef<string | null>(null);
+  
+  // Keep Ref in sync for polling logic
+  useEffect(() => {
+    fileShaRef.current = fileSha;
+  }, [fileSha]);
   
   // Track the valid path for data.json (src/data.json or data.json)
   const [activeDataPath, setActiveDataPath] = useState('src/data.json');
@@ -157,14 +163,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
   };
   
-  const fetchFromGitHub = async (shouldApplyData = true): Promise<boolean> => {
+  const fetchFromGitHub = useCallback(async (shouldApplyData = true, silent = false): Promise<boolean> => {
     const { owner, repo } = getGitHubConfig();
     const token = getGitHubToken();
     const timestamp = Date.now();
     let path = activeDataPath;
 
-    setIsLoading(true);
-    setError(null);
+    if (!silent) setIsLoading(true);
+    if (!silent) setError(null);
 
     // Check for explicit update param (from preview URL)
     const urlParams = new URLSearchParams(window.location.search);
@@ -174,8 +180,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // --- Strategy 1: Direct GitHub API (Admin Mode) ---
     if (owner && repo && token) {
         try {
-            // REMOVED EXTRA HEADERS TO PREVENT CORS ISSUES
-            // Cache busting is handled by ?t= timestamp
+            // Remove headers that cause CORS issues
             const headers: HeadersInit = {
                 'Accept': 'application/vnd.github.v3+json',
                 'Authorization': `Bearer ${token}`
@@ -194,6 +199,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             if (response.ok) {
                 const data: any = await response.json();
+                
+                // Smart Sync: Only update if SHA is different (Content Changed)
+                if (shouldApplyData && data.sha === fileShaRef.current) {
+                    if (!silent) console.log("Data is up to date (SHA match).");
+                    if (!silent) setIsLoading(false);
+                    return true;
+                }
+
                 if (path !== activeDataPath) setActiveDataPath(path);
                 setFileSha(data.sha);
 
@@ -203,40 +216,41 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         const decodedContent = decodeURIComponent(escape(atob(cleanContent)));
                         const content = JSON.parse(decodedContent);
                         applyData(content);
-                        console.log(`Data synced from GitHub API (${path})`);
+                        if (!silent) console.log(`Data synced from GitHub API (${path})`);
                     } catch (parseError) {
                         console.error("JSON Parse Error", parseError);
-                        setError("Failed to parse data from GitHub. File might be corrupted.");
-                        setIsLoading(false);
+                        if (!silent) setError("Failed to parse data from GitHub. File might be corrupted.");
+                        if (!silent) setIsLoading(false);
                         return false;
                     }
                 }
-                setIsLoading(false);
+                if (!silent) setIsLoading(false);
                 return true;
             } else {
                  if (response.status === 404) {
                      // HANDLE 404 AS FRESH START - NOT ERROR
-                     console.log("No data file found in repo. Using initial default data.");
-                     setFileSha(null); // No file yet
-                     setIsLoading(false);
-                     return true; // Return success so app loads
+                     if (!silent) console.log("No data file found in repo. Using initial default data.");
+                     setFileSha(null); 
+                     if (!silent) setIsLoading(false);
+                     return true; 
                  } else if (response.status === 401) {
-                     setError("GitHub Token invalid or expired.");
+                     if (!silent) setError("GitHub Token invalid or expired.");
                  } else {
-                     setError(`Failed to fetch data: ${response.status} ${response.statusText}`);
+                     if (!silent) setError(`Failed to fetch data: ${response.status} ${response.statusText}`);
                  }
-                 setIsLoading(false);
+                 if (!silent) setIsLoading(false);
                  return false;
             }
         } catch (error: any) {
             console.warn("GitHub Admin API fetch failed", error);
-            // CHECK IF OFFLINE
-            if (!navigator.onLine) {
-                 setError("You are offline. Please check your internet connection.");
-            } else {
-                 setError(error.message || "Network error fetching from GitHub");
+            if (!silent) {
+                if (!navigator.onLine) {
+                    setError("You are offline. Please check your internet connection.");
+                } else {
+                    setError(error.message || "Network error fetching from GitHub");
+                }
+                setIsLoading(false);
             }
-            setIsLoading(false);
             return false;
         }
     }
@@ -263,7 +277,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                          if (shouldApplyData) {
                              applyData(rootContent);
                          }
-                         setIsLoading(false);
+                         if (!silent) setIsLoading(false);
                          return true;
                      }
                  }
@@ -271,7 +285,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 if (shouldApplyData) {
                     applyData(content);
                 }
-                setIsLoading(false);
+                if (!silent) setIsLoading(false);
                 return true;
             }
         }
@@ -280,9 +294,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     
     // If both fail, we are falling back to INITIAL_DATA
-    setIsLoading(false);
+    if (!silent) setIsLoading(false);
     return false;
-  };
+  }, [activeDataPath]); // Re-create if path changes
 
   const applyData = (content: any) => {
       if (content.projects && Array.isArray(content.projects)) setProjects(content.projects);
@@ -391,7 +405,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Check Path A: src/data.json
       const resA = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/src/data.json`, {
           method: 'GET',
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
       });
 
       if (resA.ok) {
@@ -403,7 +417,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
            // Check Path B: data.json (root)
            const resB = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/data.json`, {
                 method: 'GET',
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
            });
 
            if (resB.ok) {
@@ -444,7 +458,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (response.ok) {
         const data: any = await response.json();
-        setFileSha(data.content.sha);
+        setFileSha(data.content.sha); // Update local SHA immediately
         setLastUpdated(now);
         localStorage.setItem('cms_last_updated', now.toISOString());
         
@@ -558,11 +572,31 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
   };
 
-  // --- Initialization ---
+  // --- Initialization & Polling ---
   useEffect(() => {
-    fetchFromGitHub(true);
+    // 1. Initial Fetch
+    fetchFromGitHub(true, false);
     getSyncHistory(); 
-  }, []);
+
+    // 2. Poll for updates every 30s
+    const pollInterval = setInterval(() => {
+        fetchFromGitHub(true, true); // Silent fetch
+    }, 30000);
+
+    // 3. Re-fetch on Window Focus (User switches back to tab)
+    const onFocus = () => {
+        fetchFromGitHub(true, true);
+    };
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') onFocus();
+    });
+
+    return () => {
+        clearInterval(pollInterval);
+        window.removeEventListener('focus', onFocus);
+    };
+  }, [fetchFromGitHub]);
 
   // --- Actions ---
 
