@@ -251,6 +251,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                   const content = decodeURIComponent(escape(atob(data.content.replace(/\s/g, ''))));
                   existingLogs = JSON.parse(content);
               } catch (e) { console.warn("Failed to parse sync log", e); }
+          } else if (getRes.status === 404) {
+              console.log("Creating new sync log file...");
           }
 
           // 2. Append new entry
@@ -283,6 +285,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           
       } catch (e) {
           console.error("Failed to update sync log:", e);
+          // Don't throw, log failure shouldn't stop flow
       }
   };
 
@@ -294,16 +297,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     let { owner, repo } = getGitHubConfig();
+    const token = getGitHubToken();
 
-    if (!owner || !repo || !getGitHubToken()) {
-        console.warn("Missing credentials for save");
-        setIsSaving(false);
-        return;
-    }
+    // Strict validation
+    if (!owner) throw new Error("Repository Owner is missing. Check Settings.");
+    if (!repo) throw new Error("Repository Name is missing. Check Settings.");
+    if (!token) throw new Error("GitHub Token is missing. Please login again.");
 
     setIsSaving(true);
     const now = new Date();
-    const token = getGitHubToken();
 
     const content = {
       projects, experience, clients, skills, config, socials,
@@ -315,15 +317,29 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const contentBase64 = btoa(unescape(encodeURIComponent(contentString)));
 
     try {
-      // 1. Get SHA for data file
+      // 1. Get SHA for data file (handle atomic updates)
       let currentSha = fileSha;
       if (!currentSha) {
-          const shaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${activeDataPath}`, {
-             headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
-          });
-          if (shaRes.ok) {
-              const shaData = await shaRes.json();
-              currentSha = shaData.sha;
+          try {
+              const shaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${activeDataPath}`, {
+                 headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
+              });
+              if (shaRes.ok) {
+                  const shaData = await shaRes.json();
+                  currentSha = shaData.sha;
+              } else if (shaRes.status === 404 && activeDataPath === 'src/data.json') {
+                   // Double check if it exists at root
+                   const rootRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/data.json`, {
+                        headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
+                    });
+                    if (rootRes.ok) {
+                        const rootData = await rootRes.json();
+                        currentSha = rootData.sha;
+                        setActiveDataPath('data.json'); // Switch to root for saving
+                    }
+              }
+          } catch(e) {
+              console.warn("Failed to fetch current SHA, proceeding with creation attempt...");
           }
       }
 
@@ -351,6 +367,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (isManualSync) {
             const previewUrl = `${window.location.origin}/preview?update=${now.getTime()}`;
             setLatestPreviewUrl(previewUrl);
+            
+            // Wait for log update but don't fail if it errors
             await updateSyncLog(previewUrl);
             
             // Redirect
@@ -361,10 +379,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
         
       } else {
-        throw new Error("Failed to save data.json");
+        const errData = await response.json().catch(() => ({}));
+        console.error("GitHub API Error:", errData);
+        throw new Error(errData.message || `GitHub Error: ${response.status} ${response.statusText}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving to GitHub:", error);
+      if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+          throw new Error("Network Error: Could not connect to GitHub. Check internet connection.");
+      }
       throw error;
     } finally {
         setIsSaving(false);

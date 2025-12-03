@@ -8,6 +8,7 @@ import ProfileSettings from './ProfileSettings';
 import VersionHistory from './VersionHistory';
 import { useData } from '../../contexts/DataContext';
 import { SyncLogEntry } from '../../types';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface DashboardProps {
   onLogout: () => void;
@@ -36,13 +37,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
         setSyncStatus('success');
         // Note: The browser will redirect, so this might not even be seen
     } catch (e: any) {
-        console.error(e);
+        console.error("Sync Error caught in Dashboard:", e);
         setSyncStatus('error');
-        setErrorMessage(e.message || "Sync Failed");
+        setErrorMessage(e.message || "Sync Failed. Check console.");
         setTimeout(() => {
             setSyncStatus('idle');
             setErrorMessage('');
-        }, 5000);
+        }, 8000); // Show error for longer
     }
   };
 
@@ -113,11 +114,19 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
                     </span>
                 </button>
                 {/* Error Tooltip */}
+                <AnimatePresence>
                 {errorMessage && (
-                    <div className="absolute top-full right-0 mt-2 p-2 bg-red-100 border border-red-200 rounded text-xs text-red-700 whitespace-nowrap z-50 animate-in fade-in slide-in-from-top-1">
+                    <motion.div 
+                        initial={{ opacity: 0, y: 10 }} 
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute top-full right-0 mt-2 p-3 bg-red-100 border border-red-200 rounded-lg text-xs text-red-700 whitespace-nowrap z-50 shadow-lg min-w-[200px]"
+                    >
+                        <div className="font-bold mb-1 flex items-center gap-1"><AlertCircle className="w-3 h-3"/> Sync Error</div>
                         {errorMessage}
-                    </div>
+                    </motion.div>
                 )}
+                </AnimatePresence>
             </div>
 
             <div className="h-6 w-px bg-neutral-200"></div>
