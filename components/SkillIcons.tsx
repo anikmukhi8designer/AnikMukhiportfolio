@@ -1,12 +1,9 @@
 import React from 'react';
 import { 
   Code, PenTool, Layout, Terminal, Globe, 
-  Cpu, Box, Hexagon, GitBranch, Wrench, Circle
+  Cpu, Box, Hexagon, GitBranch, Wrench, Circle, Layers,
+  Zap, Command
 } from 'lucide-react';
-
-// Using Lucide icons for some, and custom SVG paths for brands where Lucide falls short.
-// For a production app, we would use a proper icon library or individual SVGs.
-// Here we simulate brand icons with Lucide approximations or simple SVGs where possible.
 
 export const SKILL_ICONS: Record<string, React.FC<{ className?: string }>> = {
   // Design Tools
@@ -22,8 +19,12 @@ export const SKILL_ICONS: Record<string, React.FC<{ className?: string }>> = {
   "Adobe": ({ className }) => <span className={`font-bold text-[#FF0000] flex items-center justify-center border-2 border-[#FF0000] rounded ${className}`}>A</span>,
   "Sketch": ({ className }) => <Hexagon className={`${className} text-yellow-500`} />,
   "Framer": ({ className }) => <Layout className={`${className} text-black`} />,
+  "Webflow": ({ className }) => <Layers className={`${className} text-blue-500`} />,
   "Spline": ({ className }) => <Box className={`${className} text-pink-500`} />,
   "Arc": ({ className }) => <Globe className={`${className} text-red-400`} />,
+  "Linear": ({ className }) => <Zap className={`${className} text-purple-600`} />,
+  "Raycast": ({ className }) => <Command className={`${className} text-red-500`} />,
+  "Notion": ({ className }) => <span className={`font-serif font-bold text-black text-xl ${className}`}>N</span>,
   
   // Development
   "React": ({ className }) => <Cpu className={`${className} text-blue-500`} />,
@@ -34,6 +35,7 @@ export const SKILL_ICONS: Record<string, React.FC<{ className?: string }>> = {
   "VS Code": ({ className }) => <Code className={`${className} text-blue-500`} />,
   "Node.js": ({ className }) => <Hexagon className={`${className} text-green-600`} />,
   "Python": ({ className }) => <Terminal className={`${className} text-yellow-600`} />,
+  "Vite": ({ className }) => <Zap className={`${className} text-yellow-400`} />,
   
   // General/Fallback
   "Design": PenTool,
@@ -45,6 +47,7 @@ export const SKILL_ICONS: Record<string, React.FC<{ className?: string }>> = {
 export const ICON_KEYS = Object.keys(SKILL_ICONS);
 
 export const SkillIcon: React.FC<{ icon: string; className?: string }> = ({ icon, className }) => {
+  // Try to find icon by exact name match, otherwise Default
   const IconComponent = SKILL_ICONS[icon] || SKILL_ICONS["Default"];
   return <IconComponent className={className} />;
 };

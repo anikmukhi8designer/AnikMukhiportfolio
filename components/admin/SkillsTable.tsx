@@ -34,6 +34,7 @@ const SkillsTable: React.FC = () => {
     const category = skills.find(s => s.id === categoryId);
     if (!category) return;
 
+    // Use newItemImage if present, otherwise fall back to icon
     const updatedItems = [...category.items, { 
         name: newItemName, 
         icon: newItemImage ? undefined : newItemIcon, 

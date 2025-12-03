@@ -13,7 +13,7 @@ const ExperienceSection: React.FC = () => {
         
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-baseline justify-between mb-20 gap-4">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-600">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-400">
                 Experience
             </h2>
             <a href={config.resumeUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-neutral-900 hover:text-neutral-500 transition-colors">

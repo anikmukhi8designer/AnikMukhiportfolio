@@ -40,10 +40,10 @@ const ClientsSection: React.FC = () => {
       >
         {/* Minimal Section Header - Centered for the marquee style */}
         <div className="max-w-screen-xl mx-auto px-4 md:px-8 mb-16 flex flex-col md:flex-row md:items-baseline justify-between gap-4">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-600">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-400">
             Clients & Collaborations
           </h2>
-          <span className="text-sm text-neutral-600 font-medium hidden md:block">
+          <span className="text-sm text-neutral-400 font-medium hidden md:block">
             {CLIENTS.length} Companies
           </span>
         </div>

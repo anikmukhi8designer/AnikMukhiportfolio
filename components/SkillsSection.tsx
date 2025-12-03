@@ -6,7 +6,7 @@ import { SkillIcon } from './SkillIcons';
 // Brandfetch Public Key
 const BRANDFETCH_KEY = "xcgD6C-HsoohCTMkqg3DR0i9wYmaqUB2nVktAG16TWiSgYr32T7dDkfOVBVc-DXgPyODc3hx2IgCr0Y3urqLrA";
 
-// Map Skill Names to Domains for Brandfetch API (Preferred high-quality mapping)
+// Map Skill Names to Domains for Brandfetch API (Fallback only)
 const DOMAIN_MAP: Record<string, string> = {
     "Figma": "figma.com",
     "Adobe": "adobe.com",
@@ -36,22 +36,18 @@ interface SkillCardProps {
 }
 
 const SkillCard: React.FC<SkillCardProps> = ({ item, index }) => {
-    // 1. Determine the image URL
-    // Priority: CMS Image -> Domain Map -> Null (Fallback to Icon)
+    // 1. Prioritize the image explicitly set in the data (from Admin)
     let imageUrl = item.image;
 
-    // If no CMS image, try to resolve via Domain Map
+    // 2. If no image set, try to generate one from the Domain Map
     if (!imageUrl && DOMAIN_MAP[item.name]) {
-        imageUrl = `https://cdn.brandfetch.io/${DOMAIN_MAP[item.name]}/icon/theme/light/h/200/w/200`;
-    }
-
-    // 2. Optimize Brandfetch URLs
-    if (imageUrl && imageUrl.includes('brandfetch.io')) {
-        // Ensure API Key is attached
-        if (!imageUrl.includes('c=')) {
-             const separator = imageUrl.includes('?') ? '&' : '?';
-             imageUrl = `${imageUrl}${separator}c=${BRANDFETCH_KEY}`;
-        }
+        imageUrl = `https://cdn.brandfetch.io/${DOMAIN_MAP[item.name]}/icon/theme/light/h/200/w/200?c=${BRANDFETCH_KEY}`;
+    } 
+    
+    // 3. Ensure Brandfetch URLs have the API key to prevent 403 errors
+    if (imageUrl && imageUrl.includes('brandfetch.io') && !imageUrl.includes('c=')) {
+         const separator = imageUrl.includes('?') ? '&' : '?';
+         imageUrl = `${imageUrl}${separator}c=${BRANDFETCH_KEY}`;
     }
     
     return (
@@ -60,7 +56,7 @@ const SkillCard: React.FC<SkillCardProps> = ({ item, index }) => {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             transition={{ delay: index * 0.02, duration: 0.4 }}
-            className="group relative flex flex-col items-center justify-center p-8 bg-white/10 backdrop-blur-md hover:bg-white/30 transition-all duration-300 aspect-square border border-white/20 rounded-2xl hover:border-white/40 hover:shadow-xl hover:z-10"
+            className="group relative flex flex-col items-center justify-center p-8 bg-white/40 backdrop-blur-md hover:bg-white/80 transition-all duration-300 aspect-square border border-white/40 rounded-2xl hover:border-white/60 hover:shadow-xl hover:z-10"
         >
             <div className="w-12 h-12 mb-6 relative flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:-translate-y-1">
                  {imageUrl ? (
@@ -69,18 +65,21 @@ const SkillCard: React.FC<SkillCardProps> = ({ item, index }) => {
                         alt={item.name} 
                         className="w-full h-full object-contain filter grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300"
                         onError={(e) => {
+                            // Hide broken image
                             e.currentTarget.style.display = 'none';
+                            // Show fallback icon
                             const fallback = e.currentTarget.parentElement?.querySelector('.fallback-icon');
                             if (fallback) (fallback as HTMLElement).style.display = 'block';
                         }}
                     />
                 ) : (
-                    <SkillIcon icon={item.icon || 'Default'} className="w-full h-full text-neutral-500 group-hover:text-neutral-900 transition-colors duration-300" />
+                    // Immediate fallback if no URL exists at all
+                    <SkillIcon icon={item.icon || item.name || 'Default'} className="w-full h-full text-neutral-500 group-hover:text-neutral-900 transition-colors duration-300" />
                 )}
                  
-                 {/* Fallback Icon (Hidden by default, shown on error or if no image) */}
-                 <div className={`fallback-icon w-full h-full text-neutral-500 group-hover:text-neutral-900 ${imageUrl ? 'hidden' : 'block'}`}>
-                    <SkillIcon icon={item.icon || 'Default'} className="w-full h-full" />
+                 {/* Hidden fallback container that shows if img errors */}
+                 <div className="fallback-icon hidden w-full h-full text-neutral-500 group-hover:text-neutral-900">
+                    <SkillIcon icon={item.icon || item.name || 'Default'} className="w-full h-full" />
                 </div>
             </div>
 
@@ -100,10 +99,10 @@ const SkillsSection: React.FC = () => {
         
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-baseline justify-between mb-16 gap-4">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-600">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-400">
                 Skills & Tools
             </h2>
-            <span className="text-sm text-neutral-600 font-medium hidden md:block">
+            <span className="text-sm text-neutral-400 font-medium hidden md:block">
                 My Tech Stack
             </span>
         </div>

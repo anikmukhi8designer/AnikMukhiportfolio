@@ -37,16 +37,16 @@ const WorkSection: React.FC<WorkSectionProps> = ({ onProjectClick }) => {
         
         {/* Main Header */}
         <div className="flex items-end justify-between mb-24">
-           <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-600">
+           <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-400">
              Our Work
            </h2>
-           <span className="text-sm text-neutral-600">
+           <span className="text-sm text-neutral-400">
              {publishedProjects.length} Projects
            </span>
         </div>
 
         {/* Table Header (Desktop Only) */}
-        <div className="hidden md:grid grid-cols-12 gap-6 pb-6 px-6 md:px-10 border-b border-neutral-200 text-xs font-bold uppercase tracking-widest text-neutral-500 mb-4">
+        <div className="hidden md:grid grid-cols-12 gap-6 pb-6 px-6 md:px-10 border-b border-neutral-200 text-xs font-bold uppercase tracking-widest text-neutral-400 mb-4">
            <div className="col-span-5">Project</div>
            <div className="col-span-3">Client</div>
            <div className="col-span-3">Services</div>
