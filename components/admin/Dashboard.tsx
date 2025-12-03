@@ -49,9 +49,19 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
     setSyncStatus('syncing');
     setErrorMessage('');
     try {
-        await refreshAllClients();
+        const url = await refreshAllClients();
         setSyncStatus('success');
-        // Note: The browser will redirect, so this might not even be seen
+        
+        if (url) {
+            // Delay redirect to show success state
+            setTimeout(() => {
+                window.location.href = url;
+            }, 1500);
+        } else {
+             setTimeout(() => {
+                setSyncStatus('idle');
+            }, 2000);
+        }
     } catch (e: any) {
         console.error("Sync Error caught in Dashboard:", e);
         setSyncStatus('error');

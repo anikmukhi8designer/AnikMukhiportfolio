@@ -49,7 +49,7 @@ interface DataContextType {
   updateSocials: (data: SocialLink[]) => void;
 
   resetData: () => void;
-  refreshAllClients: () => Promise<void>;
+  refreshAllClients: () => Promise<string | null>;
   verifyConnection: () => Promise<{ success: boolean; message: string }>;
   fetchFromGitHub: (shouldApplyData?: boolean) => Promise<boolean>;
   
@@ -432,6 +432,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         body: JSON.stringify(body)
       });
 
+      let redirectUrl: string | null = null;
+
       if (response.ok) {
         const data: any = await response.json();
         setFileSha(data.content.sha);
@@ -442,10 +444,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const previewUrl = `${window.location.origin}/preview?update=${now.getTime()}`;
             setLatestPreviewUrl(previewUrl);
             await updateSyncLog(previewUrl);
-            window.location.href = previewUrl;
+            // Don't auto-redirect, return the URL
+            redirectUrl = previewUrl;
         } else {
              try { fetch(`/api/data?path=${finalPath}&t=${Date.now()}`, { cache: 'no-store' }); } catch(e){}
         }
+        return redirectUrl;
         
       } else {
         if (response.status === 404) {
@@ -662,7 +666,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const refreshAllClients = async () => {
       try {
-          await saveToGitHub(true);
+          return await saveToGitHub(true);
       } catch (e: any) {
           throw e;
       }
