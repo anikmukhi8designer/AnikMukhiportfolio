@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Radio, RefreshCw, UserCircle, Check, AlertCircle, History } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Radio, RefreshCw, UserCircle, Check, AlertCircle, History, ExternalLink, Clock } from 'lucide-react';
 import WorkTable from './WorkTable';
 import ExperienceTable from './ExperienceTable';
 import SkillsTable from './SkillsTable';
@@ -7,6 +7,7 @@ import ClientsTable from './ClientsTable';
 import ProfileSettings from './ProfileSettings';
 import VersionHistory from './VersionHistory';
 import { useData } from '../../contexts/DataContext';
+import { SyncLogEntry } from '../../types';
 
 interface DashboardProps {
   onLogout: () => void;
@@ -14,10 +15,18 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
-  const [activeTab, setActiveTab] = useState<'work' | 'experience' | 'skills' | 'clients' | 'settings' | 'history'>('work');
-  const { resetData, refreshAllClients, lastUpdated } = useData();
+  const [activeTab, setActiveTab] = useState<'work' | 'experience' | 'skills' | 'clients' | 'settings' | 'history' | 'sync_logs'>('work');
+  const { resetData, refreshAllClients, lastUpdated, getSyncHistory, latestPreviewUrl } = useData();
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  
+  // Sync Logs
+  const [syncLogs, setSyncLogs] = useState<SyncLogEntry[]>([]);
+
+  useEffect(() => {
+      // Fetch logs on mount
+      getSyncHistory().then(setSyncLogs);
+  }, []);
 
   const handleBroadcast = async () => {
     setSyncStatus('syncing');
@@ -25,7 +34,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
     try {
         await refreshAllClients();
         setSyncStatus('success');
-        setTimeout(() => setSyncStatus('idle'), 3000);
+        // Note: The browser will redirect, so this might not even be seen
     } catch (e: any) {
         console.error(e);
         setSyncStatus('error');
@@ -37,13 +46,28 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
     }
   };
 
+  const formatDate = (iso: string) => {
+      return new Date(iso).toLocaleString();
+  };
+
   return (
     <div className="min-h-screen bg-neutral-100 flex flex-col">
       {/* CMS Header */}
       <header className="bg-white border-b border-neutral-200 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <span className="font-bold text-neutral-900 text-base md:text-lg truncate">New Genre CMS</span>
+            {latestPreviewUrl ? (
+                <a 
+                    href={latestPreviewUrl} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="flex items-center gap-2 font-bold text-blue-600 hover:text-blue-800 text-base md:text-lg truncate transition-colors"
+                >
+                    Update URL <ExternalLink className="w-4 h-4" />
+                </a>
+            ) : (
+                <span className="font-bold text-neutral-900 text-base md:text-lg truncate">New Genre CMS</span>
+            )}
           </div>
           
           <div className="flex items-center gap-3 md:gap-6">
@@ -160,6 +184,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
                 <UserCircle className="w-4 h-4" /> Settings
             </button>
             <button 
+                onClick={() => setActiveTab('sync_logs')}
+                className={`flex items-center gap-2 px-4 md:px-6 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex-shrink-0 ${
+                    activeTab === 'sync_logs' 
+                    ? 'bg-white text-neutral-900 shadow-sm' 
+                    : 'text-neutral-500 hover:text-neutral-900'
+                }`}
+            >
+                <Clock className="w-4 h-4" /> Sync History
+            </button>
+            <button 
                 onClick={() => setActiveTab('history')}
                 className={`flex items-center gap-2 px-4 md:px-6 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex-shrink-0 ${
                     activeTab === 'history' 
@@ -167,7 +201,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
                     : 'text-neutral-500 hover:text-neutral-900'
                 }`}
             >
-                <History className="w-4 h-4" /> History
+                <History className="w-4 h-4" /> Version History
             </button>
         </div>
 
@@ -178,6 +212,54 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
         {activeTab === 'clients' && <ClientsTable />}
         {activeTab === 'settings' && <ProfileSettings />}
         {activeTab === 'history' && <VersionHistory />}
+        
+        {/* Sync History Table */}
+        {activeTab === 'sync_logs' && (
+             <div className="space-y-6">
+                 <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-medium">Sync History ({syncLogs.length})</h3>
+                    <button onClick={() => getSyncHistory().then(setSyncLogs)} className="text-sm flex items-center gap-2 text-neutral-500 hover:text-neutral-900">
+                        <RefreshCw className="w-3 h-3" /> Refresh
+                    </button>
+                </div>
+                <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden shadow-sm">
+                    {syncLogs.length === 0 ? (
+                        <div className="p-12 text-center text-neutral-400">
+                            <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                            <p>No sync logs found. Click "Sync Data" to create one.</p>
+                        </div>
+                    ) : (
+                        <div className="divide-y divide-neutral-100">
+                            {syncLogs.map((log) => (
+                                <div key={log.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-neutral-50 transition-colors">
+                                    <div className="flex items-start gap-4">
+                                        <div className="mt-1 p-2 bg-blue-50 text-blue-600 rounded-full">
+                                            <Radio className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-medium text-neutral-900 text-sm">
+                                                Manual Sync
+                                            </h4>
+                                            <div className="text-xs text-neutral-500 mt-1">
+                                                by {log.author} • {formatDate(log.timestamp)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <a 
+                                        href={log.previewUrl} 
+                                        target="_blank" 
+                                        rel="noreferrer" 
+                                        className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
+                                    >
+                                        View Preview <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+             </div>
+        )}
 
         {/* Footer Actions */}
         <div className="mt-12 pt-8 border-t border-neutral-200 flex flex-col sm:flex-row justify-between items-center text-sm text-neutral-500 gap-4">

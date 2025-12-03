@@ -1,3 +1,4 @@
+
 export type BlockType = 'paragraph' | 'h1' | 'h2' | 'quote' | 'image' | 'code' | 'divider';
 
 export interface ContentBlock {
@@ -63,4 +64,11 @@ export interface GlobalConfig {
   heroHeadline: string;
   heroSubheadline: string;
   heroDescription: string;
+}
+
+export interface SyncLogEntry {
+  id: string;
+  timestamp: string;
+  previewUrl: string;
+  author: string;
 }

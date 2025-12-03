@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
-import { Project, Experience, Client, SkillCategory, GlobalConfig, SocialLink } from '../types';
+import { Project, Experience, Client, SkillCategory, GlobalConfig, SocialLink, SyncLogEntry } from '../types';
 import { 
   PROJECTS as INITIAL_PROJECTS, 
   EXPERIENCE as INITIAL_EXPERIENCE, 
@@ -52,6 +52,10 @@ interface DataContextType {
   // New History Methods
   getHistory: () => Promise<CommitInfo[]>;
   restoreVersion: (sha: string) => Promise<void>;
+
+  // Sync Log Methods
+  getSyncHistory: () => Promise<SyncLogEntry[]>;
+  latestPreviewUrl: string | null;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -78,6 +82,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [config, setConfig] = useState<GlobalConfig>(INITIAL_CONFIG);
   const [socials, setSocials] = useState<SocialLink[]>(INITIAL_SOCIALS);
   const [isSaving, setIsSaving] = useState(false);
+  const [latestPreviewUrl, setLatestPreviewUrl] = useState<string | null>(null);
   
   const [lastUpdated, setLastUpdated] = useState<Date | null>(() => {
     const saved = localStorage.getItem('cms_last_updated');
@@ -122,8 +127,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const timestamp = Date.now();
     let path = activeDataPath;
 
+    // Check for explicit update param (from preview URL)
+    const urlParams = new URLSearchParams(window.location.search);
+    const updateTimestamp = urlParams.get('update');
+    const fetchTimestamp = updateTimestamp || timestamp;
+
     // --- Strategy 1: Direct GitHub API (Admin Mode) ---
-    // If we have a token, we query GitHub directly. This is the fastest and most reliable source for admins.
     if (owner && repo && token) {
         try {
             const headers: HeadersInit = {
@@ -134,13 +143,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 'Authorization': `Bearer ${token}`
             };
 
-            let apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?t=${timestamp}`;
+            let apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?t=${fetchTimestamp}`;
             let response = await fetch(apiUrl, { headers });
 
-            // Handle Path Fallback (src/data.json -> data.json)
+            // Handle Path Fallback
             if (response.status === 404 && path === 'src/data.json') {
                 path = 'data.json';
-                apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?t=${timestamp}`;
+                apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?t=${fetchTimestamp}`;
                 response = await fetch(apiUrl, { headers });
             }
 
@@ -163,12 +172,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     }
 
-    // --- Strategy 2: Proxy API (Public User Mode) ---
-    // If no token is present (User), we call our own Vercel API route.
-    // This route uses server-side secrets to query GitHub API, ensuring we get FRESH data instantly (skipping CDN).
+    // --- Strategy 2: Proxy API (Public/Preview Mode) ---
     try {
-        // Only attempt proxy if NOT in local dev environment without Vercel, or rely on fetch fallback.
-        const proxyUrl = `/api/data?path=${path}&t=${timestamp}`;
+        const proxyUrl = `/api/data?path=${path}&t=${fetchTimestamp}`;
         const response = await fetch(proxyUrl, { 
             cache: 'no-store',
             headers: { 'Cache-Control': 'no-cache, no-store' }
@@ -177,10 +183,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (response.ok) {
             const content = await response.json();
             
-            // Path correction check (if proxy returns error for src/, try root)
             if (content.error && path === 'src/data.json') {
                  // Retry with root path
-                 const rootPathProxy = `/api/data?path=data.json&t=${timestamp}`;
+                 const rootPathProxy = `/api/data?path=data.json&t=${fetchTimestamp}`;
                  const rootRes = await fetch(rootPathProxy, { cache: 'no-store' });
                  if (rootRes.ok) {
                      const rootContent = await rootRes.json();
@@ -205,26 +210,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.warn("Proxy fetch failed:", e);
     }
 
-    // --- Strategy 3: Raw Content (Last Resort) ---
-    // Useful for local development if /api/data isn't running, or if proxy fails.
-    if (owner && repo) {
-        try {
-            const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${path}?t=${timestamp}`;
-            const response = await fetch(rawUrl, { cache: 'no-store' });
-            
-            if (response.ok) {
-                const content = await response.json();
-                if (shouldApplyData) {
-                    applyData(content);
-                    console.log(`Data synced from GitHub Raw (${path})`);
-                }
-                return true;
-            }
-        } catch (error) {
-            console.warn("GitHub Raw fetch failed:", error);
-        }
-    }
-
     return false;
   };
 
@@ -243,7 +228,65 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
   };
 
-  const saveToGitHub = async () => {
+  const updateSyncLog = async (previewUrl: string) => {
+      const { owner, repo } = getGitHubConfig();
+      const token = getGitHubToken();
+      const logPath = 'public/admin/sync-log.json';
+      
+      if (!owner || !repo || !token) return;
+
+      try {
+          // 1. Fetch existing log
+          let existingLogs: SyncLogEntry[] = [];
+          let logSha = '';
+
+          const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}`, {
+              headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
+          });
+
+          if (getRes.ok) {
+              const data = await getRes.json();
+              logSha = data.sha;
+              try {
+                  const content = decodeURIComponent(escape(atob(data.content.replace(/\s/g, ''))));
+                  existingLogs = JSON.parse(content);
+              } catch (e) { console.warn("Failed to parse sync log", e); }
+          }
+
+          // 2. Append new entry
+          const newEntry: SyncLogEntry = {
+              id: self.crypto.randomUUID(),
+              timestamp: new Date().toISOString(),
+              previewUrl,
+              author: localStorage.getItem('github_owner') || 'Admin'
+          };
+          
+          const updatedLogs = [newEntry, ...existingLogs].slice(0, 50); // Keep last 50
+          const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(updatedLogs, null, 2))));
+
+          // 3. Save log
+          const body: any = {
+              message: `Sync Log Update: ${newEntry.timestamp}`,
+              content: contentBase64,
+              branch: 'main'
+          };
+          if (logSha) body.sha = logSha;
+
+          await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}`, {
+              method: 'PUT',
+              headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(body)
+          });
+          
+      } catch (e) {
+          console.error("Failed to update sync log:", e);
+      }
+  };
+
+  const saveToGitHub = async (isManualSync = false) => {
     // Clear pending debounce
     if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
@@ -252,142 +295,109 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     let { owner, repo } = getGitHubConfig();
 
-    if (!owner || !repo) {
-        console.warn("Repo not configured");
-        setIsSaving(false);
-        return;
-    }
-
-    const token = getGitHubToken();
-    if (!token) {
-        console.warn("Missing GitHub Token");
+    if (!owner || !repo || !getGitHubToken()) {
+        console.warn("Missing credentials for save");
         setIsSaving(false);
         return;
     }
 
     setIsSaving(true);
     const now = new Date();
-    
-    // Get latest state
-    const { projects, experience, clients, skills, config, socials } = stateRef.current;
+    const token = getGitHubToken();
 
     const content = {
-      projects,
-      experience,
-      clients,
-      skills,
-      config,
-      socials,
+      projects, experience, clients, skills, config, socials,
       lastUpdated: now.toISOString()
     };
-
+    
+    // Prepare Content
     const contentString = JSON.stringify(content, null, 2);
-    // Standard base64 encode for UTF-8
     const contentBase64 = btoa(unescape(encodeURIComponent(contentString)));
 
     try {
-      // 1. Ensure we have the latest SHA before saving to avoid 409 Conflict
+      // 1. Get SHA for data file
       let currentSha = fileSha;
       if (!currentSha) {
-          // Try to fetch SHA from active path
           const shaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${activeDataPath}`, {
              headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
           });
           if (shaRes.ok) {
               const shaData = await shaRes.json();
               currentSha = shaData.sha;
-          } else if (shaRes.status === 404 && activeDataPath === 'src/data.json') {
-               // Double check if it exists at root
-               const rootRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/data.json`, {
-                    headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
-                });
-                if (rootRes.ok) {
-                    const rootData = await rootRes.json();
-                    currentSha = rootData.sha;
-                    setActiveDataPath('data.json'); // Switch to root for saving
-                }
           }
       }
 
+      // 2. Save Data File
       const body: any = {
         message: `CMS Update: ${now.toLocaleString()}`,
         content: contentBase64,
         branch: 'main'
       };
-
-      if (currentSha) {
-        body.sha = currentSha;
-      }
+      if (currentSha) body.sha = currentSha;
 
       const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${activeDataPath}`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
 
       if (response.ok) {
         const data: any = await response.json();
-        setFileSha(data.content.sha); // Update SHA immediately for next save
+        setFileSha(data.content.sha);
         setLastUpdated(now);
         localStorage.setItem('cms_last_updated', now.toISOString());
-        console.log("GitHub Save Successful");
-
-        // Warm up the public proxy immediately after save
-        try {
-             fetch(`/api/data?path=${activeDataPath}&t=${Date.now()}`, { cache: 'no-store' });
-        } catch (e) {
-            // Ignore
+        
+        // 3. Handle Sync Log & Redirect (Only for Manual Sync/Broadcast)
+        if (isManualSync) {
+            const previewUrl = `${window.location.origin}/preview?update=${now.getTime()}`;
+            setLatestPreviewUrl(previewUrl);
+            await updateSyncLog(previewUrl);
+            
+            // Redirect
+            window.location.href = previewUrl;
+        } else {
+             // Warm up proxy silently for auto-saves
+             try { fetch(`/api/data?path=${activeDataPath}&t=${Date.now()}`, { cache: 'no-store' }); } catch(e){}
         }
-
+        
       } else {
-        const err = await response.json();
-        console.error("GitHub Save Failed:", err);
-        // Retry logic if SHA mismatch (409)
-        if (response.status === 409) {
-             console.log("SHA Mismatch, refetching and retrying...");
-             const retryShaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${activeDataPath}?t=${Date.now()}`, {
-                 headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
-             });
-             
-             if(retryShaRes.ok) {
-                 const retryShaData = await retryShaRes.json();
-                 body.sha = retryShaData.sha;
-                 
-                 const retryResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${activeDataPath}`, {
-                    method: 'PUT',
-                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                  });
-                  
-                  if (retryResponse.ok) {
-                      const retryData = await retryResponse.json();
-                      setFileSha(retryData.content.sha);
-                      setLastUpdated(now);
-                      localStorage.setItem('cms_last_updated', now.toISOString());
-                      console.log("GitHub Save Successful (Retry)");
-                  }
-             }
-        }
+        throw new Error("Failed to save data.json");
       }
     } catch (error) {
       console.error("Error saving to GitHub:", error);
+      throw error;
     } finally {
         setIsSaving(false);
     }
   };
 
-  // --- Version History Methods ---
+  const getSyncHistory = async (): Promise<SyncLogEntry[]> => {
+      const { owner, repo } = getGitHubConfig();
+      const token = getGitHubToken();
+      if (!owner || !repo || !token) return [];
 
+      try {
+          const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/public/admin/sync-log.json`, {
+              headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
+          });
+          if (res.ok) {
+              const data = await res.json();
+              const content = decodeURIComponent(escape(atob(data.content.replace(/\s/g, ''))));
+              const logs = JSON.parse(content);
+              if (logs.length > 0) setLatestPreviewUrl(logs[0].previewUrl);
+              return logs;
+          }
+      } catch (e) { console.warn("No sync history found"); }
+      return [];
+  };
+
+  // --- Version History Methods ---
   const getHistory = async (): Promise<CommitInfo[]> => {
       const { owner, repo } = getGitHubConfig();
       const token = getGitHubToken();
       
       if (!owner || !repo || !token) return [];
 
-      // Use activeDataPath
       try {
           const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits?path=${activeDataPath}&per_page=10`, {
               headers: {
@@ -406,9 +416,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                   author: item.commit.author.name
               }));
           }
-      } catch (e) {
-          console.error("Error fetching history", e);
-      }
+      } catch (e) { console.error("Error fetching history", e); }
       return [];
   };
 
@@ -417,12 +425,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const token = getGitHubToken();
       if (!owner || !repo || !token) throw new Error("Config missing");
 
-      // Use activeDataPath
       const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${activeDataPath}?ref=${sha}`, {
-          headers: {
-              'Authorization': `Bearer ${token}`,
-              'Accept': 'application/vnd.github.v3+json'
-          }
+          headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' }
       });
 
       if (response.ok) {
@@ -431,9 +435,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               const cleanContent = data.content.replace(/\s/g, '');
               const decodedContent = decodeURIComponent(escape(atob(cleanContent)));
               const content = JSON.parse(decodedContent);
-              
               applyData(content);
-              triggerSave(); 
+              // Trigger a save to make this restored version the current one
+              saveToGitHub(false); 
               alert("Version restored successfully. A new commit has been created.");
           } catch (e) {
               throw new Error("Failed to parse historical data");
@@ -445,8 +449,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // --- Initialization ---
   useEffect(() => {
-    // Attempt fetch. If it returns false, it might just mean file doesn't exist yet, which is fine for new setup.
-    fetchFromGitHub(true); 
+    fetchFromGitHub(true);
+    getSyncHistory(); // Fetch logs on init
   }, []);
 
   // --- Actions ---
@@ -456,9 +460,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           clearTimeout(saveTimeoutRef.current);
       }
       setIsSaving(true); 
-      // 2-second debounce to batch rapid edits
+      // 2-second debounce for auto-save
       saveTimeoutRef.current = setTimeout(() => {
-          saveToGitHub();
+          saveToGitHub(false);
       }, 2000); 
   };
 
@@ -554,20 +558,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             config: INITIAL_CONFIG, 
             socials: INITIAL_SOCIALS 
         };
-        await saveToGitHub();
+        await saveToGitHub(false);
     }
   };
 
+  // Called when "Sync Data" is clicked
   const refreshAllClients = async () => {
-      // Force fetch with strict cache busting
-      // This will use Admin credentials if present, or fall back to proxy/raw
       try {
-          const success = await fetchFromGitHub(true);
-          if (!success) {
-              console.log("Sync attempted but no data updated.");
-          }
+          await saveToGitHub(true); // Pass true to trigger Log update + Redirect
       } catch (e: any) {
-          throw e; // Pass error up to Dashboard
+          throw e;
       }
   };
 
@@ -580,7 +580,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       updateSkill, addSkill, deleteSkill,
       updateConfig, updateSocials,
       resetData, refreshAllClients,
-      getHistory, restoreVersion
+      getHistory, restoreVersion,
+      getSyncHistory, latestPreviewUrl
     }}>
       {children}
     </DataContext.Provider>

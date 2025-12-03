@@ -12,7 +12,7 @@ import CustomCursor from './components/CustomCursor';
 import ScrollToTop from './components/ScrollToTop';
 import LoadingScreen from './components/LoadingScreen';
 import InteractiveGradient from './components/InteractiveGradient';
-import { ArrowDown } from 'lucide-react';
+import { ArrowDown, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 
 // CMS Imports
@@ -78,6 +78,7 @@ const AppContent: React.FC = () => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAdminMode, setIsAdminMode] = useState(false);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
   // Theme State
@@ -111,10 +112,15 @@ const AppContent: React.FC = () => {
   const heroOpacity = useTransform(scrollY, [0, 400], [1, 0]);
 
   useEffect(() => {
+    // Check Routes
     if (window.location.hash === '#admin') {
       setIsAdminMode(true);
       setIsLoading(false);
+    } else if (window.location.pathname === '/preview') {
+        setIsPreviewMode(true);
+        // Loading screen still runs, but data fetches freshly via DataContext using ?update=
     }
+
     const handleHashChange = () => {
         if (window.location.hash === '#admin') setIsAdminMode(true);
     };
@@ -137,6 +143,15 @@ const AppContent: React.FC = () => {
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-50 font-sans selection:bg-neutral-900 dark:selection:bg-white selection:text-white dark:selection:text-black cursor-none relative transition-colors duration-500 gradient-bg">
       
+      {/* Preview Mode Banner */}
+      {isPreviewMode && (
+          <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-orange-500 text-white px-6 py-2 rounded-full shadow-xl flex items-center gap-2 text-sm font-bold uppercase tracking-wider animate-in fade-in slide-in-from-top-4">
+              <AlertCircle className="w-4 h-4" />
+              Preview Mode
+              <a href="/#admin" className="ml-2 underline opacity-80 hover:opacity-100">Back to Admin</a>
+          </div>
+      )}
+
       <AnimatePresence>
         {isLoading && <LoadingScreen onComplete={() => setIsLoading(false)} />}
       </AnimatePresence>
