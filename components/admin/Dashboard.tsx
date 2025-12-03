@@ -17,9 +17,12 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   const [activeTab, setActiveTab] = useState<'work' | 'experience' | 'skills' | 'clients' | 'settings' | 'history' | 'sync_logs'>('work');
-  const { resetData, refreshAllClients, lastUpdated, getSyncHistory, latestPreviewUrl } = useData();
+  const { resetData, refreshAllClients, lastUpdated, getSyncHistory, latestPreviewUrl, verifyConnection } = useData();
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  
+  // Connection Warning
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   
   // Sync Logs
   const [syncLogs, setSyncLogs] = useState<SyncLogEntry[]>([]);
@@ -27,6 +30,19 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   useEffect(() => {
       // Fetch logs on mount
       getSyncHistory().then(setSyncLogs);
+
+      // Verify connection on mount
+      verifyConnection().then(result => {
+          if (!result.success) {
+              setConnectionError(result.message);
+              // If it's a critical missing config, auto switch to settings
+              if (result.message.includes("Missing")) {
+                  setActiveTab('settings');
+              }
+          } else {
+              setConnectionError(null);
+          }
+      });
   }, []);
 
   const handleBroadcast = async () => {
@@ -41,8 +57,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
         setSyncStatus('error');
         
         let msg = e.message || "Sync Failed. Check console.";
-        if (msg.includes("Repository Name is missing")) {
-            msg = "Missing Repo Config. Go to Settings.";
+        if (msg.includes("Repository Name is missing") || msg.includes("Repository not found")) {
+            msg = "Repo Config Error. Go to Settings.";
             setActiveTab('settings'); // Auto-switch to settings
         }
         
@@ -96,13 +112,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
             <div className="flex flex-col items-end relative">
                 <button 
                     onClick={handleBroadcast}
-                    disabled={syncStatus === 'syncing' || syncStatus === 'success'}
+                    disabled={syncStatus === 'syncing' || syncStatus === 'success' || !!connectionError}
                     className={`flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-sm min-w-[120px] justify-center ${
                         syncStatus === 'syncing'
                         ? 'bg-neutral-100 text-neutral-400 border border-neutral-200 cursor-not-allowed'
                         : syncStatus === 'success'
                         ? 'bg-green-50 text-green-600 border border-green-200'
-                        : syncStatus === 'error'
+                        : syncStatus === 'error' || connectionError
                         ? 'bg-red-50 text-red-600 border border-red-200'
                         : 'bg-neutral-900 text-white border border-neutral-900 hover:bg-neutral-800'
                     }`}
@@ -110,13 +126,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
                 >
                     {syncStatus === 'syncing' && <RefreshCw className="w-3 h-3 animate-spin" />}
                     {syncStatus === 'success' && <Check className="w-3 h-3" />}
-                    {syncStatus === 'error' && <AlertCircle className="w-3 h-3" />}
-                    {syncStatus === 'idle' && <Radio className="w-3 h-3" />}
+                    {(syncStatus === 'error' || connectionError) && <AlertCircle className="w-3 h-3" />}
+                    {syncStatus === 'idle' && !connectionError && <Radio className="w-3 h-3" />}
                     
                     <span className="hidden md:inline">
                         {syncStatus === 'syncing' ? 'Syncing...' : 
                         syncStatus === 'success' ? 'Synced!' : 
                         syncStatus === 'error' ? 'Failed' : 
+                        connectionError ? 'Config Error' :
                         'Sync Data'}
                     </span>
                 </button>
@@ -146,7 +163,27 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
       </header>
 
       {/* Main Content */}
-      <main className="flex-grow p-4 md:p-8 max-w-7xl mx-auto w-full overflow-hidden">
+      <main className="flex-grow p-4 md:p-8 max-w-7xl mx-auto w-full overflow-hidden flex flex-col">
+        
+        {/* Connection Error Banner */}
+        {connectionError && (
+             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-4 animate-in fade-in slide-in-from-top-4">
+                 <div className="p-2 bg-red-100 rounded-lg text-red-600">
+                     <AlertCircle className="w-5 h-5" />
+                 </div>
+                 <div>
+                     <h3 className="text-sm font-bold text-red-800 mb-1">Configuration Error</h3>
+                     <p className="text-sm text-red-600 mb-3">{connectionError}</p>
+                     <button 
+                        onClick={() => setActiveTab('settings')}
+                        className="text-xs font-bold bg-white border border-red-200 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                     >
+                         Fix in Settings
+                     </button>
+                 </div>
+             </div>
+        )}
+
         {/* Tabs - Scrollable on mobile */}
         <div className="flex overflow-x-auto pb-1 mb-8 bg-neutral-200/50 p-1 rounded-xl w-full md:w-fit scrollbar-hide">
             <button 

@@ -48,6 +48,7 @@ interface DataContextType {
 
   resetData: () => void;
   refreshAllClients: () => Promise<void>;
+  verifyConnection: () => Promise<{ success: boolean; message: string }>;
   
   // New History Methods
   getHistory: () => Promise<CommitInfo[]>;
@@ -120,6 +121,34 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   // --- GitHub Helpers ---
+
+  const verifyConnection = async (): Promise<{ success: boolean; message: string }> => {
+      const { owner, repo } = getGitHubConfig();
+      const token = getGitHubToken();
+      
+      if (!owner) return { success: false, message: "Missing Repository Owner" };
+      if (!repo) return { success: false, message: "Missing Repository Name" };
+      if (!token) return { success: false, message: "Missing GitHub Token" };
+
+      try {
+          const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+              headers: { 
+                  'Authorization': `Bearer ${token}`,
+                  'Accept': 'application/vnd.github.v3+json'
+              }
+          });
+          
+          if (res.ok) return { success: true, message: "Connection Successful" };
+          
+          if (res.status === 404) return { success: false, message: `Repository "${owner}/${repo}" not found. Check Settings.` };
+          if (res.status === 401) return { success: false, message: "Invalid Token or Token expired." };
+          if (res.status === 403) return { success: false, message: "Access Forbidden (403). Check Permissions." };
+          
+          return { success: false, message: `GitHub API Error: ${res.status}` };
+      } catch (e: any) {
+          return { success: false, message: e.message || "Network Error: Could not reach GitHub." };
+      }
+  };
   
   const fetchFromGitHub = async (shouldApplyData = true): Promise<boolean> => {
     const { owner, repo } = getGitHubConfig();
@@ -299,7 +328,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     let { owner, repo } = getGitHubConfig();
     const token = getGitHubToken();
 
-    // Strict validation
+    // Strict validation with helpful errors
     if (!owner) throw new Error("Repository Owner is missing. Check Settings.");
     if (!repo) throw new Error("Repository Name is missing. Check Settings.");
     if (!token) throw new Error("GitHub Token is missing. Please login again.");
@@ -379,8 +408,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
         
       } else {
+        // Error Handling
+        if (response.status === 404) {
+             throw new Error(`Repository not found (${owner}/${repo}). Please check your settings.`);
+        }
+        if (response.status === 401) {
+            throw new Error("Invalid GitHub Token. Please re-authenticate.");
+        }
         const errData = await response.json().catch(() => ({}));
-        console.error("GitHub API Error:", errData);
         throw new Error(errData.message || `GitHub Error: ${response.status} ${response.statusText}`);
       }
     } catch (error: any) {
@@ -485,7 +520,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setIsSaving(true); 
       // 2-second debounce for auto-save
       saveTimeoutRef.current = setTimeout(() => {
-          saveToGitHub(false);
+          saveToGitHub(false).catch(err => console.error("Auto-save failed:", err));
       }, 2000); 
   };
 
@@ -604,7 +639,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       updateConfig, updateSocials,
       resetData, refreshAllClients,
       getHistory, restoreVersion,
-      getSyncHistory, latestPreviewUrl
+      getSyncHistory, latestPreviewUrl,
+      verifyConnection
     }}>
       {children}
     </DataContext.Provider>

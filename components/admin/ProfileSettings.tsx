@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Save, Plus, Trash2, Loader2, Check, Github, Key, Database, Lock } from 'lucide-react';
+import { Save, Plus, Trash2, Loader2, Check, Github, Key, Database, Lock, AlertTriangle, Wifi } from 'lucide-react';
 
 const ProfileSettings: React.FC = () => {
-  const { config, socials, updateConfig, updateSocials, isSaving } = useData();
+  const { config, socials, updateConfig, updateSocials, isSaving, verifyConnection } = useData();
   
   // Local state to prevent rapid context updates while typing
   const [localConfig, setLocalConfig] = useState(config);
@@ -18,6 +18,10 @@ const ProfileSettings: React.FC = () => {
 
   const [hasChanges, setHasChanges] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  
+  // Connection Test State
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [connectionMsg, setConnectionMsg] = useState('');
 
   // Sync with context and localStorage on mount
   useEffect(() => {
@@ -26,7 +30,7 @@ const ProfileSettings: React.FC = () => {
     setGhConfig({
         owner: localStorage.getItem('github_owner') || '',
         repo: localStorage.getItem('github_repo') || '',
-        token: localStorage.getItem('github_token') || '' // Read directly from storage
+        token: localStorage.getItem('github_token') || '' 
     });
   }, [config, socials]);
 
@@ -40,6 +44,7 @@ const ProfileSettings: React.FC = () => {
       setGhConfig(prev => ({ ...prev, [field]: value }));
       setHasChanges(true);
       setJustSaved(false);
+      setConnectionStatus('idle'); // Reset status on edit
   };
 
   const handleSocialChange = (index: number, field: keyof typeof localSocials[0], value: string) => {
@@ -70,8 +75,6 @@ const ProfileSettings: React.FC = () => {
       updateSocials(localSocials);
       
       // Save GitHub Config
-      // Note: We don't save token here if it's masked, but since we are showing the active session state
-      // we mostly care about Repo Name updates here.
       localStorage.setItem('github_owner', ghConfig.owner);
       localStorage.setItem('github_repo', ghConfig.repo);
       
@@ -80,6 +83,25 @@ const ProfileSettings: React.FC = () => {
       
       // Reset success message after 3s
       setTimeout(() => setJustSaved(false), 3000);
+  };
+
+  const testConnection = async () => {
+      setConnectionStatus('testing');
+      setConnectionMsg('');
+      
+      // Save first to ensure context uses latest values
+      localStorage.setItem('github_owner', ghConfig.owner);
+      localStorage.setItem('github_repo', ghConfig.repo);
+      
+      const result = await verifyConnection();
+      
+      if (result.success) {
+          setConnectionStatus('success');
+          setConnectionMsg(result.message);
+      } else {
+          setConnectionStatus('error');
+          setConnectionMsg(result.message);
+      }
   };
 
   return (
@@ -106,16 +128,39 @@ const ProfileSettings: React.FC = () => {
 
       {/* GitHub CMS Configuration */}
       <section className="space-y-6 bg-white p-6 rounded-xl border border-neutral-200 shadow-sm">
-        <div className="flex items-center gap-3 border-b border-neutral-100 pb-4">
-            <div className="p-2 bg-neutral-100 rounded-lg text-neutral-600">
-                <Database className="w-5 h-5" />
+        <div className="flex justify-between items-start border-b border-neutral-100 pb-4">
+            <div className="flex items-center gap-3">
+                <div className="p-2 bg-neutral-100 rounded-lg text-neutral-600">
+                    <Database className="w-5 h-5" />
+                </div>
+                <div>
+                    <h3 className="text-lg font-bold text-neutral-900">CMS Configuration</h3>
+                    <p className="text-xs text-neutral-500">Connected via GitHub API.</p>
+                </div>
             </div>
-            <div>
-                <h3 className="text-lg font-bold text-neutral-900">CMS Configuration</h3>
-                <p className="text-xs text-neutral-500">Connected via Active Session.</p>
-            </div>
+            <button 
+                onClick={testConnection}
+                className="flex items-center gap-2 px-3 py-1.5 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded text-xs font-bold text-neutral-600 transition-colors"
+            >
+                {connectionStatus === 'testing' ? <Loader2 className="w-3 h-3 animate-spin"/> : <Wifi className="w-3 h-3"/>}
+                Test Connection
+            </button>
         </div>
         
+        {/* Status Messages */}
+        {connectionStatus === 'error' && (
+            <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-xs text-red-600 flex items-center gap-2 font-medium">
+                <AlertTriangle className="w-4 h-4"/>
+                {connectionMsg}
+            </div>
+        )}
+        {connectionStatus === 'success' && (
+            <div className="p-3 bg-green-50 border border-green-100 rounded-lg text-xs text-green-700 flex items-center gap-2 font-medium">
+                <Check className="w-4 h-4"/>
+                {connectionMsg}
+            </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 flex items-center gap-2">
@@ -129,16 +174,17 @@ const ProfileSettings: React.FC = () => {
                 />
             </div>
             <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 flex items-center gap-2">
+                <label className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${!ghConfig.repo ? 'text-red-500' : 'text-neutral-500'}`}>
                     <Database className="w-3 h-3" /> Repository Name
                 </label>
                 <input 
                     type="text" 
                     value={ghConfig.repo}
                     onChange={(e) => handleGhChange('repo', e.target.value)}
-                    className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-neutral-900 focus:bg-white focus:outline-none transition-all"
+                    className={`w-full px-4 py-2.5 bg-neutral-50 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-neutral-900 focus:bg-white focus:outline-none transition-all ${!ghConfig.repo ? 'border-red-300 bg-red-50' : 'border-neutral-200'}`}
                     placeholder="e.g. portfolio"
                 />
+                {!ghConfig.repo && <p className="text-[10px] text-red-500">Required. Enter the name of your GitHub repository.</p>}
             </div>
             <div className="space-y-2 md:col-span-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 flex items-center gap-2">
