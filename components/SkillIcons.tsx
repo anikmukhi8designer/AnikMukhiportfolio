@@ -16,7 +16,7 @@ export const SKILL_ICONS: Record<string, React.FC<{ className?: string }>> = {
       <path d="M19 0L28.5 0C31.0196 0 33.4359 1.00089 35.2175 2.78249C36.9991 4.56408 38 6.98044 38 9.5C38 12.0196 36.9991 14.4359 35.2175 16.2175C33.4359 18.0001 31.0196 19 28.5 19L19 19V0Z" fill="#FF7262"/>
     </svg>
   ),
-  "Adobe": ({ className }) => <span className={`font-bold text-[#FF0000] flex items-center justify-center border-2 border-[#FF0000] rounded ${className}`}>A</span>,
+  "Adobe": ({ className }) => <span className={`font-bold text-[#FF0000] flex items-center justify-center border-2 border-[#FF0000] rounded aspect-square leading-none ${className}`}>A</span>,
   "Sketch": ({ className }) => <Hexagon className={`${className} text-yellow-600`} />,
   "Framer": ({ className }) => <Layout className={`${className} text-neutral-900`} />,
   "Webflow": ({ className }) => <Layers className={`${className} text-blue-600`} />,
@@ -24,13 +24,13 @@ export const SKILL_ICONS: Record<string, React.FC<{ className?: string }>> = {
   "Arc": ({ className }) => <Globe className={`${className} text-red-500`} />,
   "Linear": ({ className }) => <Zap className={`${className} text-purple-700`} />,
   "Raycast": ({ className }) => <Command className={`${className} text-red-600`} />,
-  "Notion": ({ className }) => <span className={`font-serif font-bold text-neutral-900 text-xl ${className}`}>N</span>,
+  "Notion": ({ className }) => <span className={`font-serif font-bold text-neutral-900 flex items-center justify-center ${className}`}>N</span>,
   
   // Development
   "React": ({ className }) => <Cpu className={`${className} text-blue-500`} />,
-  "TypeScript": ({ className }) => <span className={`font-bold text-blue-700 border border-blue-700 rounded px-1 flex items-center ${className}`}>TS</span>,
-  "Tailwind": ({ className }) => <span className={`font-bold text-cyan-600 ${className}`}>~</span>,
-  "Next.js": ({ className }) => <span className={`font-bold text-neutral-900 ${className}`}>N</span>,
+  "TypeScript": ({ className }) => <span className={`font-bold text-blue-700 border border-blue-700 rounded px-1 flex items-center justify-center text-[10px] ${className}`}>TS</span>,
+  "Tailwind": ({ className }) => <span className={`font-bold text-cyan-600 flex items-center justify-center ${className}`}>~</span>,
+  "Next.js": ({ className }) => <span className={`font-bold text-neutral-900 flex items-center justify-center ${className}`}>N</span>,
   "Git": ({ className }) => <GitBranch className={`${className} text-orange-600`} />,
   "VS Code": ({ className }) => <Code className={`${className} text-blue-600`} />,
   "Node.js": ({ className }) => <Hexagon className={`${className} text-green-700`} />,
