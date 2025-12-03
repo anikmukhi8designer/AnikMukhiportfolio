@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Github, Key, ExternalLink, Loader2, AlertCircle } from 'lucide-react';
+import { Github, Key, ExternalLink, Loader2, AlertCircle, Database } from 'lucide-react';
 
 interface AdminLoginProps {
   onLogin: () => void;
@@ -7,6 +7,7 @@ interface AdminLoginProps {
 
 const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
   const [username, setUsername] = useState('');
+  const [repo, setRepo] = useState('');
   const [token, setToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -38,11 +39,23 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
             throw new Error(`Token belongs to user "${data.login}", not "${username}".`);
         }
 
-        // 3. Save to LocalStorage for CMS Context to use
+        // 3. Verify Repository Existence
+        const repoRes = await fetch(`https://api.github.com/repos/${username}/${repo}`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: 'application/vnd.github.v3+json',
+            }
+        });
+
+        if (!repoRes.ok) {
+             if (repoRes.status === 404) throw new Error(`Repository "${repo}" not found for user "${username}".`);
+             throw new Error(`Could not access repository "${repo}". Check permissions.`);
+        }
+
+        // 4. Save to LocalStorage for CMS Context to use
         localStorage.setItem('github_token', token.trim());
         localStorage.setItem('github_owner', username.trim());
-        // We assume the repo name is either already set or will be set in Settings
-        // If it's the first time, we might prompt for repo, but for now we just auth the user.
+        localStorage.setItem('github_repo', repo.trim());
         
         onLogin();
 
@@ -86,6 +99,24 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                     placeholder="e.g. mukhianik"
                 />
             </div>
+
+            <div className="space-y-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500">Repository Name</label>
+                <div className="relative">
+                    <input 
+                        type="text" 
+                        required
+                        className="w-full pl-10 pr-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:border-transparent outline-none transition-all placeholder:text-neutral-400"
+                        value={repo}
+                        onChange={(e) => setRepo(e.target.value)}
+                        placeholder="e.g. portfolio"
+                    />
+                    <Database className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                </div>
+                <p className="text-[10px] text-neutral-400 leading-tight">
+                    The exact name of the repo where data.json is stored.
+                </p>
+            </div>
             
             <div className="space-y-1.5">
                 <div className="flex justify-between items-center">
@@ -101,7 +132,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                 </div>
                 <div className="relative">
                     <input 
-                        type="password"
+                        type="password" 
                         required
                         className="w-full pl-10 pr-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:border-transparent outline-none transition-all placeholder:text-neutral-400"
                         value={token}

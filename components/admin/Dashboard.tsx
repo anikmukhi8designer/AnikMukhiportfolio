@@ -39,7 +39,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
     } catch (e: any) {
         console.error("Sync Error caught in Dashboard:", e);
         setSyncStatus('error');
-        setErrorMessage(e.message || "Sync Failed. Check console.");
+        
+        let msg = e.message || "Sync Failed. Check console.";
+        if (msg.includes("Repository Name is missing")) {
+            msg = "Missing Repo Config. Go to Settings.";
+            setActiveTab('settings'); // Auto-switch to settings
+        }
+        
+        setErrorMessage(msg);
         setTimeout(() => {
             setSyncStatus('idle');
             setErrorMessage('');
