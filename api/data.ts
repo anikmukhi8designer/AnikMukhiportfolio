@@ -1,5 +1,30 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { Buffer } from 'buffer';
+// Explicitly define types to avoid dependency on @vercel/node and @types/node
+// which might be missing in the build environment.
+
+interface VercelRequest {
+  query: Partial<{ [key: string]: string | string[] }>;
+  cookies: Partial<{ [key: string]: string }>;
+  body: any;
+  method?: string;
+  [key: string]: any;
+}
+
+interface VercelResponse {
+  status(code: number): VercelResponse;
+  send(body: any): VercelResponse;
+  json(jsonBody: any): VercelResponse;
+  setHeader(name: string, value: string): VercelResponse;
+  [key: string]: any;
+}
+
+// Declare Node.js globals that are missing from the "DOM" lib configuration
+declare const process: {
+  env: { [key: string]: string | undefined };
+};
+
+declare const Buffer: {
+  from: (str: string, encoding?: string) => any;
+};
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // 1. Set aggressive headers to prevent Vercel and Browser caching
@@ -29,6 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const timestamp = Date.now();
     const ghUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${targetPath}?t=${timestamp}`;
     
+    // Use global fetch (available in Node 18+)
     const ghRes = await fetch(ghUrl, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -47,7 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(ghRes.status).json({ error: 'GitHub Fetch Failed', status: ghRes.status });
     }
 
-    const data = await ghRes.json();
+    const data: any = await ghRes.json();
     
     // 5. Decode Content (GitHub returns Base64)
     if (data.content && data.encoding === 'base64') {
