@@ -87,6 +87,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Store the SHA of the data.json file to handle GitHub atomic updates
   const [fileSha, setFileSha] = useState<string | null>(null);
   
+  // Track the valid path for data.json (src/data.json or data.json)
+  const [activeDataPath, setActiveDataPath] = useState('src/data.json');
+
   // Ref to hold the timeout ID for debouncing
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -111,8 +114,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return { owner, repo };
   };
 
-  const DATA_PATH = 'src/data.json';
-
   // --- GitHub Helpers ---
   
   const fetchFromGitHub = async (shouldApplyData = true): Promise<boolean> => {
@@ -136,15 +137,30 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         headers['Authorization'] = `Bearer ${token}`;
     }
 
-    // Add random timestamp to URL to bust browser/network cache
     const timestamp = Date.now();
-    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${DATA_PATH}?t=${timestamp}`;
+    
+    // Try Default Path first, then fallback
+    let path = activeDataPath;
+    let apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?t=${timestamp}`;
 
     try {
-      const response = await fetch(apiUrl, { headers });
+      let response = await fetch(apiUrl, { headers });
+
+      // If 404, check if we are using the default 'src/data.json' and try 'data.json' instead
+      if (response.status === 404 && path === 'src/data.json') {
+          console.log("src/data.json not found, trying data.json...");
+          path = 'data.json';
+          apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?t=${timestamp}`;
+          response = await fetch(apiUrl, { headers });
+      }
 
       if (response.ok) {
         const data: any = await response.json();
+        
+        // Update active path for future saves
+        if (path !== activeDataPath) {
+            setActiveDataPath(path);
+        }
         
         // Update SHA regardless of applying data
         setFileSha(data.sha);
@@ -157,18 +173,29 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 const decodedContent = decodeURIComponent(escape(atob(cleanContent)));
                 const content = JSON.parse(decodedContent);
                 applyData(content);
-                console.log("Data synced from GitHub API (Live)");
+                console.log(`Data synced from GitHub (${path})`);
             } catch (err) {
                 console.error("Error parsing GitHub data:", err);
-                return false;
+                throw new Error("Data file is corrupt or invalid JSON");
             }
         }
         return true;
       } else {
+          // If 404 still, it means no data file exists at all
+          if (response.status === 404) {
+             console.warn("No data.json found in repo. First save will create it.");
+             return false; // Not a fatal error, just means we start fresh
+          }
+          if (response.status === 401) throw new Error("Unauthorized: Invalid Token");
+          if (response.status === 403) throw new Error("Forbidden: Check Scope or Rate Limit");
+          
           console.warn(`GitHub API Error: ${response.status}`);
+          throw new Error(`GitHub Error ${response.status}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.warn("GitHub API fetch failed:", error);
+      if (error.message.includes("Unauthorized")) throw error;
+      if (error.message.includes("Forbidden")) throw error;
     }
     return false;
   };
@@ -198,7 +225,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     let { owner, repo } = getGitHubConfig();
 
     if (!owner || !repo) {
-        // Fallback prompt logic omitted for brevity, assuming configured or checking in Dashboard
         console.warn("Repo not configured");
         setIsSaving(false);
         return;
@@ -233,15 +259,25 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     try {
       // 1. Ensure we have the latest SHA before saving to avoid 409 Conflict
-      // This is crucial for "Real Time" feeling - making sure we don't overwrite blindly or fail
       let currentSha = fileSha;
       if (!currentSha) {
-          const shaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${DATA_PATH}`, {
+          // Try to fetch SHA from active path
+          const shaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${activeDataPath}`, {
              headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
           });
           if (shaRes.ok) {
               const shaData = await shaRes.json();
               currentSha = shaData.sha;
+          } else if (shaRes.status === 404 && activeDataPath === 'src/data.json') {
+               // Double check if it exists at root
+               const rootRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/data.json`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
+                });
+                if (rootRes.ok) {
+                    const rootData = await rootRes.json();
+                    currentSha = rootData.sha;
+                    setActiveDataPath('data.json'); // Switch to root for saving
+                }
           }
       }
 
@@ -255,7 +291,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         body.sha = currentSha;
       }
 
-      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${DATA_PATH}`, {
+      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${activeDataPath}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -276,7 +312,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // Retry logic if SHA mismatch (409)
         if (response.status === 409) {
              console.log("SHA Mismatch, refetching and retrying...");
-             const retryShaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${DATA_PATH}?t=${Date.now()}`, {
+             const retryShaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${activeDataPath}?t=${Date.now()}`, {
                  headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
              });
              
@@ -284,7 +320,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                  const retryShaData = await retryShaRes.json();
                  body.sha = retryShaData.sha;
                  
-                 const retryResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${DATA_PATH}`, {
+                 const retryResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${activeDataPath}`, {
                     method: 'PUT',
                     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
@@ -315,8 +351,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       if (!owner || !repo || !token) return [];
 
+      // Use activeDataPath
       try {
-          const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits?path=${DATA_PATH}&per_page=10`, {
+          const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits?path=${activeDataPath}&per_page=10`, {
               headers: {
                   'Authorization': `Bearer ${token}`,
                   'Accept': 'application/vnd.github.v3+json',
@@ -344,9 +381,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const token = getGitHubToken();
       if (!owner || !repo || !token) throw new Error("Config missing");
 
-      // Fetch specific blob content by SHA or use contents API with ref
-      // Using contents API with ref is easier to get base64
-      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${DATA_PATH}?ref=${sha}`, {
+      // Use activeDataPath
+      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${activeDataPath}?ref=${sha}`, {
           headers: {
               'Authorization': `Bearer ${token}`,
               'Accept': 'application/vnd.github.v3+json'
@@ -361,11 +397,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               const content = JSON.parse(decodedContent);
               
               applyData(content);
-              
-              // We do NOT automatically save back to main. We let the user see the old data, 
-              // and if they make a change, it will trigger a new save (new commit) on top.
-              // Effectively "Reverting" in UI first.
-              triggerSave(); // Actually, let's trigger a save to make this revert permanent immediately
+              triggerSave(); 
               alert("Version restored successfully. A new commit has been created.");
           } catch (e) {
               throw new Error("Failed to parse historical data");
@@ -377,6 +409,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // --- Initialization ---
   useEffect(() => {
+    // Attempt fetch. If it returns false, it might just mean file doesn't exist yet, which is fine for new setup.
     fetchFromGitHub(true); 
   }, []);
 
@@ -508,9 +541,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       // Force fetch with strict cache busting
-      const success = await fetchFromGitHub(true);
-      if (!success) {
-          throw new Error("Could not sync with GitHub. Check your token and permissions.");
+      try {
+          const success = await fetchFromGitHub(true);
+          if (!success) {
+              // Not necessarily an error, might just be empty repo
+              console.log("No remote data found, keeping local data.");
+          }
+      } catch (e: any) {
+          throw e; // Pass error up to Dashboard
       }
   };
 

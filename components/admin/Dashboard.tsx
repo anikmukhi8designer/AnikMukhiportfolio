@@ -17,17 +17,23 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   const [activeTab, setActiveTab] = useState<'work' | 'experience' | 'skills' | 'clients' | 'settings' | 'history'>('work');
   const { resetData, refreshAllClients, lastUpdated } = useData();
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleBroadcast = async () => {
     setSyncStatus('syncing');
+    setErrorMessage('');
     try {
         await refreshAllClients();
         setSyncStatus('success');
         setTimeout(() => setSyncStatus('idle'), 3000);
-    } catch (e) {
+    } catch (e: any) {
         console.error(e);
         setSyncStatus('error');
-        setTimeout(() => setSyncStatus('idle'), 3000);
+        setErrorMessage(e.message || "Sync Failed");
+        setTimeout(() => {
+            setSyncStatus('idle');
+            setErrorMessage('');
+        }, 5000);
     }
   };
 
@@ -55,32 +61,40 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
                 </div>
             </div>
 
-            <button 
-                onClick={handleBroadcast}
-                disabled={syncStatus === 'syncing' || syncStatus === 'success'}
-                className={`flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-sm min-w-[120px] justify-center ${
-                    syncStatus === 'syncing'
-                    ? 'bg-neutral-100 text-neutral-400 border border-neutral-200 cursor-not-allowed'
-                    : syncStatus === 'success'
-                    ? 'bg-green-50 text-green-600 border border-green-200'
-                    : syncStatus === 'error'
-                    ? 'bg-red-50 text-red-600 border border-red-200'
-                    : 'bg-neutral-900 text-white border border-neutral-900 hover:bg-neutral-800'
-                }`}
-                title="Fetch latest data from GitHub"
-            >
-                {syncStatus === 'syncing' && <RefreshCw className="w-3 h-3 animate-spin" />}
-                {syncStatus === 'success' && <Check className="w-3 h-3" />}
-                {syncStatus === 'error' && <AlertCircle className="w-3 h-3" />}
-                {syncStatus === 'idle' && <Radio className="w-3 h-3" />}
-                
-                <span className="hidden md:inline">
-                    {syncStatus === 'syncing' ? 'Syncing...' : 
-                     syncStatus === 'success' ? 'Synced!' : 
-                     syncStatus === 'error' ? 'Failed' : 
-                     'Sync Data'}
-                </span>
-            </button>
+            <div className="flex flex-col items-end relative">
+                <button 
+                    onClick={handleBroadcast}
+                    disabled={syncStatus === 'syncing' || syncStatus === 'success'}
+                    className={`flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-sm min-w-[120px] justify-center ${
+                        syncStatus === 'syncing'
+                        ? 'bg-neutral-100 text-neutral-400 border border-neutral-200 cursor-not-allowed'
+                        : syncStatus === 'success'
+                        ? 'bg-green-50 text-green-600 border border-green-200'
+                        : syncStatus === 'error'
+                        ? 'bg-red-50 text-red-600 border border-red-200'
+                        : 'bg-neutral-900 text-white border border-neutral-900 hover:bg-neutral-800'
+                    }`}
+                    title="Fetch latest data from GitHub"
+                >
+                    {syncStatus === 'syncing' && <RefreshCw className="w-3 h-3 animate-spin" />}
+                    {syncStatus === 'success' && <Check className="w-3 h-3" />}
+                    {syncStatus === 'error' && <AlertCircle className="w-3 h-3" />}
+                    {syncStatus === 'idle' && <Radio className="w-3 h-3" />}
+                    
+                    <span className="hidden md:inline">
+                        {syncStatus === 'syncing' ? 'Syncing...' : 
+                        syncStatus === 'success' ? 'Synced!' : 
+                        syncStatus === 'error' ? 'Failed' : 
+                        'Sync Data'}
+                    </span>
+                </button>
+                {/* Error Tooltip */}
+                {errorMessage && (
+                    <div className="absolute top-full right-0 mt-2 p-2 bg-red-100 border border-red-200 rounded text-xs text-red-700 whitespace-nowrap z-50 animate-in fade-in slide-in-from-top-1">
+                        {errorMessage}
+                    </div>
+                )}
+            </div>
 
             <div className="h-6 w-px bg-neutral-200"></div>
 
