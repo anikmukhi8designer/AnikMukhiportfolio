@@ -118,85 +118,112 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   
   const fetchFromGitHub = async (shouldApplyData = true): Promise<boolean> => {
     const { owner, repo } = getGitHubConfig();
-
-    if (!owner || !repo) {
-        return false;
-    }
-
     const token = getGitHubToken();
-    
-    // STRICT Cache Busting Headers
-    const headers: HeadersInit = {
-        'Accept': 'application/vnd.github.v3+json',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-    };
+    const timestamp = Date.now();
+    let path = activeDataPath;
 
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+    // --- Strategy 1: Direct GitHub API (Admin Mode) ---
+    // If we have a token, we query GitHub directly. This is the fastest and most reliable source for admins.
+    if (owner && repo && token) {
+        try {
+            const headers: HeadersInit = {
+                'Accept': 'application/vnd.github.v3+json',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+                'Authorization': `Bearer ${token}`
+            };
+
+            let apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?t=${timestamp}`;
+            let response = await fetch(apiUrl, { headers });
+
+            // Handle Path Fallback (src/data.json -> data.json)
+            if (response.status === 404 && path === 'src/data.json') {
+                path = 'data.json';
+                apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?t=${timestamp}`;
+                response = await fetch(apiUrl, { headers });
+            }
+
+            if (response.ok) {
+                const data: any = await response.json();
+                if (path !== activeDataPath) setActiveDataPath(path);
+                setFileSha(data.sha);
+
+                if (shouldApplyData) {
+                    const cleanContent = data.content.replace(/\s/g, '');
+                    const decodedContent = decodeURIComponent(escape(atob(cleanContent)));
+                    const content = JSON.parse(decodedContent);
+                    applyData(content);
+                    console.log(`Data synced from GitHub API (${path})`);
+                }
+                return true;
+            } 
+        } catch (error) {
+            console.warn("GitHub Admin API fetch failed, trying fallback...", error);
+        }
     }
 
-    const timestamp = Date.now();
-    
-    // Try Default Path first, then fallback
-    let path = activeDataPath;
-    let apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?t=${timestamp}`;
-
+    // --- Strategy 2: Proxy API (Public User Mode) ---
+    // If no token is present (User), we call our own Vercel API route.
+    // This route uses server-side secrets to query GitHub API, ensuring we get FRESH data instantly (skipping CDN).
     try {
-      let response = await fetch(apiUrl, { headers });
-
-      // If 404, check if we are using the default 'src/data.json' and try 'data.json' instead
-      if (response.status === 404 && path === 'src/data.json') {
-          console.log("src/data.json not found, trying data.json...");
-          path = 'data.json';
-          apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?t=${timestamp}`;
-          response = await fetch(apiUrl, { headers });
-      }
-
-      if (response.ok) {
-        const data: any = await response.json();
+        const proxyUrl = `/api/data?path=${path}&t=${timestamp}`;
+        const response = await fetch(proxyUrl, { 
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache' }
+        });
         
-        // Update active path for future saves
-        if (path !== activeDataPath) {
-            setActiveDataPath(path);
-        }
-        
-        // Update SHA regardless of applying data
-        setFileSha(data.sha);
-
-        if (shouldApplyData) {
-            try {
-                // Remove newlines/whitespace from base64
-                const cleanContent = data.content.replace(/\s/g, '');
-                // Decode UTF-8 safely
-                const decodedContent = decodeURIComponent(escape(atob(cleanContent)));
-                const content = JSON.parse(decodedContent);
-                applyData(content);
-                console.log(`Data synced from GitHub (${path})`);
-            } catch (err) {
-                console.error("Error parsing GitHub data:", err);
-                throw new Error("Data file is corrupt or invalid JSON");
+        if (response.ok) {
+            const content = await response.json();
+            
+            // Path correction check (if proxy returns error for src/, try root)
+            if (content.error && path === 'src/data.json') {
+                 // Retry with root path
+                 const rootPathProxy = `/api/data?path=data.json&t=${timestamp}`;
+                 const rootRes = await fetch(rootPathProxy, { cache: 'no-store' });
+                 if (rootRes.ok) {
+                     const rootContent = await rootRes.json();
+                     if (!rootContent.error) {
+                         setActiveDataPath('data.json');
+                         if (shouldApplyData) {
+                             applyData(rootContent);
+                             console.log("Data synced from API Proxy (Root)");
+                         }
+                         return true;
+                     }
+                 }
+            } else if (!content.error) {
+                if (shouldApplyData) {
+                    applyData(content);
+                    console.log(`Data synced from API Proxy (${path})`);
+                }
+                return true;
             }
         }
-        return true;
-      } else {
-          // If 404 still, it means no data file exists at all
-          if (response.status === 404) {
-             console.warn("No data.json found in repo. First save will create it.");
-             return false; // Not a fatal error, just means we start fresh
-          }
-          if (response.status === 401) throw new Error("Unauthorized: Invalid Token");
-          if (response.status === 403) throw new Error("Forbidden: Check Scope or Rate Limit");
-          
-          console.warn(`GitHub API Error: ${response.status}`);
-          throw new Error(`GitHub Error ${response.status}`);
-      }
-    } catch (error: any) {
-      console.warn("GitHub API fetch failed:", error);
-      if (error.message.includes("Unauthorized")) throw error;
-      if (error.message.includes("Forbidden")) throw error;
+    } catch (e) {
+        console.warn("Proxy fetch failed:", e);
     }
+
+    // --- Strategy 3: Raw Content (Last Resort) ---
+    // Useful for local development if /api/data isn't running, or if proxy fails.
+    if (owner && repo) {
+        try {
+            const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${path}?t=${timestamp}`;
+            const response = await fetch(rawUrl, { cache: 'no-store' });
+            
+            if (response.ok) {
+                const content = await response.json();
+                if (shouldApplyData) {
+                    applyData(content);
+                    console.log(`Data synced from GitHub Raw (${path})`);
+                }
+                return true;
+            }
+        } catch (error) {
+            console.warn("GitHub Raw fetch failed:", error);
+        }
+    }
+
     return false;
   };
 
