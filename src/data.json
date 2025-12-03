@@ -321,58 +321,6 @@
           "caption": "Integration Example"
         }
       ]
-    },
-    {
-      "id": "health-wearable-2022",
-      "title": "Pulse Os",
-      "client": "Pulse Health",
-      "roles": [
-        "Interaction Design",
-        "Prototyping"
-      ],
-      "description": "Operating system interface for a next-gen health wearable.",
-      "year": 2022,
-      "heroImage": "https://picsum.photos/id/8/1200/800",
-      "thumb": "https://picsum.photos/id/8/800/600",
-      "tags": [
-        "Healthtech",
-        "Wearable"
-      ],
-      "link": "#",
-      "published": true,
-      "content": [
-        {
-          "id": "1",
-          "type": "paragraph",
-          "content": "On a 1.5 inch screen, every pixel counts. We removed all non-essential elements."
-        }
-      ]
-    },
-    {
-      "id": "arch-vis-2022",
-      "title": "Urban Space",
-      "client": "Urban Architects",
-      "roles": [
-        "3D Visualization",
-        "Art Direction"
-      ],
-      "description": "Interactive architectural visualizations.",
-      "year": 2022,
-      "heroImage": "https://picsum.photos/id/10/1200/800",
-      "thumb": "https://picsum.photos/id/10/800/600",
-      "tags": [
-        "3D",
-        "Real Estate"
-      ],
-      "link": "#",
-      "published": true,
-      "content": [
-        {
-          "id": "1",
-          "type": "paragraph",
-          "content": "Using WebGL to bring architectural blueprints to life in the browser."
-        }
-      ]
     }
   ],
   "experience": [
@@ -587,5 +535,5 @@
       "label": "hello@mukhianik.com"
     }
   ],
-  "lastUpdated": "2025-12-03T13:13:24.103Z"
+  "lastUpdated": "2025-12-03T13:13:40.506Z"
 }
