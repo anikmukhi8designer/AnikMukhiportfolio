@@ -167,10 +167,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // If no token is present (User), we call our own Vercel API route.
     // This route uses server-side secrets to query GitHub API, ensuring we get FRESH data instantly (skipping CDN).
     try {
+        // Only attempt proxy if NOT in local dev environment without Vercel, or rely on fetch fallback.
         const proxyUrl = `/api/data?path=${path}&t=${timestamp}`;
         const response = await fetch(proxyUrl, { 
             cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache' }
+            headers: { 'Cache-Control': 'no-cache, no-store' }
         });
         
         if (response.ok) {
@@ -333,6 +334,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setLastUpdated(now);
         localStorage.setItem('cms_last_updated', now.toISOString());
         console.log("GitHub Save Successful");
+
+        // Warm up the public proxy immediately after save
+        try {
+             fetch(`/api/data?path=${activeDataPath}&t=${Date.now()}`, { cache: 'no-store' });
+        } catch (e) {
+            // Ignore
+        }
+
       } else {
         const err = await response.json();
         console.error("GitHub Save Failed:", err);
@@ -550,29 +559,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const refreshAllClients = async () => {
-      let token = getGitHubToken();
-
-      if (!token) {
-          const userInput = prompt("GitHub Token required for sync. Enter your Personal Access Token:");
-          if (userInput) {
-              localStorage.setItem('github_token', userInput.trim());
-              token = userInput.trim();
-          } else {
-              throw new Error("No token provided");
-          }
-      }
-      
-      const { owner, repo } = getGitHubConfig();
-      if (!owner || !repo) {
-         throw new Error("Repository configuration missing. Go to Settings.");
-      }
-
       // Force fetch with strict cache busting
+      // This will use Admin credentials if present, or fall back to proxy/raw
       try {
           const success = await fetchFromGitHub(true);
           if (!success) {
-              // Not necessarily an error, might just be empty repo
-              console.log("No remote data found, keeping local data.");
+              console.log("Sync attempted but no data updated.");
           }
       } catch (e: any) {
           throw e; // Pass error up to Dashboard

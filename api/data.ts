@@ -3,7 +3,7 @@ import { Buffer } from 'buffer';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // 1. Set aggressive headers to prevent Vercel and Browser caching
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
   res.setHeader('Surrogate-Control', 'no-store');
