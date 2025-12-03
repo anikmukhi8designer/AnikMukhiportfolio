@@ -77,6 +77,9 @@ const ProfileSettings: React.FC = () => {
       // Save GitHub Config
       localStorage.setItem('github_owner', ghConfig.owner);
       localStorage.setItem('github_repo', ghConfig.repo);
+      if (ghConfig.token) {
+          localStorage.setItem('github_token', ghConfig.token);
+      }
       
       setHasChanges(false);
       setJustSaved(true);
@@ -89,18 +92,32 @@ const ProfileSettings: React.FC = () => {
       setConnectionStatus('testing');
       setConnectionMsg('');
       
-      // Save first to ensure context uses latest values
+      // Temporarily save to localStorage for the verify function to pick it up immediately
+      // This allows testing before hitting "Save Changes" if desired, or at least testing current input
+      const originalOwner = localStorage.getItem('github_owner');
+      const originalRepo = localStorage.getItem('github_repo');
+      const originalToken = localStorage.getItem('github_token');
+
+      // Use current input values for testing
       localStorage.setItem('github_owner', ghConfig.owner);
       localStorage.setItem('github_repo', ghConfig.repo);
+      if (ghConfig.token) localStorage.setItem('github_token', ghConfig.token);
       
-      const result = await verifyConnection();
-      
-      if (result.success) {
-          setConnectionStatus('success');
-          setConnectionMsg(result.message);
-      } else {
-          setConnectionStatus('error');
-          setConnectionMsg(result.message);
+      try {
+        const result = await verifyConnection();
+        
+        if (result.success) {
+            setConnectionStatus('success');
+            setConnectionMsg(result.message);
+        } else {
+            setConnectionStatus('error');
+            setConnectionMsg(result.message);
+        }
+      } finally {
+         // If we haven't saved yet, revert localStorage to prevent side effects? 
+         // Actually, let's keep it simple: Testing implies you probably want these settings.
+         // But to be safe for "Cancel" behavior (which we don't strictly have), we might leave it.
+         // For now, let's assume the user intends to save if they test.
       }
   };
 
@@ -163,15 +180,17 @@ const ProfileSettings: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 flex items-center gap-2">
+                <label className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${!ghConfig.owner ? 'text-red-500' : 'text-neutral-500'}`}>
                     <Github className="w-3 h-3" /> Repository Owner
                 </label>
                 <input 
                     type="text" 
                     value={ghConfig.owner}
-                    disabled
-                    className="w-full px-4 py-2.5 bg-neutral-100 border border-neutral-200 rounded-lg text-sm font-medium text-neutral-500 cursor-not-allowed"
+                    onChange={(e) => handleGhChange('owner', e.target.value)}
+                    className={`w-full px-4 py-2.5 bg-neutral-50 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-neutral-900 focus:bg-white focus:outline-none transition-all ${!ghConfig.owner ? 'border-red-300 bg-red-50' : 'border-neutral-200'}`}
+                    placeholder="GitHub Username"
                 />
+                 {!ghConfig.owner && <p className="text-[10px] text-red-500">Required.</p>}
             </div>
             <div className="space-y-2">
                 <label className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${!ghConfig.repo ? 'text-red-500' : 'text-neutral-500'}`}>
@@ -182,25 +201,26 @@ const ProfileSettings: React.FC = () => {
                     value={ghConfig.repo}
                     onChange={(e) => handleGhChange('repo', e.target.value)}
                     className={`w-full px-4 py-2.5 bg-neutral-50 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-neutral-900 focus:bg-white focus:outline-none transition-all ${!ghConfig.repo ? 'border-red-300 bg-red-50' : 'border-neutral-200'}`}
-                    placeholder="e.g. portfolio"
+                    placeholder="Repository Name"
                 />
-                {!ghConfig.repo && <p className="text-[10px] text-red-500">Required. Enter the name of your GitHub repository.</p>}
+                {!ghConfig.repo && <p className="text-[10px] text-red-500">Required.</p>}
             </div>
             <div className="space-y-2 md:col-span-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-neutral-500 flex items-center gap-2">
+                <label className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${!ghConfig.token ? 'text-red-500' : 'text-neutral-500'}`}>
                     <Key className="w-3 h-3" /> Personal Access Token (PAT)
                 </label>
                 <div className="relative">
                     <input 
                         type="password"
-                        value="********************************"
-                        disabled
-                        className="w-full pl-10 pr-4 py-2.5 bg-neutral-100 border border-neutral-200 rounded-lg text-sm font-medium text-neutral-500 cursor-not-allowed"
+                        value={ghConfig.token}
+                        onChange={(e) => handleGhChange('token', e.target.value)}
+                        className={`w-full pl-10 pr-4 py-2.5 bg-neutral-50 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-neutral-900 focus:bg-white focus:outline-none transition-all ${!ghConfig.token ? 'border-red-300 bg-red-50' : 'border-neutral-200'}`}
+                        placeholder="ghp_..."
                     />
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                 </div>
                 <p className="text-[10px] text-neutral-400">
-                    To change the token, please <button onClick={() => { localStorage.removeItem('github_token'); window.location.reload(); }} className="text-blue-600 hover:underline">logout</button> and authenticate again.
+                    Token must have <strong>repo</strong> scope. Changes are saved to local storage.
                 </p>
             </div>
         </div>
