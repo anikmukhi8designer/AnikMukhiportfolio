@@ -76,7 +76,12 @@ const SkillCard: React.FC<SkillCardProps> = ({ item, index }) => {
                         src={imageUrl} 
                         alt={item.name} 
                         loading="lazy"
-                        className="w-full h-full object-contain drop-shadow-sm filter grayscale group-hover:grayscale-0 transition-all duration-500 opacity-70 group-hover:opacity-100"
+                        className="w-full h-full object-contain drop-shadow-sm 
+                                   filter grayscale opacity-70 
+                                   dark:brightness-0 dark:invert 
+                                   group-hover:grayscale-0 group-hover:opacity-100 
+                                   dark:group-hover:brightness-100 dark:group-hover:invert-0
+                                   transition-all duration-500"
                         onError={(e) => {
                             e.currentTarget.style.display = 'none';
                             const fallback = e.currentTarget.parentElement?.querySelector('.fallback-icon');

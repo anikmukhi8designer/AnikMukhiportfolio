@@ -437,20 +437,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           if (userInput) {
               localStorage.setItem('github_token', userInput.trim());
               token = userInput.trim();
-              await fetchFromGitHub(false);
           } else {
-              return;
+              throw new Error("No token provided");
           }
       }
 
-      try {
-          if (!fileSha) await fetchFromGitHub(false);
-          await saveToGitHub();
-          alert("Data synced to GitHub!");
-      } catch (e) {
-          console.error(e);
-          alert("Sync failed. Check console.");
-      }
+      // Fetch latest data from GitHub to ensure frontend matches source of truth
+      await fetchFromGitHub(true);
   };
 
   return (

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Radio, RefreshCw, UserCircle } from 'lucide-react';
+import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Radio, RefreshCw, UserCircle, Check, AlertCircle } from 'lucide-react';
 import WorkTable from './WorkTable';
 import ExperienceTable from './ExperienceTable';
 import SkillsTable from './SkillsTable';
@@ -15,12 +15,19 @@ interface DashboardProps {
 const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   const [activeTab, setActiveTab] = useState<'work' | 'experience' | 'skills' | 'clients' | 'settings'>('work');
   const { resetData, refreshAllClients, lastUpdated } = useData();
-  const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
 
   const handleBroadcast = async () => {
-    setIsBroadcasting(true);
-    await refreshAllClients();
-    setTimeout(() => setIsBroadcasting(false), 2000);
+    setSyncStatus('syncing');
+    try {
+        await refreshAllClients();
+        setSyncStatus('success');
+        setTimeout(() => setSyncStatus('idle'), 3000);
+    } catch (e) {
+        console.error(e);
+        setSyncStatus('error');
+        setTimeout(() => setSyncStatus('idle'), 3000);
+    }
   };
 
   return (
@@ -49,20 +56,29 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
 
             <button 
                 onClick={handleBroadcast}
-                disabled={isBroadcasting}
-                className={`flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-sm ${
-                    isBroadcasting 
-                    ? 'bg-neutral-100 text-neutral-400 border border-neutral-200' 
+                disabled={syncStatus === 'syncing' || syncStatus === 'success'}
+                className={`flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-sm min-w-[120px] justify-center ${
+                    syncStatus === 'syncing'
+                    ? 'bg-neutral-100 text-neutral-400 border border-neutral-200 cursor-not-allowed'
+                    : syncStatus === 'success'
+                    ? 'bg-green-50 text-green-600 border border-green-200'
+                    : syncStatus === 'error'
+                    ? 'bg-red-50 text-red-600 border border-red-200'
                     : 'bg-neutral-900 text-white border border-neutral-900 hover:bg-neutral-800'
                 }`}
                 title="Fetch latest data from GitHub"
             >
-                {isBroadcasting ? (
-                    <RefreshCw className="w-3 h-3 animate-spin" />
-                ) : (
-                    <Radio className="w-3 h-3" />
-                )}
-                <span className="hidden md:inline">{isBroadcasting ? 'Syncing...' : 'Sync Data'}</span>
+                {syncStatus === 'syncing' && <RefreshCw className="w-3 h-3 animate-spin" />}
+                {syncStatus === 'success' && <Check className="w-3 h-3" />}
+                {syncStatus === 'error' && <AlertCircle className="w-3 h-3" />}
+                {syncStatus === 'idle' && <Radio className="w-3 h-3" />}
+                
+                <span className="hidden md:inline">
+                    {syncStatus === 'syncing' ? 'Syncing...' : 
+                     syncStatus === 'success' ? 'Synced!' : 
+                     syncStatus === 'error' ? 'Failed' : 
+                     'Sync Data'}
+                </span>
             </button>
 
             <div className="h-6 w-px bg-neutral-200"></div>
