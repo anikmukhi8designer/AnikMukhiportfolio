@@ -47,7 +47,7 @@ const SkillCard: React.FC<SkillCardProps> = ({ item, index }) => {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             transition={{ delay: index * 0.02, duration: 0.4 }}
-            className="group relative flex flex-col items-center justify-center p-8 bg-neutral-100/30 backdrop-blur-sm hover:bg-white transition-all duration-300 aspect-square border border-transparent hover:z-10 hover:shadow-xl"
+            className="group relative flex flex-col items-center justify-center p-8 bg-white/5 backdrop-blur-sm hover:bg-white/20 transition-all duration-300 aspect-square border border-neutral-200/40 rounded-2xl hover:border-neutral-300 hover:shadow-lg hover:z-10"
         >
             <div className="w-12 h-12 mb-6 relative flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:-translate-y-1">
                  {imageUrl ? (
@@ -80,7 +80,7 @@ const SkillsSection: React.FC = () => {
   const { skills } = useData();
 
   return (
-    <section className="py-24 border-t border-neutral-200 bg-[#fafafa] relative z-10">
+    <section className="py-24 border-t border-neutral-200 bg-transparent relative z-10">
       <div className="max-w-screen-xl mx-auto px-4 md:px-8">
         
         {/* Header */}
@@ -100,13 +100,10 @@ const SkillsSection: React.FC = () => {
                         {category.title}
                     </h3>
                     
-                    {/* Grid with 1px gap for the sharp border look */}
-                    <div className="bg-neutral-200 p-[1px]">
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-[1px] bg-neutral-200">
-                            {category.items.map((item, idx) => (
-                                <SkillCard key={idx} item={item} index={idx} />
-                            ))}
-                        </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                        {category.items.map((item, idx) => (
+                            <SkillCard key={idx} item={item} index={idx} />
+                        ))}
                     </div>
                 </div>
             ))}

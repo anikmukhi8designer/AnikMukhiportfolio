@@ -48,6 +48,15 @@ const SplitNavPanel: React.FC<SplitNavPanelProps> = ({ isOpen, onClose, onProjec
   const visibleProjects = projects.filter(p => p.published).slice(0, 6); // Limit to 6 for menu
   const visibleExperience = experience.filter(e => e.published).slice(0, 4);
 
+  const handleScroll = (e: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>, id: string) => {
+    e.preventDefault();
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+    onClose();
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -100,7 +109,10 @@ const SplitNavPanel: React.FC<SplitNavPanelProps> = ({ isOpen, onClose, onProjec
               </ul>
               
               <div className="mt-auto pt-8">
-                <button onClick={onClose} className="text-sm text-neutral-400 hover:text-white transition-colors">
+                <button 
+                  onClick={(e) => handleScroll(e, 'work')} 
+                  className="text-sm text-neutral-400 hover:text-white transition-colors"
+                >
                     View All Projects ({projects.length})
                 </button>
               </div>
@@ -117,9 +129,9 @@ const SplitNavPanel: React.FC<SplitNavPanelProps> = ({ isOpen, onClose, onProjec
                     Navigation
                   </h2>
                   <div className="flex flex-col gap-4 text-xl font-medium">
-                      <a href="#work" onClick={onClose} className="hover:text-neutral-400 transition-colors">Work</a>
-                      <a href="#experience" onClick={onClose} className="hover:text-neutral-400 transition-colors">Experience</a>
-                      <a href="#contact" onClick={onClose} className="hover:text-neutral-400 transition-colors">Contact</a>
+                      <a href="#work" onClick={(e) => handleScroll(e, 'work')} className="hover:text-neutral-400 transition-colors">Work</a>
+                      <a href="#experience" onClick={(e) => handleScroll(e, 'experience')} className="hover:text-neutral-400 transition-colors">Experience</a>
+                      <a href="#contact" onClick={(e) => handleScroll(e, 'contact')} className="hover:text-neutral-400 transition-colors">Contact</a>
                   </div>
               </div>
 

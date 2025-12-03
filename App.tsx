@@ -99,6 +99,14 @@ const AppContent: React.FC = () => {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
+  const handleSmoothScroll = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
+    e.preventDefault();
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   if (isAdminMode) {
       return <AdminRoute />;
   }
@@ -162,6 +170,7 @@ const AppContent: React.FC = () => {
                 
                 <a 
                     href="#work" 
+                    onClick={(e) => handleSmoothScroll(e, 'work')}
                     className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-neutral-900 hover:text-neutral-500 transition-colors z-20"
                 >
                     Explore Work <ArrowDown className="w-4 h-4 animate-bounce" />
