@@ -289,38 +289,6 @@
           "content": "Lumina focuses on high-end fashion, so the app needed to feel invisible, letting the photography shine."
         }
       ]
-    },
-    {
-      "id": "ai-copilot-2023",
-      "title": "Syntax AI",
-      "client": "Syntax Labs",
-      "roles": [
-        "Brand Identity",
-        "Web Design"
-      ],
-      "description": "Web presence for an AI coding assistant.",
-      "year": 2023,
-      "heroImage": "https://picsum.photos/id/6/1200/800",
-      "thumb": "https://picsum.photos/id/6/800/600",
-      "tags": [
-        "AI",
-        "Web Design"
-      ],
-      "link": "#",
-      "published": true,
-      "content": [
-        {
-          "id": "1",
-          "type": "paragraph",
-          "content": "Designing for developer tools requires a specific aesthetic. Dark mode wasn't an option; it was a requirement."
-        },
-        {
-          "id": "2",
-          "type": "code",
-          "content": "const ai = new SyntaxAI({\n  mode: \"advanced\",\n  theme: \"dark\"\n});",
-          "caption": "Integration Example"
-        }
-      ]
     }
   ],
   "experience": [
@@ -535,5 +503,5 @@
       "label": "hello@mukhianik.com"
     }
   ],
-  "lastUpdated": "2025-12-03T12:25:44.999Z"
+  "lastUpdated": "2025-12-03T12:26:10.638Z"
 }
