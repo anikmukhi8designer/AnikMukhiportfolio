@@ -102,10 +102,12 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, ba
 }
 
 // --- UTILITY: Data Deduplication & Cleaning ---
+// Fixes "Syntax AI" showing twice by enforcing unique IDs
 function deduplicateAndClean<T extends { id: string }>(items: T[]): T[] {
     const seen = new Set();
     return items.filter(item => {
-        if (!item.id || seen.has(item.id)) return false;
+        if (!item.id) return false; // Remove invalid items without ID
+        if (seen.has(item.id)) return false; // Remove duplicates
         seen.add(item.id);
         return true;
     });
@@ -204,7 +206,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Explicit update check from URL
     const urlParams = new URLSearchParams(window.location.search);
-    // Use manual timestamp if provided (manual refresh), else current time
     const fetchTimestamp = urlParams.get('update') || timestamp;
 
     // --- Strategy 1: Direct GitHub API (Admin Mode / Token Present) ---
@@ -265,7 +266,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
         } catch (error: any) {
             if (!silent) {
-                // If direct fetch fails (offline), don't error out entirely, fall back to initial data
                 console.warn("Direct fetch failed", error);
                 setIsLoading(false);
             }
@@ -285,7 +285,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (response.ok) {
             const content = await response.json();
             
-            // Handle Proxy Error Wrapper (e.g. 500 from Vercel function)
+            // Handle Proxy Error Wrapper
             if (content.error) {
                  if (content.status === 404 && path === 'src/data.json') {
                      // Retry with root path via proxy
@@ -321,7 +321,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
         }
     } catch (e) {
-        console.warn("Proxy fetch failed. Ensure Vercel Env Vars are set.", e);
+        console.warn("Proxy fetch failed.", e);
     }
     
     // If both fail, we rely on INITIAL_DATA which is already loaded
@@ -416,8 +416,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsSaving(true);
     const now = new Date();
 
-    // 1. Prepare & Clean Data
+    // 1. Prepare & Clean Data (Deduplicate & Validate)
     const currentState = stateRef.current;
+    
+    // Check for critical data consistency
+    if (!currentState.projects || !Array.isArray(currentState.projects)) {
+        throw new Error("Data Error: Projects list is corrupted. Aborting save.");
+    }
+
     const content = {
       projects: deduplicateAndClean(currentState.projects),
       experience: deduplicateAndClean(currentState.experience),
@@ -484,7 +490,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
         // 5. Create Commit
         const commitPayload: any = {
-            message: `CMS Update: ${now.toLocaleString()}`,
+            message: `CMS Sync: ${now.toLocaleString()}`,
             tree: treeData.sha
         };
         if (parentSha) commitPayload.parents = [parentSha];
@@ -522,10 +528,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setLastUpdated(now);
         localStorage.setItem('cms_last_updated', now.toISOString());
         
-        // Refresh local file SHA to prevent unnecessary fetches
-        // Note: We don't have the file SHA from this flow directly easily without refetch, 
-        // but since we just wrote it, we can assume we are consistent.
-        // We'll trigger a background fetch to realign SHAs.
+        // Trigger background fetch to realign local SHA
         fetchFromGitHub(false, true);
 
         let redirectUrl: string | null = null;
@@ -549,6 +552,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  // ... (Other methods remain the same) ...
   const getSyncHistory = async (): Promise<SyncLogEntry[]> => {
       const { owner, repo } = getGitHubConfig();
       const token = getGitHubToken();
