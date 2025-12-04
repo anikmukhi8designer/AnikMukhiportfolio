@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Radio, RefreshCw, UserCircle, Check, AlertCircle, History, ExternalLink, Clock, Loader2, AlertTriangle, Settings as SettingsIcon, GitBranch } from 'lucide-react';
+import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Radio, RefreshCw, UserCircle, Check, AlertCircle, History, ExternalLink, Clock, Loader2, AlertTriangle, Settings as SettingsIcon, GitBranch, List } from 'lucide-react';
 import WorkTable from './WorkTable';
 import ExperienceTable from './ExperienceTable';
 import SkillsTable from './SkillsTable';
 import ClientsTable from './ClientsTable';
 import ProfileSettings from './ProfileSettings';
 import VersionHistory from './VersionHistory';
+import SyncLogs from './SyncLogs';
 import { useData } from '../../contexts/DataContext';
 import { SyncLogEntry } from '../../types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -235,7 +236,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
                     : 'text-neutral-500 hover:text-neutral-900'
                 }`}
             >
-                <History className="w-4 h-4" /> Version History
+                <History className="w-4 h-4" /> History
+            </button>
+            <button 
+                onClick={() => setActiveTab('sync_logs')}
+                className={`flex items-center gap-2 px-4 md:px-6 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex-shrink-0 ${
+                    activeTab === 'sync_logs' 
+                    ? 'bg-white text-neutral-900 shadow-sm' 
+                    : 'text-neutral-500 hover:text-neutral-900'
+                }`}
+            >
+                <List className="w-4 h-4" /> Logs
             </button>
         </div>
 
@@ -246,6 +257,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
         {activeTab === 'clients' && <ClientsTable />}
         {activeTab === 'settings' && <ProfileSettings />}
         {activeTab === 'history' && <VersionHistory />}
+        {activeTab === 'sync_logs' && <SyncLogs />}
 
         {/* Footer Actions */}
         <div className="mt-12 pt-8 border-t border-neutral-200 flex flex-col sm:flex-row justify-between items-center text-sm text-neutral-500 gap-4">
