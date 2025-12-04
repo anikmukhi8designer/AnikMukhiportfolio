@@ -126,7 +126,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // PATH 1: Admin (Direct GitHub API)
         if (token && owner && repo) {
             const url = `https://api.github.com/repos/${owner}/${repo}/contents/src/data.json?ref=${branch}&t=${timestamp}`;
-            const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+            const res = await fetch(url, { 
+                headers: { 'Authorization': `Bearer ${token}` },
+                cache: 'no-store'
+            });
             
             if (res.ok) {
                 const data = await res.json();
@@ -171,7 +174,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [branch, fileSha]);
 
-  // --- Core Logic: Save ---
+  // --- Core Logic: Save with Retry ---
   const syncData = async (commitMessage = "Update from CMS") => {
       const { token, owner, repo } = getAuth();
       if (!token || !owner || !repo) throw new Error("Missing configuration");
@@ -188,65 +191,91 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           socials: stateRef.current.socials,
           lastUpdated: now.toISOString()
       };
+      
+      const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
+
+      // Recursive attempt function to handle 409 Conflicts (Stale SHA)
+      const attemptSave = async (retriesLeft: number): Promise<void> => {
+          try {
+              // 1. Get FRESH SHA (No Cache)
+              let currentSha: string | undefined = undefined;
+              try {
+                  const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/src/data.json?ref=${branch}&t=${Date.now()}`, {
+                      headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                      },
+                      cache: 'no-store'
+                  });
+                  if (getRes.ok) {
+                      const currentFile = await getRes.json();
+                      currentSha = currentFile.sha;
+                  }
+              } catch(e) { /* ignore 404, file might create new */ }
+
+              // 2. PUT new content
+              const putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/src/data.json`, {
+                  method: 'PUT',
+                  headers: {
+                      'Authorization': `Bearer ${token}`,
+                      'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                      message: commitMessage,
+                      content: contentBase64,
+                      sha: currentSha, // Must match exact SHA on server
+                      branch: branch
+                  })
+              });
+
+              // HANDLE CONFLICT (409) -> RETRY
+              if (putRes.status === 409 && retriesLeft > 0) {
+                  console.warn(`SHA Conflict (409). Retrying... (${retriesLeft} attempts left)`);
+                  await new Promise(r => setTimeout(r, 800)); // Backoff
+                  return attemptSave(retriesLeft - 1);
+              }
+
+              if (!putRes.ok) {
+                  const errData = await putRes.json();
+                  throw new Error(errData.message || "Failed to sync to GitHub");
+              }
+
+              const result = await putRes.json();
+              setFileSha(result.content.sha);
+              setLastUpdated(now);
+              setHasNewVersion(false);
+              
+              // 3. Trigger Vercel Deploy Hook (if configured)
+              const deployHook = localStorage.getItem('vercel_deploy_hook');
+              if (deployHook) {
+                  try {
+                      // Important: mode 'no-cors' allows the request to be sent from browser without CORS errors
+                      await fetch(deployHook, { method: 'POST', mode: 'no-cors' });
+                      console.log("Vercel Deploy Hook triggered (no-cors mode)");
+                  } catch (e) {
+                      console.warn("Failed to trigger deploy hook", e);
+                  }
+              }
+              
+              // 4. Update Sync Log
+              const url = `${window.location.origin}/preview?t=${now.getTime()}`;
+              setLatestPreviewUrl(url);
+              // Fire and forget log update to avoid blocking UI completion
+              updateSyncLog(url, branch).catch(err => console.warn("Log update warning:", err));
+
+          } catch (e) {
+              if (retriesLeft > 0) {
+                 // Retry on network errors too
+                 await new Promise(r => setTimeout(r, 1000));
+                 return attemptSave(retriesLeft - 1);
+              }
+              throw e;
+          }
+      };
 
       try {
-          // 1. Get current SHA (if file exists)
-          let currentSha: string | undefined = undefined;
-          try {
-              const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/src/data.json?ref=${branch}`, {
-                  headers: { 'Authorization': `Bearer ${token}` }
-              });
-              if (getRes.ok) {
-                  const currentFile = await getRes.json();
-                  currentSha = currentFile.sha;
-              }
-          } catch(e) { /* ignore 404 */ }
-
-          // 2. PUT new content to GitHub (Trigger Deployment via Commit)
-          const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
-          
-          const putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/src/data.json`, {
-              method: 'PUT',
-              headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                  message: commitMessage,
-                  content: contentBase64,
-                  sha: currentSha,
-                  branch: branch
-              })
-          });
-
-          if (!putRes.ok) {
-              const errData = await putRes.json();
-              throw new Error(errData.message || "Failed to sync to GitHub");
-          }
-
-          const result = await putRes.json();
-          setFileSha(result.content.sha);
-          setLastUpdated(now);
-          setHasNewVersion(false);
-          
-          // 3. Trigger Vercel Deploy Hook (if configured)
-          const deployHook = localStorage.getItem('vercel_deploy_hook');
-          if (deployHook) {
-              try {
-                  await fetch(deployHook, { method: 'POST' });
-                  console.log("Vercel Deploy Hook triggered");
-              } catch (e) {
-                  console.warn("Failed to trigger deploy hook", e);
-              }
-          }
-          
-          // 4. Update Sync Log
-          const url = `${window.location.origin}/preview?t=${now.getTime()}`;
-          setLatestPreviewUrl(url);
-          
-          // Ensure log is updated
-          await updateSyncLog(url, branch);
-
+          await attemptSave(3); // Start with 3 retries
       } catch (e: any) {
           console.error(e);
           throw e;
@@ -379,8 +408,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       let sha = '';
 
       try {
-        const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}?ref=${currentBranch}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+        const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}?ref=${currentBranch}&t=${Date.now()}`, {
+            headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' },
+            cache: 'no-store'
         });
         if (getRes.ok) {
             const data = await getRes.json();
@@ -398,16 +428,37 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       const newContent = btoa(JSON.stringify([newEntry, ...logs].slice(0, 20), null, 2));
       
-      await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}`, {
-          method: 'PUT',
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-              message: 'Log Update',
-              content: newContent,
-              sha: sha || undefined,
-              branch: currentBranch
-          })
-      });
+      // Retry logic for log update as well
+      const attemptLogUpdate = async (retries: number) => {
+          try {
+              const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}`, {
+                  method: 'PUT',
+                  headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                      message: 'Log Update',
+                      content: newContent,
+                      sha: sha || undefined,
+                      branch: currentBranch
+                  })
+              });
+              
+              if (res.status === 409 && retries > 0) {
+                   // Refresh SHA and retry
+                   const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}?ref=${currentBranch}&t=${Date.now()}`, {
+                        headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
+                   });
+                   if (getRes.ok) {
+                        const data = await getRes.json();
+                        sha = data.sha;
+                        await attemptLogUpdate(retries - 1);
+                   }
+              }
+          } catch(e) {
+              if (retries > 0) await attemptLogUpdate(retries - 1);
+          }
+      };
+
+      await attemptLogUpdate(2);
   };
 
   const getSyncHistory = async () => {
@@ -417,7 +468,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const logPath = 'public/admin/sync-log.json';
       try {
         const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}?ref=${branch}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' },
+            cache: 'no-store'
         });
         if (getRes.ok) {
             const data = await getRes.json();
