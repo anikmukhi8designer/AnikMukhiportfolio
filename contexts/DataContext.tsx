@@ -188,8 +188,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Explicit cache buster for fetch
     const cacheBuster = `?update=${timestamp}`;
+    const refParam = branch ? `&ref=${branch}` : '';
     
-    // --- Strategy 1: Admin Direct Access (Priority: GitHub API) ---
+    // --- Strategy 1: Admin Direct Access (Priority: GitHub API with Token) ---
     // Best for Admin users as it uses the token to get fresh data immediately
     if (owner && repo && token) {
         try {
@@ -197,7 +198,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 'Accept': 'application/vnd.github.v3+json',
                 'Authorization': `Bearer ${token}`
             };
-            const refParam = branch ? `&ref=${branch}` : '';
             
             // Try src/data.json first
             let apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?t=${timestamp}${refParam}`;
@@ -219,8 +219,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     }
     
-    // --- Strategy 2: Vercel/Next.js API Proxy (Guest) ---
-    // Best for Production deployments (User side)
+    // --- Strategy 2: Vercel/Next.js API Proxy (Guest - Production) ---
+    // Best for Production deployments where .env vars are secure on server
     try {
         const proxyUrl = `/api/data?path=${path}&t=${timestamp}`;
         const response = await fetch(proxyUrl, { 
@@ -247,11 +247,43 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
         }
     } catch (e) {
-        console.warn("Strategy 2 (Proxy) failed, trying Raw Fallback...", e);
+        console.warn("Strategy 2 (Proxy) failed, trying Public API...", e);
     }
 
-    // --- Strategy 3: Raw GitHub Content (Fallback) ---
-    // Best for Local Dev (where /api doesn't exist) or Public Repos
+    // --- Strategy 3: Public GitHub API (Guest - Local/Rate-Limited) ---
+    // Critical for "Real-time" feel in local dev or without proxy. 
+    // It returns fresh data unlike Raw, but is rate limited to 60/hr per IP.
+    if (owner && repo && !token) {
+        try {
+             // Try src/data.json
+             let apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?t=${timestamp}${refParam}`;
+             let response = await fetch(apiUrl, { 
+                 headers: { 'Accept': 'application/vnd.github.v3+json' },
+                 cache: 'no-store'
+             });
+             
+             if (response.status === 404 && path === 'src/data.json') {
+                 // Try data.json
+                 const rootPath = 'data.json';
+                 apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${rootPath}?t=${timestamp}${refParam}`;
+                 response = await fetch(apiUrl, { 
+                     headers: { 'Accept': 'application/vnd.github.v3+json' },
+                     cache: 'no-store'
+                 });
+             }
+ 
+             if (response.ok) {
+                 const data = await response.json();
+                 handleDataSuccess(data, path, shouldApplyData, silent);
+                 return true;
+             }
+        } catch(e) {
+            console.warn("Strategy 3 (Public API) failed.");
+        }
+     }
+
+    // --- Strategy 4: Raw GitHub Content (Fallback - Heavily Cached) ---
+    // Best for High Traffic Guest usage if Proxy fails, but has 5-min cache delay.
     if (owner && repo) {
         try {
             // Raw URL typically has 5min cache, so we add timestamp
@@ -273,7 +305,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                  }
             }
         } catch (e) {
-             console.warn("Strategy 3 (Raw) failed.");
+             console.warn("Strategy 4 (Raw) failed.");
         }
     }
     
@@ -282,15 +314,28 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [activeDataPath, branch]);
 
   const handleDataSuccess = (data: any, path: string, shouldApplyData: boolean, silent: boolean) => {
-      // Logic to detect new version without auto-applying (if preferred)
+      let applyNow = shouldApplyData;
+      
+      // Auto-update logic: If user is GUEST (no token), always apply new data to keep site fresh.
+      // If user is ADMIN (has token), show toast to prevent disrupting their edits.
+      const isAdmin = !!localStorage.getItem('github_token');
+
       if (data.sha || data._sha) {
           const newSha = data.sha || data._sha;
           if (fileShaRef.current && fileShaRef.current !== newSha) {
                // New version detected!
-               setHasNewVersion(true);
-               if (!shouldApplyData) return; // Wait for user to reload
+               
+               if (!isAdmin) {
+                   // Guest: Auto-apply
+                   applyNow = true;
+               } else {
+                   // Admin: Show toast
+                   setHasNewVersion(true);
+                   if (!applyNow) return; 
+               }
           }
-          if (shouldApplyData) {
+          
+          if (applyNow) {
               setFileSha(newSha);
               setHasNewVersion(false);
           }
@@ -298,7 +343,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (path !== activeDataPath) setActiveDataPath(path);
 
-      if (shouldApplyData) {
+      if (applyNow) {
           try {
               // Handle both raw JSON (Proxy/Raw) and Base64 encoded (GitHub API)
               let content = data;
@@ -658,7 +703,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     fetchFromGitHub(true);
   }, [fetchFromGitHub]);
 
-  // Polling for Real-Time Updates (Every 15 seconds)
+  // Polling for Real-Time Updates (Every 5 seconds)
   useEffect(() => {
     const init = async () => {
         await verifyConnection();
@@ -666,9 +711,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
     init();
 
+    // Aggressive polling (5s) for real-time feel
     const interval = setInterval(() => {
         fetchFromGitHub(false, true);
-    }, 15000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [fetchFromGitHub]);
