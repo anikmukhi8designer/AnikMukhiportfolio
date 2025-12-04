@@ -152,8 +152,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (content) {
             // Check if data is new
             if (fileSha && sha && fileSha !== sha) {
-                // Determine if we auto-apply
-                // If user is Admin (has token), we warn them. If Guest, we auto-update.
                 const isAdmin = !!token;
                 if (isAdmin) {
                     setHasNewVersion(true);
@@ -198,21 +196,27 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const attemptSave = async (retriesLeft: number): Promise<void> => {
           try {
               // 1. Get FRESH SHA (No Cache)
+              // We must explicitly distinguish between 404 (File doesn't exist yet, SHA is undefined)
+              // and other errors (Network fail, etc - where we should NOT send undefined SHA)
               let currentSha: string | undefined = undefined;
-              try {
-                  const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/src/data.json?ref=${branch}&t=${Date.now()}`, {
-                      headers: { 
-                        'Authorization': `Bearer ${token}`,
-                        'Cache-Control': 'no-cache',
-                        'Pragma': 'no-cache'
-                      },
-                      cache: 'no-store'
-                  });
-                  if (getRes.ok) {
-                      const currentFile = await getRes.json();
-                      currentSha = currentFile.sha;
-                  }
-              } catch(e) { /* ignore 404, file might create new */ }
+              
+              const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/src/data.json?ref=${branch}&t=${Date.now()}`, {
+                  headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                  },
+                  cache: 'no-store'
+              });
+
+              if (getRes.ok) {
+                  const currentFile = await getRes.json();
+                  currentSha = currentFile.sha;
+              } else if (getRes.status !== 404) {
+                  // If it's NOT a 404, it's a real error (like rate limit, or 500). 
+                  // Throwing here forces a retry via the catch block below.
+                  throw new Error(`Failed to fetch current SHA. Status: ${getRes.status}`);
+              }
 
               // 2. PUT new content
               const putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/src/data.json`, {
@@ -232,7 +236,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               // HANDLE CONFLICT (409) -> RETRY
               if (putRes.status === 409 && retriesLeft > 0) {
                   console.warn(`SHA Conflict (409). Retrying... (${retriesLeft} attempts left)`);
-                  await new Promise(r => setTimeout(r, 800)); // Backoff
+                  await new Promise(r => setTimeout(r, 800 + (3-retriesLeft)*500)); // Exponential Backoff
                   return attemptSave(retriesLeft - 1);
               }
 
@@ -251,22 +255,26 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               if (deployHook) {
                   try {
                       // Important: mode 'no-cors' allows the request to be sent from browser without CORS errors
+                      // The response status will be 0 (opaque), but the hook triggers on Vercel's side.
                       await fetch(deployHook, { method: 'POST', mode: 'no-cors' });
                       console.log("Vercel Deploy Hook triggered (no-cors mode)");
                   } catch (e) {
                       console.warn("Failed to trigger deploy hook", e);
                   }
+              } else {
+                  console.log("No Vercel Deploy Hook configured in Settings.");
               }
               
               // 4. Update Sync Log
+              // We await this now to ensure we capture any log errors before finishing
               const url = `${window.location.origin}/preview?t=${now.getTime()}`;
               setLatestPreviewUrl(url);
-              // Fire and forget log update to avoid blocking UI completion
-              updateSyncLog(url, branch).catch(err => console.warn("Log update warning:", err));
+              await updateSyncLog(url, branch).catch(err => console.warn("Log update warning:", err));
 
           } catch (e) {
               if (retriesLeft > 0) {
                  // Retry on network errors too
+                 console.warn("Sync error, retrying...", e);
                  await new Promise(r => setTimeout(r, 1000));
                  return attemptSave(retriesLeft - 1);
               }
@@ -407,6 +415,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       let logs: SyncLogEntry[] = [];
       let sha = '';
 
+      // 1. Fetch existing log
       try {
         const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}?ref=${currentBranch}&t=${Date.now()}`, {
             headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' },
@@ -417,7 +426,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             sha = data.sha;
             logs = JSON.parse(atob(data.content.replace(/\s/g, '')));
         }
-      } catch (e) {}
+      } catch (e) {
+          // File might not exist yet, which is fine
+      }
 
       const newEntry = {
           id: self.crypto.randomUUID(),
@@ -426,6 +437,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           author: localStorage.getItem('github_owner') || 'Admin'
       };
       
+      // Limit logs to last 20 entries
       const newContent = btoa(JSON.stringify([newEntry, ...logs].slice(0, 20), null, 2));
       
       // Retry logic for log update as well
