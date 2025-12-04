@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Radio, RefreshCw, UserCircle, Check, AlertCircle, History, ExternalLink, Clock, Loader2, AlertTriangle, Settings as SettingsIcon } from 'lucide-react';
+import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Radio, RefreshCw, UserCircle, Check, AlertCircle, History, ExternalLink, Clock, Loader2, AlertTriangle, Settings as SettingsIcon, GitBranch } from 'lucide-react';
 import WorkTable from './WorkTable';
 import ExperienceTable from './ExperienceTable';
 import SkillsTable from './SkillsTable';
@@ -17,7 +17,7 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   const [activeTab, setActiveTab] = useState<'work' | 'experience' | 'skills' | 'clients' | 'settings' | 'history' | 'sync_logs'>('work');
-  const { resetData, refreshAllClients, lastUpdated, getSyncHistory, latestPreviewUrl, verifyConnection, isLoading, error, fetchFromGitHub } = useData();
+  const { resetData, refreshAllClients, lastUpdated, getSyncHistory, latestPreviewUrl, verifyConnection, isLoading, error, fetchFromGitHub, branch } = useData();
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   
@@ -157,6 +157,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
             ) : (
                 <span className="font-bold text-neutral-900 text-base md:text-lg truncate">New Genre CMS</span>
             )}
+            
+            <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-neutral-100 rounded text-xs text-neutral-500 border border-neutral-200" title="Connected Branch">
+                <GitBranch className="w-3 h-3" /> {branch}
+            </div>
           </div>
           
           <div className="flex items-center gap-3 md:gap-6">

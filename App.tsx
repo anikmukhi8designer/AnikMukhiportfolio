@@ -12,6 +12,7 @@ import CustomCursor from './components/CustomCursor';
 import ScrollToTop from './components/ScrollToTop';
 import LoadingScreen from './components/LoadingScreen';
 import InteractiveGradient from './components/InteractiveGradient';
+import RefreshHandler from './components/RefreshHandler';
 import { ArrowDown, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 
@@ -143,6 +144,9 @@ const AppContent: React.FC = () => {
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-50 font-sans selection:bg-neutral-900 dark:selection:bg-white selection:text-white dark:selection:text-black cursor-none relative transition-colors duration-500 gradient-bg">
       
+      {/* Real-time Update Notification */}
+      <RefreshHandler />
+
       {/* Preview Mode Banner */}
       {isPreviewMode && (
           <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-orange-500 text-white px-6 py-2 rounded-full shadow-xl flex items-center gap-2 text-sm font-bold uppercase tracking-wider animate-in fade-in slide-in-from-top-4">

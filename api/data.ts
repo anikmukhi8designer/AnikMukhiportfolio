@@ -1,6 +1,4 @@
-// Explicitly define types to avoid dependency on @vercel/node and @types/node
-// which might be missing in the build environment.
-
+// Explicitly define types for Vercel Serverless Functions
 interface VercelRequest {
   query: Partial<{ [key: string]: string | string[] }>;
   cookies: Partial<{ [key: string]: string }>;
@@ -17,7 +15,7 @@ interface VercelResponse {
   [key: string]: any;
 }
 
-// Declare Node.js globals that are missing from the "DOM" lib configuration
+// Declare Node.js globals
 declare const process: {
   env: { [key: string]: string | undefined };
 };
@@ -27,12 +25,12 @@ declare const Buffer: {
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // 1. CRITICAL: Set aggressive headers to prevent Vercel and Browser caching.
-  // This ensures Laptop B always gets the new data immediately.
+  // 1. CRITICAL: Kill all caching layers
+  // This tells Vercel Edge, the Browser, and any intermediate CDNs to NEVER store this response.
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
-  res.setHeader('Surrogate-Control', 'no-store');
+  res.setHeader('Surrogate-Control', 'no-store'); // Specific to Vercel
 
   // 2. Retrieve Environment Variables
   const token = process.env.VITE_GITHUB_TOKEN || process.env.GITHUB_TOKEN;
@@ -51,8 +49,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const targetPath = Array.isArray(path) ? path[0] : (path || 'src/data.json');
 
   try {
-    // 4. Fetch from GitHub API (Always fresh with timestamp)
-    const timestamp = Date.now();
+    // 4. Fetch from GitHub API with Cache Busting
+    // The 't' parameter forces GitHub's internal varnish cache to miss.
+    const timestamp = Date.now(); 
     const ghUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${targetPath}?t=${timestamp}`;
     
     // Use global fetch
@@ -60,13 +59,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Accept': 'application/vnd.github.v3+json',
-        'Cache-Control': 'no-cache'
+        'Cache-Control': 'no-cache' // Signal to node-fetch
       }
     });
 
     if (!ghRes.ok) {
+        // Fallback: If src/data.json doesn't exist, try data.json (root)
         if (ghRes.status === 404 && targetPath === 'src/data.json') {
-             return res.status(404).json({ error: 'File not found' });
+             // We return 404 so the client can try the fallback path logic
+             return res.status(404).json({ error: 'File not found', path: targetPath });
         }
         return res.status(ghRes.status).json({ error: 'GitHub Fetch Failed', status: ghRes.status });
     }
@@ -74,6 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const data: any = await ghRes.json();
     
     // 5. Decode Content and Inject SHA
+    // The SHA is critical for the frontend to know if data has changed (Versioning)
     if (data.content && data.encoding === 'base64') {
         const buffer = Buffer.from(data.content, 'base64');
         const jsonString = buffer.toString('utf-8');
@@ -81,9 +83,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         try {
             const json = JSON.parse(jsonString);
             
-            // INJECT SHA: This allows the frontend to track versions strictly
+            // Inject SHA for version tracking
             if (typeof json === 'object' && json !== null) {
                 json._sha = data.sha;
+                json._served_at = timestamp; // Debugging helper
             }
             
             return res.status(200).json(json);
