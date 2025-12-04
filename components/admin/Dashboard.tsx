@@ -50,19 +50,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
     setErrorMessage('');
     try {
         // Pass an explicit message for the commit
-        const url = await refreshAllClients("Manual Sync from Admin Dashboard");
+        await refreshAllClients("Manual Sync from Admin Dashboard");
         setSyncStatus('success');
         
-        if (url) {
-            // Delay redirect to show success state
-            setTimeout(() => {
-                window.location.href = url;
-            }, 1500);
-        } else {
-             setTimeout(() => {
-                setSyncStatus('idle');
-            }, 2000);
-        }
+        // Reset status to idle after a delay so user sees "Synced!" but no auto-redirect occurs
+        setTimeout(() => {
+            setSyncStatus('idle');
+        }, 3000);
+
     } catch (e: any) {
         console.error("Sync Error caught in Dashboard:", e);
         setSyncStatus('error');

@@ -79,8 +79,10 @@ const getEnv = (key: string) => {
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3, backoff = 500): Promise<Response> {
     try {
         const res = await fetch(url, options);
-        if (res.status === 401 || res.status === 403 || res.status === 409) return res;
-        if (res.status >= 500 && retries > 0) throw new Error(`Server Error: ${res.status}`);
+        // Retry on Server Errors (5xx) or Rate Limits (403/429) if possible, though 403 might be permanent config error
+        if (res.status === 429 || (res.status >= 500 && res.status < 600)) {
+            throw new Error(`Retryable Error: ${res.status}`);
+        }
         return res;
     } catch (err: any) {
         if (retries <= 0) throw err;
@@ -120,6 +122,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const saved = localStorage.getItem('cms_last_updated');
     return saved ? new Date(saved) : null;
   });
+  const lastUpdatedRef = useRef<Date | null>(null);
 
   const [activeDataPath, setActiveDataPath] = useState('src/data.json');
   const [fileSha, setFileSha] = useState<string | null>(null);
@@ -127,6 +130,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   
   const stateRef = useRef({ projects, experience, clients, skills, config, socials });
 
+  // Sync refs
   useEffect(() => {
       stateRef.current = { projects, experience, clients, skills, config, socials };
   }, [projects, experience, clients, skills, config, socials]);
@@ -134,6 +138,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     fileShaRef.current = fileSha;
   }, [fileSha]);
+
+  useEffect(() => {
+      lastUpdatedRef.current = lastUpdated;
+  }, [lastUpdated]);
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -186,7 +194,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!silent) setIsLoading(true);
     if (!silent) setError(null);
 
-    // Explicit cache buster for fetch
+    // Cache buster
     const cacheBuster = `?update=${timestamp}`;
     const refParam = branch ? `&ref=${branch}` : '';
     
@@ -215,12 +223,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 return true;
             }
         } catch (error) {
-             console.warn("Strategy 1 (GitHub API) failed, trying Proxy...", error);
+             // Fall through
         }
     }
     
     // --- Strategy 2: Vercel/Next.js API Proxy (Guest - Production) ---
-    // Best for Production deployments where .env vars are secure on server
+    // Primary strategy for guests. Using proxy avoids CORS and Rate Limits (if server has token).
+    // Prioritized over Public API to avoid rate limits.
     try {
         const proxyUrl = `/api/data?path=${path}&t=${timestamp}`;
         const response = await fetch(proxyUrl, { 
@@ -247,12 +256,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
         }
     } catch (e) {
-        console.warn("Strategy 2 (Proxy) failed, trying Public API...", e);
+        // Fall through
     }
 
     // --- Strategy 3: Public GitHub API (Guest - Local/Rate-Limited) ---
-    // Critical for "Real-time" feel in local dev or without proxy. 
-    // It returns fresh data unlike Raw, but is rate limited to 60/hr per IP.
+    // Fallback if Proxy is down (e.g. static export or local dev without server).
     if (owner && repo && !token) {
         try {
              // Try src/data.json
@@ -278,15 +286,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                  return true;
              }
         } catch(e) {
-            console.warn("Strategy 3 (Public API) failed.");
+            // Fall through
         }
      }
 
     // --- Strategy 4: Raw GitHub Content (Fallback - Heavily Cached) ---
-    // Best for High Traffic Guest usage if Proxy fails, but has 5-min cache delay.
+    // Last resort. 
     if (owner && repo) {
         try {
-            // Raw URL typically has 5min cache, so we add timestamp
+            // Raw URL typically has 5min cache. Adding timestamp helps sometimes but not always.
             const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}?t=${timestamp}`;
             const rawRes = await fetch(rawUrl, { cache: 'no-store' });
             
@@ -305,7 +313,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                  }
             }
         } catch (e) {
-             console.warn("Strategy 4 (Raw) failed.");
+             // Fall through
         }
     }
     
@@ -315,49 +323,62 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const handleDataSuccess = (data: any, path: string, shouldApplyData: boolean, silent: boolean) => {
       let applyNow = shouldApplyData;
-      
-      // Auto-update logic: If user is GUEST (no token), always apply new data to keep site fresh.
-      // If user is ADMIN (has token), show toast to prevent disrupting their edits.
       const isAdmin = !!localStorage.getItem('github_token');
+      
+      let incomingContent = data;
+      // Handle Base64 from API
+      if (data.content && data.encoding === 'base64') {
+          try {
+              const cleanContent = data.content.replace(/\s/g, '');
+              const decodedContent = decodeURIComponent(escape(atob(cleanContent)));
+              incomingContent = JSON.parse(decodedContent);
+          } catch(e) { 
+              console.error("Parse error", e); 
+              return;
+          }
+      }
 
+      // VERSION DETECTION LOGIC
+      let isNew = false;
+
+      // 1. Check SHA (API strategies)
       if (data.sha || data._sha) {
           const newSha = data.sha || data._sha;
           if (fileShaRef.current && fileShaRef.current !== newSha) {
-               // New version detected!
-               
-               if (!isAdmin) {
-                   // Guest: Auto-apply
-                   applyNow = true;
-               } else {
-                   // Admin: Show toast
-                   setHasNewVersion(true);
-                   if (!applyNow) return; 
-               }
+               isNew = true;
           }
-          
-          if (applyNow) {
-              setFileSha(newSha);
-              setHasNewVersion(false);
+          // Always update SHA if present
+          if (applyNow || isNew) {
+               setFileSha(newSha);
+          }
+      } 
+      // 2. Check Timestamp (Raw strategy - no SHA available usually)
+      else if (incomingContent.lastUpdated && lastUpdatedRef.current) {
+          const newDate = new Date(incomingContent.lastUpdated);
+          const oldDate = new Date(lastUpdatedRef.current);
+          if (newDate.getTime() > oldDate.getTime()) {
+              isNew = true;
           }
       }
 
-      if (path !== activeDataPath) setActiveDataPath(path);
+      // DECISION: Apply or Notify
+      if (isNew) {
+          if (!isAdmin) {
+               // Guest: Auto-apply always
+               applyNow = true;
+          } else {
+               // Admin: Notify, don't auto-apply to prevent conflict
+               setHasNewVersion(true);
+               if (!applyNow) return; 
+          }
+      }
 
       if (applyNow) {
-          try {
-              // Handle both raw JSON (Proxy/Raw) and Base64 encoded (GitHub API)
-              let content = data;
-              if (data.content && data.encoding === 'base64') {
-                  const cleanContent = data.content.replace(/\s/g, '');
-                  const decodedContent = decodeURIComponent(escape(atob(cleanContent)));
-                  content = JSON.parse(decodedContent);
-              }
-
-              applyData(content);
-          } catch (e) {
-              if (!silent) setError("Data Parse Error");
-          }
+          setHasNewVersion(false);
+          if (path !== activeDataPath) setActiveDataPath(path);
+          applyData(incomingContent);
       }
+      
       if (!silent) setIsLoading(false);
   };
 
