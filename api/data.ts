@@ -27,13 +27,14 @@ declare const Buffer: {
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // 1. Set aggressive headers to prevent Vercel and Browser caching
+  // 1. CRITICAL: Set aggressive headers to prevent Vercel and Browser caching.
+  // This ensures Laptop B always gets the new data immediately.
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
   res.setHeader('Surrogate-Control', 'no-store');
 
-  // 2. Retrieve Environment Variables (Support both VITE_ prefixed and standard names)
+  // 2. Retrieve Environment Variables
   const token = process.env.VITE_GITHUB_TOKEN || process.env.GITHUB_TOKEN;
   const owner = process.env.VITE_GITHUB_OWNER || process.env.GITHUB_OWNER;
   const repo = process.env.VITE_GITHUB_REPO || process.env.GITHUB_REPO;
@@ -45,16 +46,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  // 3. Determine the file path (default to src/data.json)
+  // 3. Determine the file path
   const { path } = req.query;
   const targetPath = Array.isArray(path) ? path[0] : (path || 'src/data.json');
 
   try {
-    // 4. Fetch from GitHub API (Always fresh)
+    // 4. Fetch from GitHub API (Always fresh with timestamp)
     const timestamp = Date.now();
     const ghUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${targetPath}?t=${timestamp}`;
     
-    // Use global fetch (available in Node 18+)
+    // Use global fetch
     const ghRes = await fetch(ghUrl, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -64,10 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     if (!ghRes.ok) {
-        // If file not found, try generic data.json if requested src/data.json failed
         if (ghRes.status === 404 && targetPath === 'src/data.json') {
-             // Let the client handle the fallback logic or retry here. 
-             // Returning 404 allows client to try the next path.
              return res.status(404).json({ error: 'File not found' });
         }
         return res.status(ghRes.status).json({ error: 'GitHub Fetch Failed', status: ghRes.status });
@@ -75,7 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const data: any = await ghRes.json();
     
-    // 5. Decode Content (GitHub returns Base64)
+    // 5. Decode Content and Inject SHA
     if (data.content && data.encoding === 'base64') {
         const buffer = Buffer.from(data.content, 'base64');
         const jsonString = buffer.toString('utf-8');
@@ -83,7 +81,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         try {
             const json = JSON.parse(jsonString);
             
-            // INJECT SHA: This allows the frontend to track versions even via Proxy
+            // INJECT SHA: This allows the frontend to track versions strictly
             if (typeof json === 'object' && json !== null) {
                 json._sha = data.sha;
             }
@@ -94,7 +92,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
     }
     
-    // Fallback if content isn't base64 (unlikely for file contents API)
     return res.status(200).json(data);
 
   } catch (error: any) {

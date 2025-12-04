@@ -82,7 +82,7 @@ const getEnv = (key: string) => {
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3, backoff = 500): Promise<Response> {
     try {
         const res = await fetch(url, options);
-        // Fail fast on Auth errors (401, 403) or Conflict (409) - Do not retry
+        // Fail fast on Auth errors (401, 403) or Conflict (409)
         if (res.status === 401 || res.status === 403 || res.status === 409) return res;
         
         // If 5xx Server Error, retry
@@ -92,10 +92,8 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, ba
         return res;
     } catch (err: any) {
         if (retries <= 0) throw err;
-        // Don't retry if it's likely a CORS/Network config issue that won't resolve itself
         if (err.message === 'Failed to fetch' && retries < 2) throw err;
         
-        console.log(`Retrying... (${retries} attempts left)`);
         await new Promise(r => setTimeout(r, backoff));
         return fetchWithRetry(url, options, retries - 1, backoff * 2);
     }
@@ -106,8 +104,8 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, ba
 function deduplicateAndClean<T extends { id: string }>(items: T[]): T[] {
     const seen = new Set();
     return items.filter(item => {
-        if (!item.id) return false; // Remove invalid items without ID
-        if (seen.has(item.id)) return false; // Remove duplicates
+        if (!item.id) return false;
+        if (seen.has(item.id)) return false; // Duplicate detected
         seen.add(item.id);
         return true;
     });
@@ -132,7 +130,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return saved ? new Date(saved) : null;
   });
 
-  // Track the valid path for data.json
   const [activeDataPath, setActiveDataPath] = useState('src/data.json');
   const [fileSha, setFileSha] = useState<string | null>(null);
   const fileShaRef = useRef<string | null>(null);
@@ -150,17 +147,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     fileShaRef.current = fileSha;
   }, [fileSha]);
 
-  // Ref to hold the timeout ID for debouncing
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Helper to get token from Env OR LocalStorage - SANITIZED
   const getGitHubToken = () => {
       const env = getEnv('VITE_GITHUB_TOKEN');
       if (env) return env.trim();
       return (localStorage.getItem('github_token') || '').trim();
   };
 
-  // Helper to get Repo Config from Env OR LocalStorage - SANITIZED
   const getGitHubConfig = () => {
       const owner = getEnv('VITE_GITHUB_OWNER') || localStorage.getItem('github_owner') || "";
       const repo = getEnv('VITE_GITHUB_REPO') || localStorage.getItem('github_repo') || "";
@@ -186,12 +180,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }, 1);
           
           if (res.ok) return { success: true, message: "Connection Successful" };
-          if (res.status === 404) return { success: false, message: `Repository "${owner}/${repo}" not found. Check Settings.` };
-          if (res.status === 401) return { success: false, message: "Invalid Token or Token expired." };
+          if (res.status === 404) return { success: false, message: `Repository "${owner}/${repo}" not found.` };
+          if (res.status === 401) return { success: false, message: "Invalid Token." };
           
           return { success: false, message: `GitHub API Error: ${res.status}` };
       } catch (e: any) {
-          return { success: false, message: e.message || "Network Error: Could not reach GitHub." };
+          return { success: false, message: e.message || "Network Error" };
       }
   };
   
@@ -204,11 +198,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!silent) setIsLoading(true);
     if (!silent) setError(null);
 
-    // Explicit update check from URL
     const urlParams = new URLSearchParams(window.location.search);
     const fetchTimestamp = urlParams.get('update') || timestamp;
 
-    // --- Strategy 1: Direct GitHub API (Admin Mode / Token Present) ---
+    // --- Strategy 1: Direct GitHub API (Admin) ---
     if (owner && repo && token) {
         try {
             const headers: HeadersInit = {
@@ -219,7 +212,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             let apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?t=${fetchTimestamp}`;
             let response = await fetchWithRetry(apiUrl, { headers });
 
-            // Fallback for path
             if (response.status === 404 && path === 'src/data.json') {
                 path = 'data.json';
                 apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?t=${fetchTimestamp}`;
@@ -229,7 +221,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (response.ok) {
                 const data: any = await response.json();
                 
-                // Smart Sync: Only update if SHA is different (Content Changed)
+                // Smart Sync: Only update if SHA is different
                 if (shouldApplyData && data.sha === fileShaRef.current) {
                     if (!silent) setIsLoading(false);
                     return true;
@@ -245,7 +237,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         const content = JSON.parse(decodedContent);
                         applyData(content);
                     } catch (parseError) {
-                        if (!silent) setError("Failed to parse data from GitHub. File might be corrupted.");
+                        if (!silent) setError("Failed to parse data.");
                         if (!silent) setIsLoading(false);
                         return false;
                     }
@@ -254,27 +246,20 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 return true;
             } else {
                  if (response.status === 404) {
-                     // 404 means no data file yet, stick with Initial Data but valid connection
                      setFileSha(null); 
                      if (!silent) setIsLoading(false);
                      return true; 
-                 } else if (response.status === 401) {
-                     if (!silent) setError("GitHub Token invalid or expired. Check Settings.");
                  }
                  if (!silent) setIsLoading(false);
                  return false;
             }
         } catch (error: any) {
-            if (!silent) {
-                console.warn("Direct fetch failed", error);
-                setIsLoading(false);
-            }
+            if (!silent) setIsLoading(false);
             return false;
         }
     }
     
-    // --- Strategy 2: Proxy API (Public/Preview Mode) ---
-    // If no token, or token strategy failed/not applicable, try public proxy
+    // --- Strategy 2: Proxy API (Public) ---
     try {
         const proxyUrl = `/api/data?path=${path}&t=${fetchTimestamp}`;
         const response = await fetch(proxyUrl, { 
@@ -285,17 +270,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (response.ok) {
             const content = await response.json();
             
-            // Handle Proxy Error Wrapper
             if (content.error) {
                  if (content.status === 404 && path === 'src/data.json') {
-                     // Retry with root path via proxy
+                     // Retry with root path
                      const rootPathProxy = `/api/data?path=data.json&t=${fetchTimestamp}`;
                      const rootRes = await fetch(rootPathProxy, { cache: 'no-store' });
                      if (rootRes.ok) {
                          const rootContent = await rootRes.json();
                          if (!rootContent.error && shouldApplyData) {
                              setActiveDataPath('data.json');
-                             // Read injected SHA from proxy
                              if (rootContent._sha) setFileSha(rootContent._sha);
                              applyData(rootContent);
                              if (!silent) setIsLoading(false);
@@ -303,10 +286,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                          }
                      }
                  }
-                 console.warn("Proxy returned error:", content.error);
             } else if (shouldApplyData) {
                 // SUCCESS: Apply Data from Proxy
-                // Read injected SHA from proxy (if added by api/data.ts)
                 if (content._sha) {
                     if (content._sha === fileShaRef.current) {
                         if (!silent) setIsLoading(false);
@@ -314,7 +295,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     }
                     setFileSha(content._sha);
                 }
-                
                 applyData(content);
                 if (!silent) setIsLoading(false);
                 return true;
@@ -324,13 +304,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.warn("Proxy fetch failed.", e);
     }
     
-    // If both fail, we rely on INITIAL_DATA which is already loaded
     if (!silent) setIsLoading(false);
     return false;
   }, [activeDataPath]);
 
   const applyData = (content: any) => {
-      // Apply Deduplication on load to clean up any existing mess from previous versions
+      // DEDUPLICATION: Run cleaning here to ensure state never has duplicates
       if (content.projects && Array.isArray(content.projects)) setProjects(deduplicateAndClean(content.projects));
       if (content.experience && Array.isArray(content.experience)) setExperience(deduplicateAndClean(content.experience));
       if (content.clients && Array.isArray(content.clients)) setClients(deduplicateAndClean(content.clients));
@@ -353,7 +332,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (!owner || !repo || !token) return;
 
       try {
-          // Use simple PUT for log as it's small
           let existingLogs: SyncLogEntry[] = [];
           let logSha = '';
 
@@ -395,13 +373,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               },
               body: JSON.stringify(body)
           }, 1);
-      } catch (e) {
-          console.warn("Log update failed", e);
-      }
+      } catch (e) { console.warn("Log update failed", e); }
   };
 
-  // --- CORE SYNC ENGINE ---
-  // Uses Git Database API (Blob -> Tree -> Commit) to bypass 1MB file limit and ensure atomic updates
+  // --- CORE SYNC ENGINE: Git Database API ---
   const saveToGitHub = async (isManualSync = false) => {
     if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
@@ -411,7 +386,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     let { owner, repo } = getGitHubConfig();
     const token = getGitHubToken();
 
-    if (!owner || !repo || !token) throw new Error("Missing credentials. Check Settings.");
+    if (!owner || !repo || !token) throw new Error("Missing credentials.");
 
     setIsSaving(true);
     const now = new Date();
@@ -419,11 +394,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // 1. Prepare & Clean Data (Deduplicate & Validate)
     const currentState = stateRef.current;
     
-    // Check for critical data consistency
-    if (!currentState.projects || !Array.isArray(currentState.projects)) {
-        throw new Error("Data Error: Projects list is corrupted. Aborting save.");
-    }
-
     const content = {
       projects: deduplicateAndClean(currentState.projects),
       experience: deduplicateAndClean(currentState.experience),
@@ -457,7 +427,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
              headers: { 'Authorization': `Bearer ${token}` }
         });
         
-        // Handle Empty Repo case
         let parentSha = '';
         let baseTreeSha = '';
 
@@ -468,7 +437,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         // 4. Create New Tree
-        // If repo is empty, we don't send base_tree
         const treePayload: any = {
             tree: [{
                 path: finalPath,
@@ -512,7 +480,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }, 1);
 
         if (!refRes.ok) {
-            // If main branch doesn't exist, try creating it (first push)
+            // Handle first push scenario
             if (refRes.status === 404 || refRes.status === 422) {
                  await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/git/refs`, {
                     method: 'POST',
@@ -524,11 +492,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
         }
 
-        // Success Handling
+        // Success
         setLastUpdated(now);
         localStorage.setItem('cms_last_updated', now.toISOString());
-        
-        // Trigger background fetch to realign local SHA
         fetchFromGitHub(false, true);
 
         let redirectUrl: string | null = null;
@@ -542,9 +508,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return redirectUrl;
 
     } catch (error: any) {
-      console.error("Error saving to GitHub:", error);
+      console.error("Error saving:", error);
       if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
-          throw new Error("Network Error: Could not connect to GitHub. Check internet connection.");
+          throw new Error("Network Error: Could not connect to GitHub.");
       }
       throw error;
     } finally {
@@ -552,7 +518,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // ... (Other methods remain the same) ...
   const getSyncHistory = async (): Promise<SyncLogEntry[]> => {
       const { owner, repo } = getGitHubConfig();
       const token = getGitHubToken();
@@ -569,7 +534,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               if (logs.length > 0) setLatestPreviewUrl(logs[0].previewUrl);
               return logs;
           }
-      } catch (e) { console.warn("No sync history found"); }
+      } catch (e) { }
       return [];
   };
 
@@ -595,7 +560,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                   author: item.commit.author.name
               }));
           }
-      } catch (e) { console.error("Error fetching history", e); }
+      } catch (e) { }
       return [];
   };
 
@@ -616,16 +581,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               const content = JSON.parse(decodedContent);
               applyData(content);
               saveToGitHub(false); 
-              alert("Version restored successfully. A new commit has been created.");
+              alert("Version restored successfully. New commit created.");
           } catch (e) {
-              throw new Error("Failed to parse historical data");
+              throw new Error("Failed to parse data");
           }
       } else {
           throw new Error("Failed to fetch version");
       }
   };
 
-  // --- Initialization & Polling ---
   useEffect(() => {
     fetchFromGitHub(true, false);
     getSyncHistory(); 
@@ -647,8 +611,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         window.removeEventListener('focus', onFocus);
     };
   }, [fetchFromGitHub]);
-
-  // --- Actions ---
 
   const triggerSave = () => {
       if (saveTimeoutRef.current) {
