@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { Github, ArrowUpRight } from 'lucide-react';
 import { Project } from '../types';
 
 interface ProjectCardProps {
@@ -21,16 +22,16 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-50px" }}
     >
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-baseline">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center md:items-baseline">
         {/* Title */}
-        <div className="md:col-span-5 relative">
+        <div className="md:col-span-4 relative">
            <h3 className="text-3xl md:text-5xl font-medium tracking-tight text-neutral-900 dark:text-white transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.01] origin-left">
              {project.title}
            </h3>
         </div>
 
         {/* Client */}
-        <div className="md:col-span-3">
+        <div className="md:col-span-2">
            <span className="text-lg text-neutral-600 dark:text-neutral-400 transition-colors duration-300 group-hover:text-neutral-900 dark:group-hover:text-white font-medium">{project.client}</span>
         </div>
 
@@ -41,6 +42,37 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
                 {tag}
              </span>
            ))}
+        </div>
+
+        {/* Actions / Links */}
+        <div className="md:col-span-2 flex items-center md:justify-start gap-2 mt-4 md:mt-0">
+            {project.link && (
+                <a 
+                    href={project.link} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors py-2 px-3 rounded-full border border-transparent hover:border-neutral-200 dark:hover:border-white/20 hover:bg-white/50 dark:hover:bg-white/10"
+                    title="Visit Live Site"
+                >
+                    <ArrowUpRight className="w-4 h-4" />
+                    <span className="hidden lg:inline">Live</span>
+                </a>
+            )}
+            
+            {project.githubRepoUrl && (
+                <a 
+                    href={project.githubRepoUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors py-2 px-3 rounded-full border border-transparent hover:border-neutral-200 dark:hover:border-white/20 hover:bg-white/50 dark:hover:bg-white/10"
+                    title="View Source on GitHub"
+                >
+                    <Github className="w-4 h-4" />
+                    <span className="hidden lg:inline">GitHub</span>
+                </a>
+            )}
         </div>
 
         {/* Year */}

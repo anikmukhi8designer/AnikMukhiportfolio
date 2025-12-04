@@ -271,6 +271,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               setLatestPreviewUrl(url);
               await updateSyncLog(url, branch).catch(err => console.warn("Log update warning:", err));
 
+              // 5. Pull (Fetch) Latest Data
+              // Ensure our local state is strictly consistent with the server
+              await fetchData(true);
+
           } catch (e) {
               if (retriesLeft > 0) {
                  // Retry on network errors too

@@ -3,7 +3,7 @@ import { Project, ContentBlock, BlockType } from '../../types';
 import { 
   ArrowLeft, Save, Trash2, GripVertical, Image as ImageIcon, 
   Type, Heading1, Heading2, Code, Quote, ArrowUp, ArrowDown, Minus,
-  Link as LinkIcon, Calendar, Tag, Copy, X, Upload, Loader2, Settings
+  Link as LinkIcon, Calendar, Tag, Copy, X, Upload, Loader2, Settings, Github
 } from 'lucide-react';
 
 interface BlockEditorProps {
@@ -399,6 +399,19 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
                     onChange={(e) => handleMetaChange('link', e.target.value)}
                     className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
                     placeholder="https://..."
+                />
+            </div>
+
+            <div>
+                <label className="block text-xs font-bold text-neutral-900 mb-2 flex items-center gap-1">
+                    <Github className="w-3 h-3"/> GitHub Repo URL
+                </label>
+                <input 
+                    type="text" 
+                    value={formData.githubRepoUrl || ''}
+                    onChange={(e) => handleMetaChange('githubRepoUrl', e.target.value)}
+                    className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+                    placeholder="https://github.com/..."
                 />
             </div>
 

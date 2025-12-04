@@ -19,6 +19,7 @@ export interface Project {
   thumb: string;
   tags: string[];
   link?: string;
+  githubRepoUrl?: string;
   published: boolean;
   images?: string[];
   content?: ContentBlock[];

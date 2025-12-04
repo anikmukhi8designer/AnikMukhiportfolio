@@ -47,9 +47,10 @@ const WorkSection: React.FC<WorkSectionProps> = ({ onProjectClick }) => {
 
         {/* Table Header (Desktop Only) */}
         <div className="hidden md:grid grid-cols-12 gap-6 pb-6 px-6 md:px-10 border-b border-neutral-200 text-xs font-bold uppercase tracking-widest text-neutral-400 mb-4">
-           <div className="col-span-5">Project</div>
-           <div className="col-span-3">Client</div>
+           <div className="col-span-4">Project</div>
+           <div className="col-span-2">Client</div>
            <div className="col-span-3">Services</div>
+           <div className="col-span-2">Links</div>
            <div className="col-span-1 text-right">Year</div>
         </div>
 
