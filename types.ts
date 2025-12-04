@@ -70,6 +70,8 @@ export interface GlobalConfig {
 export interface SyncLogEntry {
   id: string;
   timestamp: string;
-  previewUrl: string;
+  action: 'Push' | 'Pull' | 'Sync';
+  status: 'Success' | 'Failed';
+  message: string;
   author: string;
 }
