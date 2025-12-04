@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Save, Plus, Trash2, Loader2, Check, Github, Key, Database, Lock, AlertTriangle, Wifi } from 'lucide-react';
+import { Save, Plus, Trash2, Loader2, Check, Github, Key, Database, Lock, AlertTriangle, Wifi, ExternalLink } from 'lucide-react';
 
 const ProfileSettings: React.FC = () => {
   const { config, socials, updateConfig, updateSocials, isSaving, verifyConnection } = useData();
@@ -13,7 +13,8 @@ const ProfileSettings: React.FC = () => {
   const [ghConfig, setGhConfig] = useState({
       owner: '',
       repo: '',
-      token: ''
+      token: '',
+      deployHook: ''
   });
 
   const [hasChanges, setHasChanges] = useState(false);
@@ -30,7 +31,8 @@ const ProfileSettings: React.FC = () => {
     setGhConfig({
         owner: localStorage.getItem('github_owner') || '',
         repo: localStorage.getItem('github_repo') || '',
-        token: localStorage.getItem('github_token') || '' 
+        token: localStorage.getItem('github_token') || '',
+        deployHook: localStorage.getItem('vercel_deploy_hook') || ''
     });
   }, [config, socials]);
 
@@ -80,6 +82,11 @@ const ProfileSettings: React.FC = () => {
       if (ghConfig.token) {
           localStorage.setItem('github_token', ghConfig.token);
       }
+      if (ghConfig.deployHook) {
+          localStorage.setItem('vercel_deploy_hook', ghConfig.deployHook);
+      } else {
+          localStorage.removeItem('vercel_deploy_hook');
+      }
       
       setHasChanges(false);
       setJustSaved(true);
@@ -93,12 +100,6 @@ const ProfileSettings: React.FC = () => {
       setConnectionMsg('');
       
       // Temporarily save to localStorage for the verify function to pick it up immediately
-      // This allows testing before hitting "Save Changes" if desired, or at least testing current input
-      const originalOwner = localStorage.getItem('github_owner');
-      const originalRepo = localStorage.getItem('github_repo');
-      const originalToken = localStorage.getItem('github_token');
-
-      // Use current input values for testing
       localStorage.setItem('github_owner', ghConfig.owner);
       localStorage.setItem('github_repo', ghConfig.repo);
       if (ghConfig.token) localStorage.setItem('github_token', ghConfig.token);
@@ -114,10 +115,6 @@ const ProfileSettings: React.FC = () => {
             setConnectionMsg(result.message);
         }
       } finally {
-         // If we haven't saved yet, revert localStorage to prevent side effects? 
-         // Actually, let's keep it simple: Testing implies you probably want these settings.
-         // But to be safe for "Cancel" behavior (which we don't strictly have), we might leave it.
-         // For now, let's assume the user intends to save if they test.
       }
   };
 
@@ -221,6 +218,27 @@ const ProfileSettings: React.FC = () => {
                 </div>
                 <p className="text-[10px] text-neutral-400">
                     Token must have <strong>repo</strong> scope. Changes are saved to local storage.
+                </p>
+            </div>
+            
+             <div className="space-y-2 md:col-span-2 pt-4 border-t border-neutral-100">
+                <div className="flex justify-between items-center mb-2">
+                    <label className="text-xs font-bold uppercase tracking-wider flex items-center gap-2 text-neutral-500">
+                        <Wifi className="w-3 h-3" /> Vercel Deploy Hook (Optional)
+                    </label>
+                    <a href="https://vercel.com/docs/deployments/deploy-hooks" target="_blank" rel="noreferrer" className="text-[10px] text-blue-600 flex items-center gap-1 hover:underline">
+                        Get Hook URL <ExternalLink className="w-3 h-3"/>
+                    </a>
+                </div>
+                <input 
+                    type="password"
+                    value={ghConfig.deployHook}
+                    onChange={(e) => handleGhChange('deployHook', e.target.value)}
+                    className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-neutral-900 focus:bg-white focus:outline-none transition-all placeholder:text-neutral-400"
+                    placeholder="https://api.vercel.com/v1/integrations/deploy/..."
+                />
+                <p className="text-[10px] text-neutral-400">
+                    If provided, the "Sync Data" button will trigger this URL to ensure a fresh deployment.
                 </p>
             </div>
         </div>

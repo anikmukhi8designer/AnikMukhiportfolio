@@ -36,7 +36,7 @@ interface DataContextType {
   
   // Actions
   reloadContent: () => void;
-  syncData: (commitMessage?: string) => Promise<void>; // Renamed from refreshAllClients for clarity
+  syncData: (commitMessage?: string) => Promise<void>; 
   resetData: () => Promise<void>;
   
   // CRUD
@@ -190,14 +190,19 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       };
 
       try {
-          // 1. Get current SHA to allow update
-          const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/src/data.json?ref=${branch}`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const currentFile = await getRes.json();
-          const currentSha = currentFile.sha;
+          // 1. Get current SHA (if file exists)
+          let currentSha: string | undefined = undefined;
+          try {
+              const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/src/data.json?ref=${branch}`, {
+                  headers: { 'Authorization': `Bearer ${token}` }
+              });
+              if (getRes.ok) {
+                  const currentFile = await getRes.json();
+                  currentSha = currentFile.sha;
+              }
+          } catch(e) { /* ignore 404 */ }
 
-          // 2. PUT new content
+          // 2. PUT new content to GitHub (Trigger Deployment via Commit)
           const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
           
           const putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/src/data.json`, {
@@ -214,19 +219,33 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               })
           });
 
-          if (!putRes.ok) throw new Error("Failed to sync to GitHub");
+          if (!putRes.ok) {
+              const errData = await putRes.json();
+              throw new Error(errData.message || "Failed to sync to GitHub");
+          }
 
           const result = await putRes.json();
           setFileSha(result.content.sha);
           setLastUpdated(now);
           setHasNewVersion(false);
           
-          // Generate Preview URL
+          // 3. Trigger Vercel Deploy Hook (if configured)
+          const deployHook = localStorage.getItem('vercel_deploy_hook');
+          if (deployHook) {
+              try {
+                  await fetch(deployHook, { method: 'POST' });
+                  console.log("Vercel Deploy Hook triggered");
+              } catch (e) {
+                  console.warn("Failed to trigger deploy hook", e);
+              }
+          }
+          
+          // 4. Update Sync Log
           const url = `${window.location.origin}/preview?t=${now.getTime()}`;
           setLatestPreviewUrl(url);
           
-          // Update Log (Best effort)
-          updateSyncLog(url, branch).catch(console.warn);
+          // Ensure log is updated
+          await updateSyncLog(url, branch);
 
       } catch (e: any) {
           console.error(e);
@@ -392,8 +411,21 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const getSyncHistory = async () => {
-     // Implementation can fetch from public/admin/sync-log.json via proxy or api
-     return [];
+      const { token, owner, repo } = getAuth();
+      if (!token) return [];
+      
+      const logPath = 'public/admin/sync-log.json';
+      try {
+        const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}?ref=${branch}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (getRes.ok) {
+            const data = await getRes.json();
+            const logs = JSON.parse(atob(data.content.replace(/\s/g, '')));
+            return logs;
+        }
+      } catch (e) {}
+      return [];
   };
 
   return (
