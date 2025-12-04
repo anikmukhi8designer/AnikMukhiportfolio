@@ -49,7 +49,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
     setSyncStatus('syncing');
     setErrorMessage('');
     try {
-        const url = await refreshAllClients();
+        // Pass an explicit message for the commit
+        const url = await refreshAllClients("Manual Sync from Admin Dashboard");
         setSyncStatus('success');
         
         if (url) {

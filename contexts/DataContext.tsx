@@ -28,7 +28,7 @@ interface DataContextType {
   isLoading: boolean;
   error: string | null;
   branch: string;
-  hasNewVersion: boolean; // Notifies UI to show "New Update Available"
+  hasNewVersion: boolean;
   reloadContent: () => void;
   
   updateProject: (id: string, data: Partial<Project>) => void;
@@ -52,7 +52,7 @@ interface DataContextType {
   updateSocials: (data: SocialLink[]) => void;
 
   resetData: () => void;
-  refreshAllClients: () => Promise<string | null>;
+  refreshAllClients: (commitMessage?: string) => Promise<string | null>;
   verifyConnection: () => Promise<{ success: boolean; message: string }>;
   fetchFromGitHub: (shouldApplyData?: boolean, silent?: boolean) => Promise<boolean>;
   
@@ -167,6 +167,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               const repoData = await res.json();
               if (repoData.default_branch && repoData.default_branch !== branch) {
                   setBranch(repoData.default_branch);
+                  console.log(`Detected default branch: ${repoData.default_branch}`);
               }
               return { success: true, message: "Connection Successful" };
           }
@@ -186,10 +187,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!silent) setIsLoading(true);
     if (!silent) setError(null);
 
-    // Explicit cache buster for fetch
-    const cacheBuster = `?update=${timestamp}`;
-
-    // --- Strategy 1: Admin Direct Access (Priority) ---
     if (owner && repo && token) {
         try {
             const headers: HeadersInit = {
@@ -198,7 +195,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             };
             const refParam = branch ? `&ref=${branch}` : '';
             
-            // Try src/data.json first
             let apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?t=${timestamp}${refParam}`;
             let response = await fetchWithRetry(apiUrl, { headers });
 
@@ -218,9 +214,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     }
     
-    // --- Strategy 2: Public Proxy (Guest) ---
     try {
-        // We append timestamp to PROXY URL to bypass Vercel Edge Cache
         const proxyUrl = `/api/data?path=${path}&t=${timestamp}`;
         const response = await fetch(proxyUrl, { 
             cache: 'no-store',
@@ -231,7 +225,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const content = await response.json();
             
             if (content.error && content.status === 404 && path === 'src/data.json') {
-                // Retry root path
                 const rootRes = await fetch(`/api/data?path=data.json&t=${timestamp}`, { cache: 'no-store' });
                 if (rootRes.ok) {
                     const rootContent = await rootRes.json();
@@ -254,13 +247,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [activeDataPath, branch]);
 
   const handleDataSuccess = (data: any, path: string, shouldApplyData: boolean, silent: boolean) => {
-      // Logic to detect new version without auto-applying (if preferred)
       if (data.sha || data._sha) {
           const newSha = data.sha || data._sha;
           if (fileShaRef.current && fileShaRef.current !== newSha) {
-               // New version detected!
                setHasNewVersion(true);
-               if (!shouldApplyData) return; // Wait for user to reload
+               if (!shouldApplyData) return;
           }
           if (shouldApplyData) {
               setFileSha(newSha);
@@ -272,7 +263,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (shouldApplyData) {
           try {
-              // Handle both raw JSON (Proxy) and Base64 encoded (GitHub API)
               let content = data;
               if (data.content && data.encoding === 'base64') {
                   const cleanContent = data.content.replace(/\s/g, '');
@@ -301,9 +291,67 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
   };
 
-  const saveToGitHub = async (isManualSync = false) => {
+  const updateSyncLog = async (previewUrl: string) => {
+      const { owner, repo } = getGitHubConfig();
+      const token = getGitHubToken();
+      const logPath = 'public/admin/sync-log.json';
+      
+      if (!owner || !repo || !token) return;
+
+      try {
+          let existingLogs: SyncLogEntry[] = [];
+          let logSha = '';
+
+          const getRes = await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}?ref=${branch}`, {
+              headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
+          }, 1);
+
+          if (getRes.ok) {
+              const data = await getRes.json();
+              logSha = data.sha;
+              try {
+                  const content = decodeURIComponent(escape(atob(data.content.replace(/\s/g, ''))));
+                  existingLogs = JSON.parse(content);
+              } catch (e) {}
+          }
+
+          const newEntry: SyncLogEntry = {
+              id: self.crypto.randomUUID(),
+              timestamp: new Date().toISOString(),
+              previewUrl,
+              author: localStorage.getItem('github_owner') || 'Admin'
+          };
+          
+          const updatedLogs = [newEntry, ...existingLogs].slice(0, 50); 
+          const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(updatedLogs, null, 2))));
+
+          const body: any = {
+              message: `Sync Log Update: ${newEntry.timestamp}`,
+              content: contentBase64,
+              branch: branch 
+          };
+          if (logSha) body.sha = logSha;
+
+          await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}`, {
+              method: 'PUT',
+              headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(body)
+          }, 1);
+      } catch (e) { console.warn("Log update failed", e); }
+  };
+
+  const saveToGitHub = async (isManualSync = false, customMessage?: string) => {
+    if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+    }
+
     let { owner, repo } = getGitHubConfig();
     const token = getGitHubToken();
+
     if (!owner || !repo || !token) throw new Error("Missing credentials.");
 
     setIsSaving(true);
@@ -323,7 +371,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const contentString = JSON.stringify(content, null, 2);
 
     try {
-        // Blob
+        // 1. Create Blob
         const blobRes = await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/git/blobs`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -331,36 +379,45 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         });
         const blobData = await blobRes.json();
 
-        // Latest Commit
+        // 2. Get Latest Commit
         const commitsRes = await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/commits/${branch}`, {
              headers: { 'Authorization': `Bearer ${token}` }
         });
-        const commitData = await commitsRes.json();
         
-        // Tree
+        let parentSha = '';
+        let baseTreeSha = '';
+
+        if (commitsRes.ok) {
+            const commitData = await commitsRes.json();
+            parentSha = commitData.sha;
+            baseTreeSha = commitData.commit.tree.sha;
+        }
+
+        // 3. Create Tree
         const treeRes = await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/git/trees`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                base_tree: commitData.commit.tree.sha,
+                base_tree: baseTreeSha,
                 tree: [{ path: activeDataPath, mode: '100644', type: 'blob', sha: blobData.sha }]
             })
         });
         const treeData = await treeRes.json();
         
-        // Commit
+        // 4. Create Commit
+        const message = customMessage || `CMS Update: ${now.toLocaleString()}`;
         const commitRes = await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/git/commits`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                message: `CMS Update: ${now.toLocaleString()}`,
+                message: message,
                 tree: treeData.sha,
-                parents: [commitData.sha]
+                parents: parentSha ? [parentSha] : []
             })
         });
         const newCommitData = await commitRes.json();
 
-        // Ref Update
+        // 5. Update Reference (Push)
         await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${branch}`, {
             method: 'PATCH',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -368,11 +425,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         });
 
         setLastUpdated(now);
-        fetchFromGitHub(false, true); // Trigger local update check
+        fetchFromGitHub(false, true); 
         
         if (isManualSync) {
              const url = `${window.location.origin}/preview?update=${now.getTime()}`;
              setLatestPreviewUrl(url);
+             await updateSyncLog(url);
              return url;
         }
         return null;
@@ -385,84 +443,184 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // State Management Actions
   const updateProject = (id: string, data: Partial<Project>) => {
     setProjects(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
+    triggerSave();
   };
 
   const addProject = (project: Project) => {
     setProjects(prev => [project, ...prev]);
+    triggerSave();
   };
 
   const deleteProject = (id: string) => {
     setProjects(prev => prev.filter(p => p.id !== id));
+    triggerSave();
   };
 
   const updateExperience = (id: string, data: Partial<Experience>) => {
     setExperience(prev => prev.map(e => e.id === id ? { ...e, ...data } : e));
+    triggerSave();
   };
 
   const addExperience = (exp: Experience) => {
     setExperience(prev => [exp, ...prev]);
+    triggerSave();
   };
 
   const deleteExperience = (id: string) => {
     setExperience(prev => prev.filter(e => e.id !== id));
+    triggerSave();
   };
 
   const reorderExperience = (items: Experience[]) => {
     setExperience(items);
+    triggerSave();
   };
 
   const updateClient = (id: string, data: Partial<Client>) => {
     setClients(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
+    triggerSave();
   };
 
   const addClient = (client: Client) => {
     setClients(prev => [...prev, client]);
+    triggerSave();
   };
 
   const deleteClient = (id: string) => {
     setClients(prev => prev.filter(c => c.id !== id));
+    triggerSave();
   };
 
   const updateSkill = (id: string, data: Partial<SkillCategory>) => {
     setSkills(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
+    triggerSave();
   };
 
   const addSkill = (skill: SkillCategory) => {
     setSkills(prev => [...prev, skill]);
+    triggerSave();
   };
 
   const deleteSkill = (id: string) => {
     setSkills(prev => prev.filter(s => s.id !== id));
+    triggerSave();
   };
 
   const updateConfig = (data: Partial<GlobalConfig>) => {
     setConfig(prev => ({ ...prev, ...data }));
+    triggerSave();
   };
 
   const updateSocials = (data: SocialLink[]) => {
     setSocials(data);
+    triggerSave();
   };
 
-  const resetData = () => {
+  const resetData = async () => {
     setProjects(INITIAL_PROJECTS);
     setExperience(INITIAL_EXPERIENCE);
     setClients(INITIAL_CLIENTS);
     setSkills(INITIAL_SKILLS);
     setConfig(INITIAL_CONFIG);
     setSocials(INITIAL_SOCIALS);
-    setLastUpdated(null);
+    stateRef.current = { 
+        projects: INITIAL_PROJECTS, 
+        experience: INITIAL_EXPERIENCE, 
+        clients: INITIAL_CLIENTS, 
+        skills: INITIAL_SKILLS, 
+        config: INITIAL_CONFIG, 
+        socials: INITIAL_SOCIALS 
+    };
+    await saveToGitHub(false, "Reset to Demo Data");
   };
 
-  // --- Helpers ---
-  const getHistory = async () => { return []; /* simplified for brevity */ };
-  const restoreVersion = async (sha: string) => {};
-  const getSyncHistory = async () => { return []; };
-  const reloadContent = () => fetchFromGitHub(true);
+  const triggerSave = () => {
+      if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+      }
+      setIsSaving(true); 
+      saveTimeoutRef.current = setTimeout(() => {
+          saveToGitHub(false, "Auto-save").catch(err => console.error("Auto-save failed:", err));
+      }, 3000); 
+  };
+  
+  const getHistory = async (): Promise<CommitInfo[]> => {
+      const { owner, repo } = getGitHubConfig();
+      const token = getGitHubToken();
+      if (!owner || !repo || !token) return [];
 
-  // Polling for Real-Time Updates (Every 10 seconds)
+      try {
+          const response = await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/commits?path=${activeDataPath}&sha=${branch}&per_page=10`, {
+              headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Accept': 'application/vnd.github.v3+json',
+                  'Cache-Control': 'no-cache'
+              }
+          });
+          if (response.ok) {
+              const data = await response.json();
+              return data.map((item: any) => ({
+                  sha: item.sha,
+                  message: item.commit.message,
+                  date: item.commit.committer.date,
+                  author: item.commit.author.name
+              }));
+          }
+      } catch (e) { }
+      return [];
+  };
+
+  const restoreVersion = async (sha: string): Promise<void> => {
+      const { owner, repo } = getGitHubConfig();
+      const token = getGitHubToken();
+      if (!owner || !repo || !token) throw new Error("Config missing");
+
+      const response = await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/contents/${activeDataPath}?ref=${sha}`, {
+          headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' }
+      });
+
+      if (response.ok) {
+          const data = await response.json();
+          try {
+              const cleanContent = data.content.replace(/\s/g, '');
+              const decodedContent = decodeURIComponent(escape(atob(cleanContent)));
+              const content = JSON.parse(decodedContent);
+              applyData(content);
+              await saveToGitHub(false, `Rollback to version ${sha.substring(0, 7)}`); 
+          } catch (e) {
+              throw new Error("Failed to parse data");
+          }
+      }
+  };
+
+  const getSyncHistory = async (): Promise<SyncLogEntry[]> => {
+      const { owner, repo } = getGitHubConfig();
+      const token = getGitHubToken();
+      if (!owner || !repo || !token) return [];
+
+      try {
+          const res = await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/contents/public/admin/sync-log.json?ref=${branch}`, {
+              headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
+          });
+          if (res.ok) {
+              const data = await res.json();
+              const content = decodeURIComponent(escape(atob(data.content.replace(/\s/g, ''))));
+              const logs = JSON.parse(content);
+              if (logs.length > 0) setLatestPreviewUrl(logs[0].previewUrl);
+              return logs;
+          }
+      } catch (e) { }
+      return [];
+  };
+
+  // Define reloadContent
+  const reloadContent = useCallback(() => {
+    fetchFromGitHub(true);
+  }, [fetchFromGitHub]);
+
+  // Polling for Real-Time Updates (Every 15 seconds)
   useEffect(() => {
     const init = async () => {
         await verifyConnection();
@@ -471,9 +629,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     init();
 
     const interval = setInterval(() => {
-        // Silent check for updates
         fetchFromGitHub(false, true);
-    }, 10000);
+    }, 15000);
 
     return () => clearInterval(interval);
   }, [fetchFromGitHub]);
@@ -487,7 +644,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       updateClient, addClient, deleteClient,
       updateSkill, addSkill, deleteSkill,
       updateConfig, updateSocials,
-      resetData, refreshAllClients: saveToGitHub, verifyConnection, fetchFromGitHub,
+      resetData, 
+      refreshAllClients: (commitMessage?: string) => saveToGitHub(true, commitMessage),
+      verifyConnection, fetchFromGitHub,
       getHistory, restoreVersion, getSyncHistory, latestPreviewUrl
     }}>
       {children}
