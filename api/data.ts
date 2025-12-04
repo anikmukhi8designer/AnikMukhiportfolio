@@ -31,8 +31,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
   res.setHeader('Surrogate-Control', 'no-store'); // Specific to Vercel
+  
+  // 2. CORS Headers
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
-  // 2. Retrieve Environment Variables
+  if (req.method === 'OPTIONS') {
+    res.status(200).send('ok');
+    return;
+  }
+
+  // 3. Retrieve Environment Variables
   const token = process.env.VITE_GITHUB_TOKEN || process.env.GITHUB_TOKEN;
   const owner = process.env.VITE_GITHUB_OWNER || process.env.GITHUB_OWNER;
   const repo = process.env.VITE_GITHUB_REPO || process.env.GITHUB_REPO;
@@ -44,12 +55,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  // 3. Determine the file path
+  // 4. Determine the file path
   const { path } = req.query;
   const targetPath = Array.isArray(path) ? path[0] : (path || 'src/data.json');
 
   try {
-    // 4. Fetch from GitHub API with Cache Busting
+    // 5. Fetch from GitHub API with Cache Busting
     // The 't' parameter forces GitHub's internal varnish cache to miss.
     const timestamp = Date.now(); 
     const ghUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${targetPath}?t=${timestamp}`;
@@ -74,7 +85,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const data: any = await ghRes.json();
     
-    // 5. Decode Content and Inject SHA
+    // 6. Decode Content and Inject SHA
     // The SHA is critical for the frontend to know if data has changed (Versioning)
     if (data.content && data.encoding === 'base64') {
         const buffer = Buffer.from(data.content, 'base64');

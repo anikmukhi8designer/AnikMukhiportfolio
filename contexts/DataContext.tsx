@@ -167,7 +167,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               const repoData = await res.json();
               if (repoData.default_branch && repoData.default_branch !== branch) {
                   setBranch(repoData.default_branch);
-                  console.log(`Detected default branch: ${repoData.default_branch}`);
               }
               return { success: true, message: "Connection Successful" };
           }
@@ -187,6 +186,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!silent) setIsLoading(true);
     if (!silent) setError(null);
 
+    // Explicit cache buster for fetch
+    const cacheBuster = `?update=${timestamp}`;
+    
+    // --- Strategy 1: Admin Direct Access (Priority: GitHub API) ---
+    // Best for Admin users as it uses the token to get fresh data immediately
     if (owner && repo && token) {
         try {
             const headers: HeadersInit = {
@@ -195,6 +199,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             };
             const refParam = branch ? `&ref=${branch}` : '';
             
+            // Try src/data.json first
             let apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?t=${timestamp}${refParam}`;
             let response = await fetchWithRetry(apiUrl, { headers });
 
@@ -210,10 +215,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 return true;
             }
         } catch (error) {
-             // Fall through to proxy
+             console.warn("Strategy 1 (GitHub API) failed, trying Proxy...", error);
         }
     }
     
+    // --- Strategy 2: Vercel/Next.js API Proxy (Guest) ---
+    // Best for Production deployments (User side)
     try {
         const proxyUrl = `/api/data?path=${path}&t=${timestamp}`;
         const response = await fetch(proxyUrl, { 
@@ -224,6 +231,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (response.ok) {
             const content = await response.json();
             
+            // Handle proxy 404 (file not found) by trying root path
             if (content.error && content.status === 404 && path === 'src/data.json') {
                 const rootRes = await fetch(`/api/data?path=data.json&t=${timestamp}`, { cache: 'no-store' });
                 if (rootRes.ok) {
@@ -239,7 +247,34 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
         }
     } catch (e) {
-        console.warn("Proxy fetch failed.", e);
+        console.warn("Strategy 2 (Proxy) failed, trying Raw Fallback...", e);
+    }
+
+    // --- Strategy 3: Raw GitHub Content (Fallback) ---
+    // Best for Local Dev (where /api doesn't exist) or Public Repos
+    if (owner && repo) {
+        try {
+            // Raw URL typically has 5min cache, so we add timestamp
+            const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}?t=${timestamp}`;
+            const rawRes = await fetch(rawUrl, { cache: 'no-store' });
+            
+            if (rawRes.ok) {
+                const rawData = await rawRes.json();
+                handleDataSuccess(rawData, path, shouldApplyData, silent);
+                return true;
+            } else if (path === 'src/data.json') {
+                // Try root data.json
+                 const rawUrlRoot = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/data.json?t=${timestamp}`;
+                 const rawResRoot = await fetch(rawUrlRoot, { cache: 'no-store' });
+                 if (rawResRoot.ok) {
+                    const rawDataRoot = await rawResRoot.json();
+                    handleDataSuccess(rawDataRoot, 'data.json', shouldApplyData, silent);
+                    return true;
+                 }
+            }
+        } catch (e) {
+             console.warn("Strategy 3 (Raw) failed.");
+        }
     }
     
     if (!silent) setIsLoading(false);
@@ -247,11 +282,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [activeDataPath, branch]);
 
   const handleDataSuccess = (data: any, path: string, shouldApplyData: boolean, silent: boolean) => {
+      // Logic to detect new version without auto-applying (if preferred)
       if (data.sha || data._sha) {
           const newSha = data.sha || data._sha;
           if (fileShaRef.current && fileShaRef.current !== newSha) {
+               // New version detected!
                setHasNewVersion(true);
-               if (!shouldApplyData) return;
+               if (!shouldApplyData) return; // Wait for user to reload
           }
           if (shouldApplyData) {
               setFileSha(newSha);
@@ -263,6 +300,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (shouldApplyData) {
           try {
+              // Handle both raw JSON (Proxy/Raw) and Base64 encoded (GitHub API)
               let content = data;
               if (data.content && data.encoding === 'base64') {
                   const cleanContent = data.content.replace(/\s/g, '');
