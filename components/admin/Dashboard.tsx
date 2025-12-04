@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Radio, RefreshCw, UserCircle, Check, AlertCircle, History, ExternalLink, Clock, Loader2, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Radio, RefreshCw, UserCircle, Check, AlertCircle, History, ExternalLink, Clock, Loader2, AlertTriangle, Settings as SettingsIcon } from 'lucide-react';
 import WorkTable from './WorkTable';
 import ExperienceTable from './ExperienceTable';
 import SkillsTable from './SkillsTable';
@@ -67,9 +67,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
         setSyncStatus('error');
         
         let msg = e.message || "Sync Failed. Check console.";
-        if (msg.includes("Repository Name is missing") || msg.includes("Repository not found")) {
-            msg = "Repo Config Error. Go to Settings.";
-            setActiveTab('settings'); // Auto-switch to settings
+        
+        // Intelligent Error Redirect
+        if (
+            msg.includes("Repository Owner") || 
+            msg.includes("Repository Name") || 
+            msg.includes("GitHub Token") || 
+            msg.includes("Permissions") ||
+            msg.includes("Repository not found")
+        ) {
+            msg = "Configuration Error. Please check Settings.";
+            setActiveTab('settings'); // Auto-switch to settings to help user
         }
         
         setErrorMessage(msg);
@@ -201,10 +209,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
                         initial={{ opacity: 0, y: 10 }} 
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0 }}
-                        className="absolute top-full right-0 mt-2 p-3 bg-red-100 border border-red-200 rounded-lg text-xs text-red-700 whitespace-nowrap z-50 shadow-lg min-w-[200px]"
+                        className="absolute top-full right-0 mt-2 p-3 bg-red-100 border border-red-200 rounded-lg text-xs text-red-700 whitespace-nowrap z-50 shadow-lg min-w-[200px] flex items-center gap-2"
                     >
-                        <div className="font-bold mb-1 flex items-center gap-1"><AlertCircle className="w-3 h-3"/> Sync Error</div>
-                        {errorMessage}
+                        <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0"/>
+                        <span>{errorMessage}</span>
+                        {errorMessage.includes("Settings") && (
+                            <button onClick={() => setActiveTab('settings')} className="ml-2 underline font-bold">Fix</button>
+                        )}
                     </motion.div>
                 )}
                 </AnimatePresence>
@@ -233,9 +244,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
                      <p className="text-sm text-red-600 mb-3">{connectionError}</p>
                      <button 
                         onClick={() => setActiveTab('settings')}
-                        className="text-xs font-bold bg-white border border-red-200 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                        className="text-xs font-bold bg-white border border-red-200 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-2"
                      >
-                         Fix in Settings
+                         <SettingsIcon className="w-3 h-3" /> Fix in Settings
                      </button>
                  </div>
              </div>

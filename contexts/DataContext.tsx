@@ -82,8 +82,9 @@ const getEnv = (key: string) => {
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3, backoff = 500): Promise<Response> {
     try {
         const res = await fetch(url, options);
-        // If 409 Conflict, don't retry blindly, return immediately to handle logic
-        if (res.status === 409) return res; 
+        // Fail fast on Auth errors (401, 403) or Conflict (409) - Do not retry
+        if (res.status === 401 || res.status === 403 || res.status === 409) return res;
+        
         // If 5xx Server Error, retry
         if (res.status >= 500 && retries > 0) {
             throw new Error(`Server Error: ${res.status}`);
@@ -91,6 +92,9 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, ba
         return res;
     } catch (err: any) {
         if (retries <= 0) throw err;
+        // Don't retry if it's likely a CORS/Network config issue that won't resolve itself
+        if (err.message === 'Failed to fetch' && retries < 2) throw err;
+        
         console.log(`Retrying... (${retries} attempts left)`);
         await new Promise(r => setTimeout(r, backoff));
         return fetchWithRetry(url, options, retries - 1, backoff * 2);
@@ -138,14 +142,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [projects, experience, clients, skills, config, socials]);
 
 
-  // Helper to get token from Env OR LocalStorage
+  // Helper to get token from Env OR LocalStorage - SANITIZED
   const getGitHubToken = () => {
       const env = getEnv('VITE_GITHUB_TOKEN');
-      if (env) return env;
-      return localStorage.getItem('github_token') || '';
+      if (env) return env.trim();
+      return (localStorage.getItem('github_token') || '').trim();
   };
 
-  // Helper to get Repo Config from Env OR LocalStorage
+  // Helper to get Repo Config from Env OR LocalStorage - SANITIZED
   const getGitHubConfig = () => {
       const owner = getEnv('VITE_GITHUB_OWNER') || localStorage.getItem('github_owner') || "";
       const repo = getEnv('VITE_GITHUB_REPO') || localStorage.getItem('github_repo') || "";
@@ -253,7 +257,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                      if (!silent) setIsLoading(false);
                      return true; 
                  } else if (response.status === 401) {
-                     if (!silent) setError("GitHub Token invalid or expired.");
+                     if (!silent) setError("GitHub Token invalid or expired. Check Settings.");
                  } else {
                      if (!silent) setError(`Failed to fetch data: ${response.status} ${response.statusText}`);
                  }
@@ -506,10 +510,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
       } else {
         if (response.status === 404) {
-             throw new Error(`Repository not found (${owner}/${repo}). Please check your settings.`);
+             throw new Error(`Repository not found (${owner}/${repo}). Check Settings.`);
         }
-        if (response.status === 401) {
-            throw new Error("Invalid GitHub Token. Please re-authenticate.");
+        if (response.status === 401 || response.status === 403) {
+            throw new Error("Invalid GitHub Token or Missing Permissions. Check Settings.");
         }
         if (response.status === 409) {
             throw new Error("Sync Conflict. Data changed on server during save. Please try again.");
