@@ -202,10 +202,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!silent) setIsLoading(true);
     if (!silent) setError(null);
 
-    // Explicit update check
+    // Explicit update check from URL
     const urlParams = new URLSearchParams(window.location.search);
+    // Use manual timestamp if provided (manual refresh), else current time
     const fetchTimestamp = urlParams.get('update') || timestamp;
 
+    // --- Strategy 1: Direct GitHub API (Admin Mode / Token Present) ---
     if (owner && repo && token) {
         try {
             const headers: HeadersInit = {
@@ -216,6 +218,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             let apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?t=${fetchTimestamp}`;
             let response = await fetchWithRetry(apiUrl, { headers });
 
+            // Fallback for path
             if (response.status === 404 && path === 'src/data.json') {
                 path = 'data.json';
                 apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?t=${fetchTimestamp}`;
@@ -225,6 +228,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (response.ok) {
                 const data: any = await response.json();
                 
+                // Smart Sync: Only update if SHA is different (Content Changed)
                 if (shouldApplyData && data.sha === fileShaRef.current) {
                     if (!silent) setIsLoading(false);
                     return true;
@@ -249,6 +253,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 return true;
             } else {
                  if (response.status === 404) {
+                     // 404 means no data file yet, stick with Initial Data but valid connection
                      setFileSha(null); 
                      if (!silent) setIsLoading(false);
                      return true; 
@@ -260,37 +265,72 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
         } catch (error: any) {
             if (!silent) {
-                if (!navigator.onLine) {
-                    setError("You are offline. Please check your internet connection.");
-                } else {
-                    setError(error.message || "Network error fetching from GitHub");
-                }
+                // If direct fetch fails (offline), don't error out entirely, fall back to initial data
+                console.warn("Direct fetch failed", error);
                 setIsLoading(false);
             }
             return false;
         }
     }
     
-    // Proxy fallback for preview mode
+    // --- Strategy 2: Proxy API (Public/Preview Mode) ---
+    // If no token, or token strategy failed/not applicable, try public proxy
     try {
         const proxyUrl = `/api/data?path=${path}&t=${fetchTimestamp}`;
-        const response = await fetch(proxyUrl, { cache: 'no-store' });
+        const response = await fetch(proxyUrl, { 
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache' }
+        });
+        
         if (response.ok) {
             const content = await response.json();
-            if (!content.error && shouldApplyData) {
+            
+            // Handle Proxy Error Wrapper (e.g. 500 from Vercel function)
+            if (content.error) {
+                 if (content.status === 404 && path === 'src/data.json') {
+                     // Retry with root path via proxy
+                     const rootPathProxy = `/api/data?path=data.json&t=${fetchTimestamp}`;
+                     const rootRes = await fetch(rootPathProxy, { cache: 'no-store' });
+                     if (rootRes.ok) {
+                         const rootContent = await rootRes.json();
+                         if (!rootContent.error && shouldApplyData) {
+                             setActiveDataPath('data.json');
+                             // Read injected SHA from proxy
+                             if (rootContent._sha) setFileSha(rootContent._sha);
+                             applyData(rootContent);
+                             if (!silent) setIsLoading(false);
+                             return true;
+                         }
+                     }
+                 }
+                 console.warn("Proxy returned error:", content.error);
+            } else if (shouldApplyData) {
+                // SUCCESS: Apply Data from Proxy
+                // Read injected SHA from proxy (if added by api/data.ts)
+                if (content._sha) {
+                    if (content._sha === fileShaRef.current) {
+                        if (!silent) setIsLoading(false);
+                        return true;
+                    }
+                    setFileSha(content._sha);
+                }
+                
                 applyData(content);
                 if (!silent) setIsLoading(false);
                 return true;
             }
         }
-    } catch (e) {}
+    } catch (e) {
+        console.warn("Proxy fetch failed. Ensure Vercel Env Vars are set.", e);
+    }
     
+    // If both fail, we rely on INITIAL_DATA which is already loaded
     if (!silent) setIsLoading(false);
     return false;
   }, [activeDataPath]);
 
   const applyData = (content: any) => {
-      // Apply Deduplication on load to clean up any existing mess
+      // Apply Deduplication on load to clean up any existing mess from previous versions
       if (content.projects && Array.isArray(content.projects)) setProjects(deduplicateAndClean(content.projects));
       if (content.experience && Array.isArray(content.experience)) setExperience(deduplicateAndClean(content.experience));
       if (content.clients && Array.isArray(content.clients)) setClients(deduplicateAndClean(content.clients));

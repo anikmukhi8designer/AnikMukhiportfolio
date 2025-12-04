@@ -41,7 +41,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!token || !owner || !repo) {
     return res.status(500).json({ 
       error: 'Server Misconfiguration', 
-      details: 'Missing GitHub Environment Variables (TOKEN, OWNER, or REPO)' 
+      details: 'Missing GitHub Environment Variables (TOKEN, OWNER, or REPO). Check Vercel Project Settings.' 
     });
   }
 
@@ -82,6 +82,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         
         try {
             const json = JSON.parse(jsonString);
+            
+            // INJECT SHA: This allows the frontend to track versions even via Proxy
+            if (typeof json === 'object' && json !== null) {
+                json._sha = data.sha;
+            }
+            
             return res.status(200).json(json);
         } catch (parseError) {
             return res.status(500).json({ error: 'Invalid JSON in source file' });
