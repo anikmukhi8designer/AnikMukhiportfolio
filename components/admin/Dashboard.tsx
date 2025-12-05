@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Radio, RefreshCw, UserCircle, Check, AlertCircle, History, ExternalLink, Clock, Loader2, AlertTriangle, Settings as SettingsIcon, GitBranch, List, X } from 'lucide-react';
+import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Radio, RefreshCw, UserCircle, Check, AlertCircle, History, ExternalLink, Clock, Loader2, AlertTriangle, Settings as SettingsIcon, GitBranch, List, X, Rocket } from 'lucide-react';
 import WorkTable from './WorkTable';
 import ExperienceTable from './ExperienceTable';
 import SkillsTable from './SkillsTable';
@@ -18,10 +18,13 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   const [activeTab, setActiveTab] = useState<'work' | 'experience' | 'skills' | 'clients' | 'settings' | 'history' | 'sync_logs'>('work');
-  const { resetData, syncData, lastUpdated, latestPreviewUrl, verifyConnection, isLoading, error, branch, isSaving } = useData();
+  const { resetData, syncData, triggerDeploy, lastUpdated, latestPreviewUrl, verifyConnection, isLoading, error, branch, isSaving } = useData();
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
+  const [deployStatus, setDeployStatus] = useState<'idle' | 'deploying' | 'success' | 'error'>('idle');
+  
   const [errorMessage, setErrorMessage] = useState('');
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [missingHook, setMissingHook] = useState(false);
 
   useEffect(() => {
       verifyConnection().then(result => {
@@ -34,6 +37,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
               setConnectionError(null);
           }
       });
+      // Check for hook
+      setMissingHook(!localStorage.getItem('vercel_deploy_hook'));
   }, []);
 
   const handleSync = async () => {
@@ -51,19 +56,32 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
         if (elapsed < 800) await new Promise(r => setTimeout(r, 800 - elapsed));
         
         setSyncStatus('success');
-        
-        // Reset to idle after 4 seconds
         setTimeout(() => setSyncStatus('idle'), 4000);
     } catch (e: any) {
         console.error("Sync Error:", e);
         setSyncStatus('error');
-        setErrorMessage(e.message || "Sync Failed. Check console or Logs.");
-        
+        setErrorMessage(e.message || "Sync Failed. Check network connection.");
         setTimeout(() => {
             setSyncStatus('idle');
             setErrorMessage('');
         }, 5000);
     }
+  };
+
+  const handleDeploy = async () => {
+      setDeployStatus('deploying');
+      try {
+          await triggerDeploy();
+          setDeployStatus('success');
+          setTimeout(() => setDeployStatus('idle'), 3000);
+      } catch (e: any) {
+          setDeployStatus('error');
+          setErrorMessage("Deploy failed. Check settings.");
+          setTimeout(() => {
+            setDeployStatus('idle');
+            setErrorMessage('');
+        }, 3000);
+      }
   };
 
   if (isLoading) {
@@ -89,9 +107,23 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
                   <Check className="w-5 h-5 text-green-400" />
                   <div className="flex flex-col">
                       <span className="text-sm font-bold">Sync Successful</span>
-                      <span className="text-xs text-neutral-400">Updates will appear on the live site shortly.</span>
+                      <span className="text-xs text-neutral-400">Updates pushed to GitHub.</span>
                   </div>
                   <button onClick={() => setSyncStatus('idle')} className="ml-4 p-1 hover:bg-white/10 rounded-full"><X className="w-4 h-4"/></button>
+              </motion.div>
+          )}
+          {deployStatus === 'success' && (
+              <motion.div 
+                  initial={{ opacity: 0, y: -20, x: '-50%' }}
+                  animate={{ opacity: 1, y: 0, x: '-50%' }}
+                  exit={{ opacity: 0, y: -20, x: '-50%' }}
+                  className="fixed top-8 left-1/2 z-50 flex items-center gap-3 bg-blue-600 text-white px-6 py-4 rounded-full shadow-2xl"
+              >
+                  <Rocket className="w-5 h-5 text-white" />
+                  <div className="flex flex-col">
+                      <span className="text-sm font-bold">Deploy Triggered</span>
+                      <span className="text-xs text-white/80">Vercel is rebuilding your site.</span>
+                  </div>
               </motion.div>
           )}
           {(syncStatus === 'error' || errorMessage) && (
@@ -103,7 +135,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
               >
                   <AlertTriangle className="w-5 h-5 text-white" />
                   <div className="flex flex-col">
-                      <span className="text-sm font-bold">Sync Failed</span>
+                      <span className="text-sm font-bold">Action Failed</span>
                       <span className="text-xs text-white/80">{errorMessage}</span>
                   </div>
                   <button onClick={() => setErrorMessage('')} className="ml-4 p-1 hover:bg-white/10 rounded-full"><X className="w-4 h-4"/></button>
@@ -135,7 +167,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
           
           <div className="flex items-center gap-3 md:gap-6">
             
-            {/* Sync Status Text */}
             <div className="text-right flex flex-col items-end">
                 <span className="hidden md:block text-[10px] font-bold uppercase tracking-wider text-neutral-400">
                     GitHub Status
@@ -148,7 +179,23 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
                 </div>
             </div>
 
-            <div className="flex flex-col items-end relative">
+            <div className="flex items-center gap-2">
+                {/* Deploy Button */}
+                <button 
+                    onClick={handleDeploy}
+                    disabled={deployStatus === 'deploying' || missingHook}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-sm ${
+                        missingHook 
+                        ? 'bg-neutral-100 text-neutral-300 cursor-not-allowed' 
+                        : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 hover:text-neutral-900'
+                    }`}
+                    title={missingHook ? "Configure Deploy Hook in Settings first" : "Trigger Vercel Rebuild"}
+                >
+                    {deployStatus === 'deploying' ? <Loader2 className="w-3 h-3 animate-spin"/> : <Rocket className="w-3 h-3" />}
+                    <span className="hidden lg:inline">Deploy</span>
+                </button>
+
+                {/* Sync Button */}
                 <button 
                     onClick={handleSync}
                     disabled={syncStatus === 'syncing' || syncStatus === 'success' || !!connectionError}
@@ -203,6 +250,27 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
                         className="text-xs font-bold bg-white border border-red-200 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-2"
                      >
                          <SettingsIcon className="w-3 h-3" /> Fix in Settings
+                     </button>
+                 </div>
+             </div>
+        )}
+
+        {/* Missing Hook Warning */}
+        {!connectionError && missingHook && (
+             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-4 animate-in fade-in slide-in-from-top-4">
+                 <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
+                     <Rocket className="w-5 h-5" />
+                 </div>
+                 <div>
+                     <h3 className="text-sm font-bold text-blue-800 mb-1">Enable Auto-Deploy</h3>
+                     <p className="text-sm text-blue-600 mb-3">
+                        Connect Vercel to automatically rebuild your site when you push changes. 
+                     </p>
+                     <button 
+                        onClick={() => setActiveTab('settings')}
+                        className="text-xs font-bold bg-white border border-blue-200 text-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors flex items-center gap-2"
+                     >
+                         <SettingsIcon className="w-3 h-3" /> Configure Deploy Hook
                      </button>
                  </div>
              </div>

@@ -37,6 +37,7 @@ interface DataContextType {
   // Actions
   reloadContent: () => void;
   syncData: (commitMessage?: string) => Promise<void>; 
+  triggerDeploy: () => Promise<void>;
   resetData: () => Promise<void>;
   
   // CRUD
@@ -256,10 +257,36 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return [];
   };
 
+  // --- Trigger Vercel Deploy Hook ---
+  const triggerDeploy = async () => {
+      const deployHook = localStorage.getItem('vercel_deploy_hook');
+      if (!deployHook) throw new Error("No Deploy Hook configured in Settings.");
+      
+      try {
+          // Add cache buster to hook to ensure it's treated as new
+          const separator = deployHook.includes('?') ? '&' : '?';
+          const hookWithCache = `${deployHook}${separator}t=${Date.now()}`;
+          
+          await fetch(hookWithCache, { method: 'POST', mode: 'no-cors' });
+          
+          await updateSyncLog({ 
+            action: 'Sync', 
+            status: 'Success', 
+            message: 'Manual Deploy Triggered', 
+            author: 'Admin'
+          });
+      } catch (e: any) {
+          console.error("Deploy failed", e);
+          throw new Error("Failed to trigger deploy hook.");
+      }
+  };
+
   // --- Core Logic: Sync (Push then Pull) ---
   const syncData = async (commitMessage = "Update from CMS") => {
+      if (!navigator.onLine) throw new Error("No internet connection. Cannot sync.");
+
       const { token, owner, repo } = getAuth();
-      if (!token || !owner || !repo) throw new Error("Missing configuration credentials");
+      if (!token || !owner || !repo) throw new Error("Missing configuration credentials. Check Settings.");
 
       setIsSaving(true);
       const now = new Date();
@@ -293,9 +320,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               if (getRes.ok) {
                   const currentFile = await getRes.json();
                   currentSha = currentFile.sha;
-              } else if (getRes.status !== 404) {
-                  // If 404, file doesn't exist, so currentSha stays undefined (create new file)
-                  // If other error, throw
               }
 
               const putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/src/data.json`, {
@@ -318,7 +342,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               }
 
               if (!putRes.ok) {
-                  const errData = await putRes.json();
+                  const errData = await putRes.json().catch(() => ({}));
                   throw new Error(errData.message || `GitHub API Error: ${putRes.status}`);
               }
 
@@ -330,7 +354,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               const url = `${window.location.origin}/preview?t=${now.getTime()}`;
               setLatestPreviewUrl(url);
 
-          } catch (e) {
+          } catch (e: any) {
+              if (e.message === 'Failed to fetch') {
+                  throw new Error("Network Error: Could not reach GitHub. Check CORS/AdBlocker.");
+              }
               if (retriesLeft > 0) {
                  await new Promise(r => setTimeout(r, 1000));
                  return attemptPush(retriesLeft - 1);
@@ -354,14 +381,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           // 2. TRIGGER HOOKS
           const deployHook = localStorage.getItem('vercel_deploy_hook');
           if (deployHook) {
-              // Fire and forget
               fetch(deployHook, { method: 'POST', mode: 'no-cors' }).catch(e => console.warn("Deploy hook failed", e));
           }
 
-          // 3. PULL (FETCH) - Verify we can read what we just wrote
-          // Fetch immediately to ensure consistency
-          // We force silent=true so it doesn't trigger global loading state
-          // We wait 1s to allow GitHub consistency
+          // 3. PULL (FETCH) - Verify
           await new Promise(r => setTimeout(r, 1000));
           const pulled = await fetchData(true);
           
@@ -370,13 +393,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 action: 'Pull', 
                 status: 'Success', 
                 message: 'Verified update from remote', 
-                author: 'System'
-             });
-          } else {
-             await updateSyncLog({ 
-                action: 'Pull', 
-                status: 'Failed', 
-                message: 'Could not verify update immediately', 
                 author: 'System'
              });
           }
@@ -452,7 +468,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setSkills(INITIAL_SKILLS);
       setConfig(INITIAL_CONFIG);
       setSocials(INITIAL_SOCIALS);
-      // Trigger a save immediately to reset remote
       setTimeout(() => syncData("Reset to Demo Data"), 500);
   };
 
@@ -503,7 +518,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const data = await res.json();
           const content = JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\s/g, '')))));
           applyData(content);
-          // Auto-save the restored version as the new current
           setTimeout(() => syncData(`Restored version ${sha.substring(0,7)}`), 500);
       }
   };
@@ -513,7 +527,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         projects, experience, clients, skills, config, socials,
         lastUpdated, isSaving, isLoading, error, branch, hasNewVersion,
         reloadContent: () => fetchData(),
-        syncData, resetData,
+        syncData, resetData, triggerDeploy,
         updateProject, addProject, deleteProject,
         updateExperience, addExperience, deleteExperience, reorderExperience,
         updateClient, addClient, deleteClient,
