@@ -289,90 +289,6 @@
           "content": "Lumina focuses on high-end fashion, so the app needed to feel invisible, letting the photography shine."
         }
       ]
-    },
-    {
-      "id": "ai-copilot-2023",
-      "title": "Syntax AI",
-      "client": "Syntax Labs",
-      "roles": [
-        "Brand Identity",
-        "Web Design"
-      ],
-      "description": "Web presence for an AI coding assistant.",
-      "year": 2023,
-      "heroImage": "https://picsum.photos/id/6/1200/800",
-      "thumb": "https://picsum.photos/id/6/800/600",
-      "tags": [
-        "AI",
-        "Web Design"
-      ],
-      "link": "#",
-      "published": true,
-      "content": [
-        {
-          "id": "1",
-          "type": "paragraph",
-          "content": "Designing for developer tools requires a specific aesthetic. Dark mode wasn't an option; it was a requirement."
-        },
-        {
-          "id": "2",
-          "type": "code",
-          "content": "const ai = new SyntaxAI({\n  mode: \"advanced\",\n  theme: \"dark\"\n});",
-          "caption": "Integration Example"
-        }
-      ]
-    },
-    {
-      "id": "health-wearable-2022",
-      "title": "Pulse Os",
-      "client": "Pulse Health",
-      "roles": [
-        "Interaction Design",
-        "Prototyping"
-      ],
-      "description": "Operating system interface for a next-gen health wearable.",
-      "year": 2022,
-      "heroImage": "https://picsum.photos/id/8/1200/800",
-      "thumb": "https://picsum.photos/id/8/800/600",
-      "tags": [
-        "Healthtech",
-        "Wearable"
-      ],
-      "link": "#",
-      "published": true,
-      "content": [
-        {
-          "id": "1",
-          "type": "paragraph",
-          "content": "On a 1.5 inch screen, every pixel counts. We removed all non-essential elements."
-        }
-      ]
-    },
-    {
-      "id": "arch-vis-2022",
-      "title": "Urban Space",
-      "client": "Urban Architects",
-      "roles": [
-        "3D Visualization",
-        "Art Direction"
-      ],
-      "description": "Interactive architectural visualizations.",
-      "year": 2022,
-      "heroImage": "https://picsum.photos/id/10/1200/800",
-      "thumb": "https://picsum.photos/id/10/800/600",
-      "tags": [
-        "3D",
-        "Real Estate"
-      ],
-      "link": "#",
-      "published": true,
-      "content": [
-        {
-          "id": "1",
-          "type": "paragraph",
-          "content": "Using WebGL to bring architectural blueprints to life in the browser."
-        }
-      ]
     }
   ],
   "experience": [
@@ -515,5 +431,5 @@
       "label": "hello@mukhianik.com"
     }
   ],
-  "lastUpdated": "2025-12-05T10:28:00.027Z"
+  "lastUpdated": "2025-12-05T10:28:18.859Z"
 }
