@@ -42,6 +42,7 @@ export interface Client {
 }
 
 export interface SocialLink {
+  id: string;
   platform: string;
   url: string;
   label: string;

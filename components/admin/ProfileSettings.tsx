@@ -37,7 +37,9 @@ const ProfileSettings: React.FC = () => {
   };
 
   const handleAddSocial = () => {
-    const newSocials = [...localSocials, { platform: "New Platform", url: "", label: "Link Label" }];
+    // Generate UUID for the new social link
+    const newId = self.crypto.randomUUID();
+    const newSocials = [...localSocials, { id: newId, platform: "New Platform", url: "", label: "Link Label" }];
     setLocalSocials(newSocials);
     setHasChanges(true);
     setJustSaved(false);
@@ -175,6 +177,70 @@ const ProfileSettings: React.FC = () => {
                     className="w-full px-4 py-2 bg-white border border-neutral-300 rounded-lg focus:ring-2 focus:ring-neutral-900 focus:outline-none resize-none"
                 />
             </div>
+        </div>
+      </section>
+
+      {/* Social Links Configuration */}
+      <section className="space-y-6">
+        <div className="flex justify-between items-center border-b border-neutral-200 pb-2">
+            <h3 className="text-lg font-medium">Social Links</h3>
+            <button 
+                onClick={handleAddSocial}
+                className="flex items-center gap-1 text-xs font-bold text-neutral-600 hover:text-neutral-900 px-2 py-1 rounded hover:bg-neutral-100 transition-colors"
+            >
+                <Plus className="w-3 h-3" /> Add Link
+            </button>
+        </div>
+        
+        <div className="space-y-4">
+            {localSocials.map((social, index) => (
+                <div key={social.id || index} className="flex flex-col md:flex-row gap-4 p-4 bg-white border border-neutral-200 rounded-lg shadow-sm">
+                    <div className="flex-1 space-y-2">
+                        <label className="text-xs font-bold text-neutral-500 uppercase">Platform</label>
+                        <input 
+                            type="text" 
+                            value={social.platform}
+                            onChange={(e) => handleSocialChange(index, 'platform', e.target.value)}
+                            className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded text-sm focus:outline-none focus:bg-white focus:border-neutral-400"
+                            placeholder="e.g. Twitter"
+                        />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                         <label className="text-xs font-bold text-neutral-500 uppercase">URL</label>
+                         <input 
+                            type="text" 
+                            value={social.url}
+                            onChange={(e) => handleSocialChange(index, 'url', e.target.value)}
+                            className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded text-sm focus:outline-none focus:bg-white focus:border-neutral-400"
+                            placeholder="https://..."
+                        />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                         <label className="text-xs font-bold text-neutral-500 uppercase">Label (Visible)</label>
+                         <div className="flex gap-2">
+                             <input 
+                                type="text" 
+                                value={social.label}
+                                onChange={(e) => handleSocialChange(index, 'label', e.target.value)}
+                                className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded text-sm focus:outline-none focus:bg-white focus:border-neutral-400"
+                                placeholder="@username"
+                            />
+                            <button 
+                                onClick={() => handleDeleteSocial(index)}
+                                className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors self-end"
+                                title="Remove Link"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                         </div>
+                    </div>
+                </div>
+            ))}
+            {localSocials.length === 0 && (
+                <div className="text-center py-6 text-neutral-400 text-sm bg-neutral-50 rounded-lg border border-dashed border-neutral-200">
+                    No social links added yet.
+                </div>
+            )}
         </div>
       </section>
 

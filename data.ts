@@ -224,9 +224,6 @@ export const CLIENTS: Client[] = [
   { id: "c7", name: "Studio X" },
   { id: "c8", name: "Google" }, 
   { id: "c9", name: "Airbnb" }  
-  // { id: "c10", name: "Stripe" },  
-  // { id: "c11", name: "Linear" },  
-  // { id: "c12", name: "Vercel" }   
 ];
 
 export const SKILLS: SkillCategory[] = [
@@ -242,34 +239,10 @@ export const SKILLS: SkillCategory[] = [
         { name: "Spline", image: "https://cdn.brandfetch.io/spline.design/w/200/h/200" }
     ]
   }
-  // {
-  //   id: "s2",
-  //   title: "Development",
-  //   items: [
-  //       { name: "React", image: "https://cdn.brandfetch.io/react.dev/w/200/h/200" },
-  //       { name: "TypeScript", image: "https://cdn.brandfetch.io/typescriptlang.org/w/200/h/200" },
-  //       { name: "Tailwind", image: "https://cdn.brandfetch.io/tailwindcss.com/w/200/h/200" },
-  //       { name: "Next.js", image: "https://cdn.brandfetch.io/nextjs.org/w/200/h/200" },
-  //       { name: "Vite", image: "https://cdn.brandfetch.io/vitejs.dev/w/200/h/200" },
-  //       { name: "Node.js", image: "https://cdn.brandfetch.io/nodejs.org/w/200/h/200" }
-  //   ]
-  // },
-  // {
-  //   id: "s3",
-  //   title: "Tools & Productivity",
-  //   items: [
-  //       { name: "Linear", image: "https://cdn.brandfetch.io/linear.app/w/200/h/200" },
-  //       { name: "Notion", image: "https://cdn.brandfetch.io/notion.so/w/200/h/200" },
-  //       { name: "VS Code", image: "https://cdn.brandfetch.io/visualstudio.com/w/200/h/200" },
-  //       { name: "Raycast", image: "https://cdn.brandfetch.io/raycast.com/w/200/h/200" },
-  //       { name: "Arc", image: "https://cdn.brandfetch.io/arc.net/w/200/h/200" },
-  //       { name: "GitHub", image: "https://cdn.brandfetch.io/github.com/w/200/h/200" }
-  //   ]
-  // }
 ];
 
 export const SOCIALS: SocialLink[] = [
-  { platform: "Twitter", url: "https://twitter.com", label: "@mukhi_anik" },
-  { platform: "LinkedIn", url: "https://linkedin.com", label: "Mukhi Anik" },
-  { platform: "Email", url: "mailto:hello@example.com", label: "hello@mukhianik.com" }
+  { id: "twitter-link", platform: "Twitter", url: "https://twitter.com", label: "@mukhi_anik" },
+  { id: "linkedin-link", platform: "LinkedIn", url: "https://linkedin.com", label: "Mukhi Anik" },
+  { id: "email-link", platform: "Email", url: "mailto:hello@example.com", label: "hello@mukhianik.com" }
 ];

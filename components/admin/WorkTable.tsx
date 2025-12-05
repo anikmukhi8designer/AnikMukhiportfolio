@@ -1,6 +1,6 @@
 import React from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Edit2, Trash2, Plus } from 'lucide-react';
+import { Edit2, Trash2, Plus, Loader2 } from 'lucide-react';
 
 interface WorkTableProps {
   onEdit?: (projectId: string) => void;
@@ -8,11 +8,11 @@ interface WorkTableProps {
 
 const WorkTable: React.FC<WorkTableProps> = ({ onEdit }) => {
   const { projects, updateProject, deleteProject, addProject } = useData();
+  const [deletingId, setDeletingId] = React.useState<string | null>(null);
 
-  const handleAddNew = () => {
-    // Generate a proper UUID so UI and DB are in sync
+  const handleAddNew = async () => {
+    // Generate UUID locally so we can use it immediately in the UI (Optimistic Update)
     const newId = self.crypto.randomUUID();
-    
     const newProject = {
       id: newId,
       title: "New Project",
@@ -28,11 +28,15 @@ const WorkTable: React.FC<WorkTableProps> = ({ onEdit }) => {
       content: []
     };
     
-    addProject(newProject);
-    
-    // Immediately open editor for new project
-    // This works because DataContext now optimistically updates the list
+    await addProject(newProject);
     if (onEdit) onEdit(newId);
+  };
+  
+  const handleDelete = async (id: string) => {
+      if(!confirm("Delete this project?")) return;
+      setDeletingId(id);
+      await deleteProject(id);
+      setDeletingId(null);
   };
 
   return (
@@ -93,9 +97,12 @@ const WorkTable: React.FC<WorkTableProps> = ({ onEdit }) => {
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button 
-                        onClick={() => deleteProject(project.id)}
-                        className="hover:text-red-600"
-                      ><Trash2 className="w-4 h-4" /></button>
+                        onClick={() => handleDelete(project.id)}
+                        disabled={deletingId === project.id}
+                        className="hover:text-red-600 disabled:opacity-50"
+                      >
+                        {deletingId === project.id ? <Loader2 className="w-4 h-4 animate-spin"/> : <Trash2 className="w-4 h-4" />}
+                      </button>
                     </div>
                   </td>
                 </tr>
