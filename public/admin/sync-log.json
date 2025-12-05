@@ -1,5 +1,13 @@
 [
   {
+    "id": "1f6a6206-f90b-4138-ab50-c9192143be58",
+    "timestamp": "2025-12-05T07:16:17.048Z",
+    "action": "Sync",
+    "status": "Success",
+    "message": "Manual Deploy Triggered",
+    "author": "Admin"
+  },
+  {
     "id": "0828c998-4a71-43e3-a40e-4e6a202d1768",
     "timestamp": "2025-12-05T07:16:05.509Z",
     "action": "Pull",
