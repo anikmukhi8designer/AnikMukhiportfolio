@@ -23,7 +23,8 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
 
     try {
         if (isSignUp) {
-            const { data, error } = await supabase.auth.signUp({
+            // Casting auth to any to bypass potential type mismatch where signUp might not be recognized in strict mode or old types
+            const { data, error } = await (supabase.auth as any).signUp({
                 email,
                 password,
             });
@@ -33,7 +34,8 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                 setIsSignUp(false);
             }
         } else {
-            const { data, error } = await supabase.auth.signInWithPassword({
+            // Casting auth to any to bypass potential type mismatch for signInWithPassword
+            const { data, error } = await (supabase.auth as any).signInWithPassword({
                 email,
                 password,
             });

@@ -44,9 +44,9 @@ const NavBar: React.FC<NavBarProps> = ({ isMenuOpen, setIsMenuOpen, theme, toggl
         initial={{ y: 0 }}
         animate={{ y: isVisible ? 0 : -100 }}
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-        className="fixed top-0 left-0 right-0 z-50 bg-white/60 dark:bg-black/60 backdrop-blur-md border-b border-white/20 dark:border-white/5 text-neutral-900 dark:text-white pointer-events-none transition-all duration-300"
+        className="fixed top-0 left-0 right-0 z-50 bg-white/60 dark:bg-black/60 backdrop-blur-md border-b border-white/20 dark:border-white/5 text-neutral-900 dark:text-white pointer-events-auto transition-all duration-300"
       >
-        <div className="max-w-screen-xl mx-auto px-4 md:px-8 h-20 flex items-center justify-between pointer-events-auto relative">
+        <div className="max-w-screen-xl mx-auto px-4 md:px-8 h-20 flex items-center justify-between relative">
           <a href="#" className="text-lg font-bold tracking-tight z-50">
             Mukhi Anik
           </a>

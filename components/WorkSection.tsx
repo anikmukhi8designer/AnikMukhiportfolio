@@ -9,7 +9,7 @@ interface WorkSectionProps {
 }
 
 const WorkSection: React.FC<WorkSectionProps> = ({ onProjectClick }) => {
-  const { projects } = useData();
+  const { projects, lastUpdated } = useData();
   const publishedProjects = projects.filter(p => p.published);
   
   const [hoveredProject, setHoveredProject] = useState<string | null>(null);
@@ -55,7 +55,7 @@ const WorkSection: React.FC<WorkSectionProps> = ({ onProjectClick }) => {
         </div>
 
         {/* Projects List */}
-        <div>
+        <div key={lastUpdated?.getTime()}>
           {publishedProjects.map((project) => (
             <ProjectCard 
               key={project.id} 
@@ -65,6 +65,12 @@ const WorkSection: React.FC<WorkSectionProps> = ({ onProjectClick }) => {
               onMouseLeave={() => setHoveredProject(null)}
             />
           ))}
+          {publishedProjects.length === 0 && (
+             <div className="py-24 text-center text-neutral-400">
+                <p>No published projects found.</p>
+                <p className="text-xs mt-2 opacity-60">Check the Admin Dashboard to add or publish projects.</p>
+             </div>
+          )}
         </div>
       </div>
 

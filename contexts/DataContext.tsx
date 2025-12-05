@@ -9,7 +9,6 @@ import {
   SOCIALS as INITIAL_SOCIALS
 } from '../data';
 import { supabase } from '../src/supabaseClient';
-import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 // --- Types ---
 interface DataContextType {
@@ -80,8 +79,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [latestPreviewUrl, setLatestPreviewUrl] = useState<string | null>(null);
 
   // --- Real-time Handler ---
-  const handleRealtimeChange = (payload: RealtimePostgresChangesPayload<any>, table: string, setState: React.Dispatch<React.SetStateAction<any[]>>) => {
+  // Using any for payload to avoid type import issues with different supabase versions
+  const handleRealtimeChange = (payload: any, table: string, setState: React.Dispatch<React.SetStateAction<any[]>>) => {
       const { eventType, new: newRecord, old: oldRecord } = payload;
+      console.log(`Realtime Update: ${table} (${eventType})`, newRecord);
 
       setState(prevData => {
           if (eventType === 'INSERT') {
@@ -97,7 +98,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
           return prevData;
       });
+      
       setLastUpdated(new Date());
+      setHasNewVersion(true); // Trigger UI refresh indicator if needed
   };
 
   // --- Core Logic: Fetch from Supabase ---
@@ -107,11 +110,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     try {
         // 1. Check connectivity and Schema existence
-        // We select 0 rows just to check if the table exists and connection works
         const { error: connectionError, count } = await supabase.from('projects').select('*', { count: 'exact', head: true });
         
         if (connectionError) {
-            // 42P01 is the Postgres error code for "undefined_table"
             if (connectionError.code === '42P01') {
                 throw new Error("Tables not found. Please run the supabase_schema.sql in your Supabase SQL Editor.");
             }
@@ -122,7 +123,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (count === 0 && !isInitialized) {
             console.log("Empty database detected. Auto-seeding with demo data...");
             try {
-                // We use upsert to be safe, though insert is fine if empty
                 await Promise.all([
                     supabase.from('projects').upsert(INITIAL_PROJECTS),
                     supabase.from('experience').upsert(INITIAL_EXPERIENCE),
@@ -131,9 +131,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     supabase.from('socials').upsert(INITIAL_SOCIALS),
                     supabase.from('config').upsert({ ...INITIAL_CONFIG, id: 1 })
                 ]);
-                console.log("Auto-seeding complete.");
             } catch (seedError) {
-                console.warn("Auto-seeding failed. This might be due to RLS policies preventing anonymous writes. Please log in as Admin to seed data manually if needed.", seedError);
+                console.warn("Auto-seeding warning: ", seedError);
             }
         }
 
@@ -146,7 +145,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             { data: socialsData },
             { data: configData }
         ] = await Promise.all([
-            supabase.from('projects').select('*').order('created_at', { ascending: false }), // Assuming created_at or year
+            supabase.from('projects').select('*').order('created_at', { ascending: false }),
             supabase.from('experience').select('*').order('order', { ascending: true }),
             supabase.from('clients').select('*').order('order', { ascending: true }),
             supabase.from('skills').select('*').order('order', { ascending: true }),
@@ -154,11 +153,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             supabase.from('config').select('*').single()
         ]);
 
-        if (projectsData && projectsData.length > 0) setProjects(projectsData);
-        if (experienceData && experienceData.length > 0) setExperience(experienceData);
-        if (clientsData && clientsData.length > 0) setClients(clientsData);
-        if (skillsData && skillsData.length > 0) setSkills(skillsData);
-        if (socialsData && socialsData.length > 0) setSocials(socialsData);
+        if (projectsData) setProjects(projectsData);
+        if (experienceData) setExperience(experienceData);
+        if (clientsData) setClients(clientsData);
+        if (skillsData) setSkills(skillsData);
+        if (socialsData) setSocials(socialsData);
         if (configData) setConfig(prev => ({ ...prev, ...configData }));
         
         setLastUpdated(new Date());
@@ -178,6 +177,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // --- Realtime Subscription Setup ---
   useEffect(() => {
+    // Remove existing channels first to avoid duplicates
+    supabase.removeAllChannels();
+
     const channel = supabase.channel('global-changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, (payload) => handleRealtimeChange(payload, 'projects', setProjects))
         .on('postgres_changes', { event: '*', schema: 'public', table: 'experience' }, (payload) => handleRealtimeChange(payload, 'experience', setExperience))
@@ -185,11 +187,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .on('postgres_changes', { event: '*', schema: 'public', table: 'skills' }, (payload) => handleRealtimeChange(payload, 'skills', setSkills))
         .on('postgres_changes', { event: '*', schema: 'public', table: 'socials' }, (payload) => handleRealtimeChange(payload, 'socials', setSocials))
         .on('postgres_changes', { event: '*', schema: 'public', table: 'config' }, (payload) => {
+             console.log("Config Updated", payload.new);
              if (payload.new) setConfig(prev => ({ ...prev, ...payload.new }));
         })
         .subscribe((status) => {
             if (status === 'SUBSCRIBED') {
                 console.log("Realtime subscription active");
+            } else if (status === 'CHANNEL_ERROR') {
+                console.error("Realtime connection error");
             }
         });
 
@@ -203,14 +208,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Optimistic update
       setProjects(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
       const { error } = await supabase.from('projects').update(data).eq('id', id);
-      if (error) throw error;
+      if (error) {
+        console.error("Update failed", error);
+        // Revert (needs fetch)
+        fetchData(true);
+        throw error;
+      }
   };
 
   const addProject = async (p: Project) => {
       setProjects(prev => [p, ...prev]);
       const { error } = await supabase.from('projects').insert(p);
       if (error) {
-        // Revert on error
         setProjects(prev => prev.filter(item => item.id !== p.id));
         throw error;
       }
@@ -250,9 +259,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const updates = items.map((item, index) => ({
           id: item.id,
           order: index,
-          // We need to provide minimal required fields for upsert in case of conflict, or just update
-          // Since it's existing data, we can just update the order field if we iterate.
-          // But upsert is more efficient batch-wise.
           ...item
       }));
       const { error } = await supabase.from('experience').upsert(updates);
@@ -296,18 +302,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updateSocials = async (data: SocialLink[]) => {
       setSocials(data);
-      // We upsert all. Any not in this list should technically be deleted if we want exact sync,
-      // but for simplicity we just upsert the ones passed.
       const { error } = await supabase.from('socials').upsert(data);
-      
-      // To handle deletions, we might need to know which IDs were removed. 
-      // For now, let's assume the UI passes the full new list and we might need to clear old ones.
-      // A simple strategy for small lists: delete all and re-insert? No, that breaks IDs/refs.
-      // Better strategy: The UI should call deleteSocial for removals individually.
       if (error) throw error;
   };
 
-  // Optional: Sync Data to GitHub via existing API
   const syncData = async (commitMessage = "Manual Sync") => {
      setIsSaving(true);
      try {
