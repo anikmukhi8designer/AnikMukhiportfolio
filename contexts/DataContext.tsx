@@ -124,41 +124,54 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         let sha: string = '';
         const timestamp = Date.now();
         const cacheBuster = Math.random().toString(36).substring(7);
+        let fetchSuccess = false;
 
         // PATH 1: Admin (Direct GitHub API)
         if (token && owner && repo) {
-            const sanitizedOwner = encodeURIComponent(owner);
-            const sanitizedRepo = encodeURIComponent(repo);
-            const sanitizedBranch = encodeURIComponent(branch);
-            
-            const url = `https://api.github.com/repos/${sanitizedOwner}/${sanitizedRepo}/contents/src/data.json?ref=${sanitizedBranch}&t=${timestamp}&cb=${cacheBuster}`;
-            const res = await fetch(url, { 
-                headers: { 
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/vnd.github.v3+json'
-                },
-                cache: 'no-store'
-            });
-            
-            if (res.ok) {
-                const data = await res.json();
-                sha = data.sha;
-                content = JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\s/g, '')))));
+            try {
+                const sanitizedOwner = encodeURIComponent(owner);
+                const sanitizedRepo = encodeURIComponent(repo);
+                const sanitizedBranch = encodeURIComponent(branch);
+                
+                const url = `https://api.github.com/repos/${sanitizedOwner}/${sanitizedRepo}/contents/src/data.json?ref=${sanitizedBranch}&t=${timestamp}&cb=${cacheBuster}`;
+                const res = await fetch(url, { 
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    },
+                    cache: 'no-store'
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    sha = data.sha;
+                    content = JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\s/g, '')))));
+                    fetchSuccess = true;
+                }
+            } catch (directError) {
+                console.warn("Direct GitHub fetch failed, attempting proxy fallback...", directError);
             }
         } 
-        // PATH 2: Guest (Proxy)
-        else {
-            const res = await fetch(`/api/data?path=src/data.json&t=${timestamp}&cb=${cacheBuster}`);
+        
+        // PATH 2: Proxy (Fallback or Guest)
+        if (!fetchSuccess) {
+            // Include token if available to bypass rate limits or access private repos via proxy
+            const headers: HeadersInit = {};
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const res = await fetch(`/api/data?path=src/data.json&t=${timestamp}&cb=${cacheBuster}`, { headers });
             if (res.ok) {
                 const data = await res.json();
                 if (!data.error) {
                     content = data;
                     sha = data._sha || '';
+                    fetchSuccess = true;
                 }
             }
         }
 
-        if (content) {
+        if (fetchSuccess && content) {
+            // Check if data is new
             if (fileSha && sha && fileSha !== sha) {
                 const isAdmin = !!token;
                 if (isAdmin) {
@@ -168,11 +181,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     setFileSha(sha);
                 }
             } else if (!fileSha) {
+                // First load
                 applyData(content);
                 setFileSha(sha);
             }
+            return true;
         }
-        return true;
+        return false;
     } catch (e) {
         if (!silent) console.warn("Fetch failed:", e);
         return false;
@@ -194,60 +209,95 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     try {
-        // Log Update logic remains best-effort
+        // Best-effort update via proxy fallback mechanism
         let logs: SyncLogEntry[] = [];
         let sha = '';
         
+        // Read logs
         try {
-          const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}?ref=${branch}&t=${Date.now()}`, {
-              headers: { 
-                  'Authorization': `Bearer ${token}`,
-                  'Accept': 'application/vnd.github.v3+json'
-              },
-              cache: 'no-store'
-          });
-          if (getRes.ok) {
-              const data = await getRes.json();
-              sha = data.sha;
-              logs = JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\s/g, '')))));
-          }
+            const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}?ref=${branch}&t=${Date.now()}`, {
+                headers: { 'Authorization': `Bearer ${token}` },
+                cache: 'no-store'
+            });
+            if (getRes.ok) {
+                const data = await getRes.json();
+                sha = data.sha;
+                logs = JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\s/g, '')))));
+            } else {
+                // Try proxy
+                const proxyRes = await fetch(`/api/data?path=${logPath}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (proxyRes.ok) {
+                    const data = await proxyRes.json();
+                    if (!data.error) {
+                        logs = data;
+                        sha = data._sha;
+                    }
+                }
+            }
         } catch (e) {}
 
         const updatedLogs = [newEntry, ...logs].slice(0, 50);
         const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(updatedLogs, null, 2))));
 
-        await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}`, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-                'Accept': 'application/vnd.github.v3+json'
-            },
-            body: JSON.stringify({
-                message: `Log: ${entry.action} - ${entry.status}`,
-                content: contentBase64,
-                sha: sha || undefined,
-                branch: branch
-            })
-        });
+        // Write logs
+        try {
+             await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: `Log: ${entry.action} - ${entry.status}`,
+                    content: contentBase64,
+                    sha: sha || undefined,
+                    branch: branch
+                })
+            });
+        } catch(directErr) {
+             // Proxy write fallback
+             await fetch(`/api/data?path=${logPath}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: `Log: ${entry.action} - ${entry.status}`,
+                    content: contentBase64,
+                    sha: sha || undefined,
+                    branch: branch
+                })
+            });
+        }
+
     } catch (e) {
         console.warn("Failed to update sync log", e);
     }
   };
 
-  // ... (Other getters similar to above, sanitized) ...
-
   const getSyncHistory = async (): Promise<SyncLogEntry[]> => {
       const { token, owner, repo } = getAuth();
       if (!token) return [];
+      
+      const logPath = 'public/admin/sync-log.json';
       try {
-          const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/public/admin/sync-log.json?ref=${branch}&t=${Date.now()}`, {
-             headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' },
+          // Try direct
+          const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}?ref=${branch}&t=${Date.now()}`, {
+             headers: { 'Authorization': `Bearer ${token}` },
              cache: 'no-store'
           });
+          
           if (res.ok) {
               const data = await res.json();
               return JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\s/g, '')))));
+          } else {
+              // Try proxy
+              const proxyRes = await fetch(`/api/data?path=${logPath}`, { headers: { 'Authorization': `Bearer ${token}` } });
+              if (proxyRes.ok) {
+                  const data = await proxyRes.json();
+                  return data.error ? [] : data;
+              }
           }
       } catch (e) {}
       return [];
@@ -303,22 +353,25 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               let currentSha: string | undefined = undefined;
               
               // 1. Get SHA (READ)
-              // Try Direct GitHub First
               try {
                   const getRes = await fetch(`https://api.github.com/repos/${sanitizedOwner}/${sanitizedRepo}/contents/src/data.json?ref=${sanitizedBranch}&t=${Date.now()}`, {
-                      headers: { 
-                        'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                      },
+                      headers: { 'Authorization': `Bearer ${token}` },
                       cache: 'no-store'
                   });
 
                   if (getRes.ok) {
                       const currentFile = await getRes.json();
                       currentSha = currentFile.sha;
+                  } else {
+                      // Try proxy read if direct read fails (e.g. 403/cors)
+                       const proxyRes = await fetch(`/api/data?path=src/data.json`, { headers: { 'Authorization': `Bearer ${token}` } });
+                       if (proxyRes.ok) {
+                           const data = await proxyRes.json();
+                           currentSha = data._sha;
+                       }
                   }
               } catch (readError) {
-                   console.warn("Direct Read failed, trying proxy if needed later...");
+                   console.warn("Read failed during push prep", readError);
               }
 
               // 2. Put Content (WRITE)
@@ -338,35 +391,32 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                       headers: {
                           'Authorization': `Bearer ${token}`,
                           'Content-Type': 'application/json',
-                          'Accept': 'application/vnd.github.v3+json'
                       },
                       body
                   });
               } catch (netErr) {
-                  // Strategy B: Proxy Fallback (if direct fails due to CORS/Blocker)
-                  console.warn("Direct GitHub PUT failed. Falling back to Proxy.");
+                  // Strategy B: Proxy Fallback
                   putRes = await fetch(`/api/data?path=src/data.json`, {
                       method: 'PUT',
                       headers: {
-                          'Authorization': `Bearer ${token}`, // Pass token to proxy
+                          'Authorization': `Bearer ${token}`,
                           'Content-Type': 'application/json'
                       },
                       body
                   });
               }
 
-              if (putRes.status === 409 && retriesLeft > 0) {
+              if (putRes && putRes.status === 409 && retriesLeft > 0) {
                   await new Promise(r => setTimeout(r, 800)); 
                   return attemptPush(retriesLeft - 1);
               }
 
-              if (!putRes.ok) {
-                  const errData = await putRes.json().catch(() => ({}));
-                  throw new Error(errData.message || `API Error: ${putRes.status}`);
+              if (!putRes || !putRes.ok) {
+                  const errData = putRes ? await putRes.json().catch(() => ({})) : {};
+                  throw new Error(errData.message || `API Error: ${putRes?.status}`);
               }
 
               const result = await putRes.json();
-              // Proxy might return structure differently, handle both
               const newSha = result.content ? result.content.sha : result.sha; 
               
               setFileSha(newSha);
@@ -397,8 +447,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               fetch(deployHook, { method: 'POST', mode: 'no-cors' }).catch(() => {});
           }
 
-          // Pull to verify
-          setTimeout(() => fetchData(true), 1000);
+          // Force Pull to verify consistency
+          // Wait slightly for GitHub propagation if needed
+          await new Promise(r => setTimeout(r, 1500));
+          const pulled = await fetchData(true);
+          
+          if (pulled) {
+              await updateSyncLog({ action: 'Pull', status: 'Success', message: 'Verified update', author: 'System' });
+          } else {
+              console.warn("Immediate pull verification failed, retrying in background...");
+              // Retry once more
+              setTimeout(() => fetchData(true), 4000);
+          }
 
       } catch (e: any) {
           console.error("Sync Data Failed", e);
@@ -420,8 +480,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (data.socials) setSocials(data.socials);
       if (data.lastUpdated) setLastUpdated(new Date(data.lastUpdated));
   };
-
-  // ... (CRUD Wrappers and other helpers remain mostly same, just ensuring headers are clean) ...
   
   // --- Lifecycle ---
   useEffect(() => {
@@ -430,7 +488,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return () => clearInterval(interval);
   }, [fetchData]);
 
-  // Wrappers
+  // Wrappers (mostly unchanged)
   const updateProject = (id: string, data: Partial<Project>) => setProjects(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
   const addProject = (p: Project) => setProjects(prev => [p, ...prev]);
   const deleteProject = (id: string) => setProjects(prev => prev.filter(p => p.id !== id));
@@ -467,7 +525,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (!token || !owner || !repo) return { success: false, message: "Missing Credentials" };
       try {
           const res = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`, {
-              headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' }
+              headers: { 'Authorization': `Bearer ${token}` }
           });
           if (res.ok) {
                const data = await res.json();
@@ -484,7 +542,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const { token, owner, repo } = getAuth();
       if (!token) return [];
       const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits?path=src/data.json&sha=${branch}`, {
-          headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' }
+          headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
           const data = await res.json();
@@ -502,7 +560,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const { token, owner, repo } = getAuth();
       if (!token) return;
       const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/src/data.json?ref=${sha}`, {
-          headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' }
+          headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
           const data = await res.json();
