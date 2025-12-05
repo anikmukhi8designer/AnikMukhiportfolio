@@ -5,10 +5,23 @@ import { Loader2, RefreshCw, Database } from 'lucide-react';
 const DbStatus: React.FC = () => {
     const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
     const [message, setMessage] = useState('');
+    const [projectUrl, setProjectUrl] = useState('');
     const [isExpanded, setIsExpanded] = useState(false);
 
     const checkConnection = async () => {
         setStatus('loading');
+        
+        // Extract project ID from the supabase client URL for display
+        // Supabase URL format: https://[project-id].supabase.co
+        try {
+            // @ts-ignore - access private property to help user debug
+            const url = supabase.supabaseUrl || '';
+            const match = url.match(/https:\/\/([^.]+)\./);
+            setProjectUrl(match ? match[1] : 'Unknown Project');
+        } catch(e) {
+            setProjectUrl('Unknown Configuration');
+        }
+
         try {
             // Try to fetch the count of projects to verify access
             const { error, count } = await supabase
@@ -47,11 +60,16 @@ const DbStatus: React.FC = () => {
                     {status === 'error' && <div className="w-2.5 h-2.5 bg-red-500 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.6)]" />}
                 </div>
                 
-                <span className="text-xs font-bold tracking-wide uppercase">
-                    {status === 'loading' && "Connecting DB..."}
-                    {status === 'success' && "Supabase Live"}
-                    {status === 'error' && "DB Connection Error"}
-                </span>
+                <div className="flex flex-col leading-none">
+                    <span className="text-xs font-bold tracking-wide uppercase">
+                        {status === 'loading' && "Connecting..."}
+                        {status === 'success' && "Supabase Live"}
+                        {status === 'error' && "Connection Error"}
+                    </span>
+                    {projectUrl && isExpanded && (
+                         <span className="text-[9px] opacity-60 font-mono mt-0.5">{projectUrl}</span>
+                    )}
+                </div>
 
                 <div className="w-px h-3 bg-current opacity-20 mx-1"></div>
 
@@ -67,6 +85,11 @@ const DbStatus: React.FC = () => {
             {(isExpanded || status === 'error') && message && (
                 <div className="ml-2 px-3 py-2 bg-black/80 text-white text-[10px] font-mono rounded-lg max-w-[250px] break-words animate-in fade-in slide-in-from-bottom-2">
                     {message}
+                    {status === 'error' && (
+                        <div className="mt-1 pt-1 border-t border-white/20 opacity-75">
+                            Check Supabase URL in src/supabaseClient.ts
+                        </div>
+                    )}
                 </div>
             )}
         </div>

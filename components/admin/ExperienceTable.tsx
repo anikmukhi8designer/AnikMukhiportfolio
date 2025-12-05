@@ -20,7 +20,7 @@ const ExperienceTable: React.FC = () => {
       company: "Company Name",
       period: "2024 — Present",
       description: "Description of responsibilities...",
-      published: false
+      published: true // Default to live
     });
   };
 

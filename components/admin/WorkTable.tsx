@@ -23,7 +23,7 @@ const WorkTable: React.FC<WorkTableProps> = ({ onEdit }) => {
       heroImage: "https://picsum.photos/1200/800",
       thumb: "https://picsum.photos/800/600",
       tags: ["Tag 1"],
-      published: false,
+      published: true, // Default to true so it shows up immediately
       images: [],
       content: []
     };

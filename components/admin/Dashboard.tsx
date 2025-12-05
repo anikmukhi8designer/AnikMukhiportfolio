@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, RefreshCw, UserCircle, Check, AlertCircle, Loader2, Rocket, Database, UploadCloud } from 'lucide-react';
+import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, RefreshCw, UserCircle, Check, AlertCircle, Loader2, Rocket, Database, UploadCloud, Save } from 'lucide-react';
 import WorkTable from './WorkTable';
 import ExperienceTable from './ExperienceTable';
 import SkillsTable from './SkillsTable';
@@ -18,6 +18,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   const { resetData, syncData, triggerDeploy, projects, reloadContent, verifyConnection, isLoading, isSaving } = useData();
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [deployStatus, setDeployStatus] = useState<'idle' | 'deploying' | 'success' | 'error'>('idle');
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   const [errorMessage, setErrorMessage] = useState('');
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -33,6 +34,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
           }
       });
   }, []);
+
+  const handleRefresh = async () => {
+      setIsRefreshing(true);
+      await reloadContent();
+      setTimeout(() => setIsRefreshing(false), 800);
+  };
 
   const handleSync = async () => {
     if (isSaving || syncStatus === 'syncing') return;
@@ -101,7 +108,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
       </AnimatePresence>
 
       {/* CMS Header */}
-      <header className="bg-white border-b border-neutral-200 sticky top-0 z-20">
+      <header className="bg-white border-b border-neutral-200 sticky top-0 z-[100]">
         <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <span className="font-bold text-neutral-900 text-base md:text-lg truncate flex items-center gap-2">
@@ -110,49 +117,57 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
             </span>
           </div>
           
-          <div className="flex items-center gap-3 md:gap-6">
-            <div className="text-right flex flex-col items-end">
-                <span className="hidden md:block text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+          <div className="flex items-center gap-3 md:gap-4">
+            {/* Status Indicators (Hidden on small mobile) */}
+            <div className="hidden md:flex flex-col items-end mr-4">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
                     Database Status
                 </span>
                 <div className="flex items-center gap-1.5">
                     <div className={`w-2 h-2 rounded-full ${!connectionError ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                    <span className={`hidden md:block text-xs font-bold ${!connectionError ? 'text-neutral-900' : 'text-neutral-500'}`}>
+                    <span className={`text-xs font-bold ${!connectionError ? 'text-neutral-900' : 'text-neutral-500'}`}>
                         {!connectionError ? 'Connected' : 'Error'}
                     </span>
                 </div>
             </div>
 
-            <div className="flex items-center gap-2">
-                <button 
-                    onClick={handleDeploy}
-                    disabled={deployStatus === 'deploying'}
-                    className="flex items-center gap-2 px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-neutral-50 transition-colors"
-                >
-                    {deployStatus === 'deploying' ? <Loader2 className="w-3 h-3 animate-spin"/> : <Rocket className="w-3 h-3" />}
-                    <span className="hidden lg:inline">Deploy Site</span>
-                </button>
+            {/* Action Buttons */}
+            <button 
+                onClick={handleRefresh}
+                className="p-2 text-neutral-500 hover:text-neutral-900 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors"
+                title="Refresh Data from Database"
+            >
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
 
-                <button 
-                    onClick={handleSync}
-                    disabled={syncStatus === 'syncing' || !!connectionError}
-                    className={`flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-sm min-w-[120px] justify-center ${
-                        syncStatus === 'syncing'
-                        ? 'bg-neutral-100 text-neutral-400 border border-neutral-200 cursor-not-allowed'
-                        : syncStatus === 'success'
-                        ? 'bg-green-50 text-green-600 border border-green-200'
-                        : 'bg-neutral-900 text-white border border-neutral-900 hover:bg-neutral-800'
-                    }`}
-                    title="Backup current data to GitHub repository"
-                >
-                    {syncStatus === 'syncing' ? <Loader2 className="w-3 h-3 animate-spin" /> : <UploadCloud className="w-3 h-3" />}
-                    <span className="hidden md:inline">
-                        {syncStatus === 'syncing' ? 'Backing up...' : 'Backup to GitHub'}
-                    </span>
-                </button>
-            </div>
+            <button 
+                onClick={handleDeploy}
+                disabled={deployStatus === 'deploying'}
+                className="hidden sm:flex items-center gap-2 px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-neutral-50 transition-colors"
+            >
+                {deployStatus === 'deploying' ? <Loader2 className="w-3 h-3 animate-spin"/> : <Rocket className="w-3 h-3" />}
+                <span className="hidden lg:inline">Deploy Site</span>
+            </button>
 
-            <div className="h-6 w-px bg-neutral-200"></div>
+            <button 
+                onClick={handleSync}
+                disabled={syncStatus === 'syncing' || !!connectionError}
+                className={`flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-sm min-w-[120px] justify-center ${
+                    syncStatus === 'syncing'
+                    ? 'bg-neutral-100 text-neutral-400 border border-neutral-200 cursor-not-allowed'
+                    : syncStatus === 'success'
+                    ? 'bg-green-50 text-green-600 border border-green-200'
+                    : 'bg-neutral-900 text-white border border-neutral-900 hover:bg-neutral-800'
+                }`}
+                title="Backup current data to GitHub repository"
+            >
+                {syncStatus === 'syncing' ? <Loader2 className="w-3 h-3 animate-spin" /> : <UploadCloud className="w-3 h-3" />}
+                <span className="hidden md:inline">
+                    {syncStatus === 'syncing' ? 'Backing up...' : 'Backup to GitHub'}
+                </span>
+            </button>
+
+            <div className="h-6 w-px bg-neutral-200 mx-2"></div>
 
             <button onClick={onLogout} className="p-2 text-neutral-400 hover:text-neutral-900 transition-colors" title="Logout">
                 <LogOut className="w-5 h-5" />
