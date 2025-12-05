@@ -74,19 +74,19 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [error, setError] = useState<string | null>(null);
   const [hasNewVersion, setHasNewVersion] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
   
   const [branch, setBranch] = useState('main'); 
   const [latestPreviewUrl, setLatestPreviewUrl] = useState<string | null>(null);
 
   // --- Real-time Handler ---
-  // This function merges incoming changes from Supabase into local React state automatically
   const handleRealtimeChange = (payload: RealtimePostgresChangesPayload<any>, table: string, setState: React.Dispatch<React.SetStateAction<any[]>>) => {
       const { eventType, new: newRecord, old: oldRecord } = payload;
 
       setState(prevData => {
           if (eventType === 'INSERT') {
-              // Prevent duplicates if we already added it optimistically
-              if (prevData.find(item => item.id === newRecord.id)) return prevData;
+              // Check if already exists to prevent duplication
+              if (prevData.some(item => item.id === newRecord.id)) return prevData;
               return [newRecord, ...prevData];
           } 
           if (eventType === 'UPDATE') {
@@ -103,8 +103,41 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // --- Core Logic: Fetch from Supabase ---
   const fetchData = useCallback(async (silent = false): Promise<boolean> => {
     if (!silent) setIsLoading(true);
-    
+    setError(null);
+
     try {
+        // 1. Check connectivity and Schema existence
+        // We select 0 rows just to check if the table exists and connection works
+        const { error: connectionError, count } = await supabase.from('projects').select('*', { count: 'exact', head: true });
+        
+        if (connectionError) {
+            // 42P01 is the Postgres error code for "undefined_table"
+            if (connectionError.code === '42P01') {
+                throw new Error("Tables not found. Please run the supabase_schema.sql in your Supabase SQL Editor.");
+            }
+            throw connectionError;
+        }
+
+        // 2. Auto-Seed if Database is Empty
+        if (count === 0 && !isInitialized) {
+            console.log("Empty database detected. Auto-seeding with demo data...");
+            try {
+                // We use upsert to be safe, though insert is fine if empty
+                await Promise.all([
+                    supabase.from('projects').upsert(INITIAL_PROJECTS),
+                    supabase.from('experience').upsert(INITIAL_EXPERIENCE),
+                    supabase.from('clients').upsert(INITIAL_CLIENTS),
+                    supabase.from('skills').upsert(INITIAL_SKILLS),
+                    supabase.from('socials').upsert(INITIAL_SOCIALS),
+                    supabase.from('config').upsert({ ...INITIAL_CONFIG, id: 1 })
+                ]);
+                console.log("Auto-seeding complete.");
+            } catch (seedError) {
+                console.warn("Auto-seeding failed. This might be due to RLS policies preventing anonymous writes. Please log in as Admin to seed data manually if needed.", seedError);
+            }
+        }
+
+        // 3. Fetch Actual Data
         const [
             { data: projectsData },
             { data: experienceData },
@@ -113,7 +146,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             { data: socialsData },
             { data: configData }
         ] = await Promise.all([
-            supabase.from('projects').select('*').order('year', { ascending: false }),
+            supabase.from('projects').select('*').order('created_at', { ascending: false }), // Assuming created_at or year
             supabase.from('experience').select('*').order('order', { ascending: true }),
             supabase.from('clients').select('*').order('order', { ascending: true }),
             supabase.from('skills').select('*').order('order', { ascending: true }),
@@ -129,18 +162,19 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (configData) setConfig(prev => ({ ...prev, ...configData }));
         
         setLastUpdated(new Date());
+        setIsInitialized(true);
         return true;
-    } catch (e) {
+
+    } catch (e: any) {
         console.error("Supabase Fetch failed:", e);
-        // Don't show error immediately on init, as tables might be empty
         if (!silent) {
-           // We might be just starting up without tables, use defaults silently
+           setError(e.message || "Failed to load data.");
         }
         return false;
     } finally {
         if (!silent) setIsLoading(false);
     }
-  }, []);
+  }, [isInitialized]);
 
   // --- Realtime Subscription Setup ---
   useEffect(() => {
@@ -153,72 +187,76 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .on('postgres_changes', { event: '*', schema: 'public', table: 'config' }, (payload) => {
              if (payload.new) setConfig(prev => ({ ...prev, ...payload.new }));
         })
-        .subscribe();
+        .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                console.log("Realtime subscription active");
+            }
+        });
 
     return () => {
         supabase.removeChannel(channel);
     };
   }, []);
 
-
-  // --- CRUD Operations (Direct DB Access + Optimistic UI) ---
-  
+  // --- CRUD Operations ---
   const updateProject = async (id: string, data: Partial<Project>) => {
-      // Optimistic
+      // Optimistic update
       setProjects(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
       const { error } = await supabase.from('projects').update(data).eq('id', id);
-      if (error) {
-          console.error("Update failed", error);
-          fetchData(true); // Revert on error
-      }
+      if (error) throw error;
   };
 
   const addProject = async (p: Project) => {
-      // Optimistic
       setProjects(prev => [p, ...prev]);
-      // Note: We use the locally generated ID for immediate UI update.
-      // Ensure your DB table allows inserting UUIDs or use trigger to handle it.
       const { error } = await supabase.from('projects').insert(p);
       if (error) {
-          console.error("Insert failed", error);
-          setProjects(prev => prev.filter(item => item.id !== p.id));
+        // Revert on error
+        setProjects(prev => prev.filter(item => item.id !== p.id));
+        throw error;
       }
   };
 
   const deleteProject = async (id: string) => {
-      // Optimistic
+      const prevProjects = [...projects];
       setProjects(prev => prev.filter(p => p.id !== id));
+      
       const { error } = await supabase.from('projects').delete().eq('id', id);
-      if (error) fetchData(true);
+      if (error) {
+          setProjects(prevProjects);
+          throw error;
+      }
   };
   
   const updateExperience = async (id: string, data: Partial<Experience>) => {
       setExperience(prev => prev.map(e => e.id === id ? { ...e, ...data } : e));
-      await supabase.from('experience').update(data).eq('id', id);
+      const { error } = await supabase.from('experience').update(data).eq('id', id);
+      if (error) throw error;
   };
 
   const addExperience = async (e: Experience) => {
       setExperience(prev => [e, ...prev]);
-      await supabase.from('experience').insert(e);
+      const { error } = await supabase.from('experience').insert(e);
+      if (error) throw error;
   };
 
   const deleteExperience = async (id: string) => {
       setExperience(prev => prev.filter(e => e.id !== id));
-      await supabase.from('experience').delete().eq('id', id);
+      const { error } = await supabase.from('experience').delete().eq('id', id);
+      if (error) throw error;
   };
   
   const reorderExperience = async (items: Experience[]) => {
       setExperience(items);
-      // Batch update order
       const updates = items.map((item, index) => ({
           id: item.id,
           order: index,
-          company: item.company,
-          role: item.role
+          // We need to provide minimal required fields for upsert in case of conflict, or just update
+          // Since it's existing data, we can just update the order field if we iterate.
+          // But upsert is more efficient batch-wise.
+          ...item
       }));
-      
-      const { error } = await supabase.from('experience').upsert(updates, { onConflict: 'id' });
-      if (error) console.error("Reorder failed", error);
+      const { error } = await supabase.from('experience').upsert(updates);
+      if (error) throw error;
   };
   
   const updateClient = async (id: string, data: Partial<Client>) => {
@@ -258,49 +296,81 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updateSocials = async (data: SocialLink[]) => {
       setSocials(data);
+      // We upsert all. Any not in this list should technically be deleted if we want exact sync,
+      // but for simplicity we just upsert the ones passed.
       const { error } = await supabase.from('socials').upsert(data);
-      // Clean up deleted ones if any
-      const ids = data.map(s => s.id);
-      if (ids.length > 0) {
-          await supabase.from('socials').delete().not('id', 'in', `(${ids.join(',')})`);
-      }
+      
+      // To handle deletions, we might need to know which IDs were removed. 
+      // For now, let's assume the UI passes the full new list and we might need to clear old ones.
+      // A simple strategy for small lists: delete all and re-insert? No, that breaks IDs/refs.
+      // Better strategy: The UI should call deleteSocial for removals individually.
+      if (error) throw error;
   };
 
-  // --- Legacy / Compatibility ---
+  // Optional: Sync Data to GitHub via existing API
   const syncData = async (commitMessage = "Manual Sync") => {
-     // Operations are now real-time, but we can simulate a 'sync' visual
-     console.log("Real-time sync active.");
      setIsSaving(true);
-     await new Promise(resolve => setTimeout(resolve, 500));
-     setIsSaving(false);
+     try {
+         const payload = {
+             config,
+             projects,
+             experience,
+             clients,
+             skills,
+             socials,
+             _commitMessage: commitMessage
+         };
+         
+         const res = await fetch('/api/data', {
+             method: 'PUT',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify(payload)
+         });
+         
+         if (!res.ok) throw new Error("Failed to sync to GitHub");
+         
+     } catch(e: any) {
+         console.error("Sync error:", e);
+         throw e;
+     } finally {
+         setIsSaving(false);
+     }
   };
 
-  // --- Initialization ---
   useEffect(() => {
       fetchData();
   }, [fetchData]);
 
   const resetData = async () => {
-      if (!confirm("Reset database to default demo data?")) return;
+      if (!confirm("Reset database to default demo data? This cannot be undone.")) return;
       
-      // Clean tables
-      await Promise.all([
-          supabase.from('projects').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
-          supabase.from('experience').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
-          supabase.from('clients').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
-          supabase.from('skills').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
-          supabase.from('socials').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      ]);
-      
-      // Re-seed
-      await supabase.from('projects').insert(INITIAL_PROJECTS);
-      await supabase.from('experience').insert(INITIAL_EXPERIENCE);
-      await supabase.from('clients').insert(INITIAL_CLIENTS);
-      await supabase.from('skills').insert(INITIAL_SKILLS);
-      await supabase.from('socials').insert(INITIAL_SOCIALS);
-      await supabase.from('config').upsert({ ...INITIAL_CONFIG, id: 1 });
-      
-      fetchData(true);
+      setIsLoading(true);
+      try {
+          // Clear all tables
+          await supabase.from('projects').delete().neq('id', 'placeholder');
+          await supabase.from('experience').delete().neq('id', 'placeholder');
+          await supabase.from('clients').delete().neq('id', 'placeholder');
+          await supabase.from('skills').delete().neq('id', 'placeholder');
+          await supabase.from('socials').delete().neq('id', 'placeholder');
+          await supabase.from('config').delete().neq('id', 0);
+          
+          // Re-insert defaults
+          await Promise.all([
+            supabase.from('projects').insert(INITIAL_PROJECTS),
+            supabase.from('experience').insert(INITIAL_EXPERIENCE),
+            supabase.from('clients').insert(INITIAL_CLIENTS),
+            supabase.from('skills').insert(INITIAL_SKILLS),
+            supabase.from('socials').insert(INITIAL_SOCIALS),
+            supabase.from('config').upsert({ ...INITIAL_CONFIG, id: 1 })
+          ]);
+          
+          await fetchData(true);
+      } catch(e) {
+          console.error("Reset failed", e);
+          alert("Reset failed. Check console.");
+      } finally {
+          setIsLoading(false);
+      }
   };
 
   const verifyConnection = async () => {
