@@ -31,8 +31,6 @@ const Modal: React.FC<ModalProps> = ({ project, onClose }) => {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [onClose]);
 
-  if (!project) return null;
-
   return (
     <AnimatePresence>
       {project && (
@@ -126,6 +124,8 @@ const Modal: React.FC<ModalProps> = ({ project, onClose }) => {
                                 {project.link && (
                                     <a 
                                         href={project.link} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
                                         className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-neutral-900 dark:text-white hover:text-neutral-500 dark:hover:text-neutral-300 transition-colors mt-4"
                                     >
                                         Visit Live Site <ArrowUpRight className="w-4 h-4" />
