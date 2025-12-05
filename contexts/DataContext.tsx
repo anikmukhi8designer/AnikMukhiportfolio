@@ -18,50 +18,37 @@ interface CommitInfo {
 }
 
 interface DataContextType {
-  // Data State
   projects: Project[];
   experience: Experience[];
   clients: Client[];
   skills: SkillCategory[];
   config: GlobalConfig;
   socials: SocialLink[];
-  
-  // Meta State
   lastUpdated: Date | null;
   isSaving: boolean;
   isLoading: boolean;
   error: string | null;
   branch: string;
   hasNewVersion: boolean;
-  
-  // Actions
   reloadContent: () => void;
   syncData: (commitMessage?: string) => Promise<void>; 
   triggerDeploy: () => Promise<void>;
   resetData: () => Promise<void>;
-  
-  // CRUD
   updateProject: (id: string, data: Partial<Project>) => void;
   addProject: (project: Project) => void;
   deleteProject: (id: string) => void;
-  
   updateExperience: (id: string, data: Partial<Experience>) => void;
   addExperience: (exp: Experience) => void;
   deleteExperience: (id: string) => void;
   reorderExperience: (items: Experience[]) => void;
-
   updateClient: (id: string, data: Partial<Client>) => void;
   addClient: (client: Client) => void;
   deleteClient: (id: string) => void;
-
   updateSkill: (id: string, data: Partial<SkillCategory>) => void;
   addSkill: (skill: SkillCategory) => void;
   deleteSkill: (id: string) => void;
-
   updateConfig: (data: Partial<GlobalConfig>) => void;
   updateSocials: (data: SocialLink[]) => void;
-  
-  // Helpers
   verifyConnection: () => Promise<{ success: boolean; message: string }>;
   getHistory: () => Promise<CommitInfo[]>;
   restoreVersion: (sha: string) => Promise<void>;
@@ -108,7 +95,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [fileSha, setFileSha] = useState<string | null>(null);
   const [latestPreviewUrl, setLatestPreviewUrl] = useState<string | null>(null);
 
-  // Keep a ref of state for saving without dependency cycles
   const stateRef = useRef({ projects, experience, clients, skills, config, socials });
   useEffect(() => {
       stateRef.current = { projects, experience, clients, skills, config, socials };
@@ -127,7 +113,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         let fetchSuccess = false;
 
         const sanitizedBranch = encodeURIComponent(branch);
-        // Param string for proxy fallback
         const proxyParams = `path=src/data.json&branch=${sanitizedBranch}&t=${timestamp}&cb=${cacheBuster}`;
 
         // PATH 1: Admin (Direct GitHub API)
@@ -158,7 +143,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         } 
         
         // PATH 2: Proxy (Fallback or Guest)
-        // Note: We now explicitly pass 'branch' to the proxy
         if (!fetchSuccess) {
             const headers: HeadersInit = { 'Cache-Control': 'no-cache' };
             if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -175,28 +159,21 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         if (fetchSuccess && content) {
-            // Check if data is new based on SHA difference
             if (fileSha && sha && fileSha !== sha) {
                 const isAdmin = !!token;
-                
-                // If it's a silent poll (auto-refresh), we update logic
                 if (silent) {
                     if (isAdmin) {
-                        // Admins get a notification/button
                         setHasNewVersion(true);
                     } else {
-                        // Guests get auto-updated
                         applyData(content);
                         setFileSha(sha);
                     }
                 } else {
-                    // Manual refresh always applies
                     applyData(content);
                     setFileSha(sha);
                     setHasNewVersion(false);
                 }
             } else if (!fileSha) {
-                // First load
                 applyData(content);
                 setFileSha(sha);
             }
@@ -211,137 +188,80 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [branch, fileSha]);
 
-  // --- Internal: Update Sync Log ---
-  const updateSyncLog = async (entry: Omit<SyncLogEntry, 'id' | 'timestamp'>) => {
-    const { token, owner, repo } = getAuth();
-    if (!token) return;
-
-    const logPath = 'public/admin/sync-log.json';
-    const newEntry: SyncLogEntry = {
-        id: self.crypto.randomUUID(),
-        timestamp: new Date().toISOString(),
-        ...entry
-    };
-    
-    const sanitizedBranch = encodeURIComponent(branch);
-    const proxyParams = `path=${logPath}&branch=${sanitizedBranch}`;
-
-    try {
-        // Best-effort update via proxy fallback mechanism
-        let logs: SyncLogEntry[] = [];
-        let sha = '';
-        
-        // Read logs
-        try {
-            const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}?ref=${branch}&t=${Date.now()}`, {
-                headers: { 'Authorization': `Bearer ${token}` },
-                cache: 'no-store'
-            });
-            if (getRes.ok) {
-                const data = await getRes.json();
-                sha = data.sha;
-                logs = JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\s/g, '')))));
-            } else {
-                // Try proxy
-                const proxyRes = await fetch(`/api/data?${proxyParams}`, { headers: { 'Authorization': `Bearer ${token}` } });
-                if (proxyRes.ok) {
-                    const data = await proxyRes.json();
-                    if (!data.error) {
-                        logs = data;
-                        sha = data._sha;
-                    }
-                }
-            }
-        } catch (e) {}
-
-        const updatedLogs = [newEntry, ...logs].slice(0, 50);
-        const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(updatedLogs, null, 2))));
-
-        // Write logs
-        try {
-             await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    message: `Log: ${entry.action} - ${entry.status}`,
-                    content: contentBase64,
-                    sha: sha || undefined,
-                    branch: branch
-                })
-            });
-        } catch(directErr) {
-             // Proxy write fallback
-             await fetch(`/api/data?${proxyParams}`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    message: `Log: ${entry.action} - ${entry.status}`,
-                    content: contentBase64,
-                    sha: sha || undefined,
-                    branch: branch
-                })
-            });
-        }
-
-    } catch (e) {
-        console.warn("Failed to update sync log", e);
-    }
-  };
-
-  const getSyncHistory = async (): Promise<SyncLogEntry[]> => {
+  // --- Helper: Update a specific file in Repo ---
+  const updateRepoFile = async (path: string, contentBase64: string, message: string, retries = 3): Promise<string> => {
       const { token, owner, repo } = getAuth();
-      if (!token) return [];
-      
-      const logPath = 'public/admin/sync-log.json';
-      const proxyParams = `path=${logPath}&branch=${encodeURIComponent(branch)}`;
-      
+      const sanitizedOwner = encodeURIComponent(owner);
+      const sanitizedRepo = encodeURIComponent(repo);
+      const sanitizedBranch = encodeURIComponent(branch);
+      const proxyParams = `path=${path}&branch=${sanitizedBranch}`;
+
       try {
-          // Try direct
-          const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}?ref=${branch}&t=${Date.now()}`, {
-             headers: { 'Authorization': `Bearer ${token}` },
-             cache: 'no-store'
-          });
-          
-          if (res.ok) {
-              const data = await res.json();
-              return JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\s/g, '')))));
-          } else {
-              // Try proxy
-              const proxyRes = await fetch(`/api/data?${proxyParams}`, { headers: { 'Authorization': `Bearer ${token}` } });
-              if (proxyRes.ok) {
-                  const data = await proxyRes.json();
-                  return data.error ? [] : data;
+          // 1. Get SHA (Read current file to handle updates correctly)
+          let currentSha: string | undefined;
+          try {
+              const getRes = await fetch(`https://api.github.com/repos/${sanitizedOwner}/${sanitizedRepo}/contents/${path}?ref=${sanitizedBranch}&t=${Date.now()}`, {
+                  headers: { 'Authorization': `Bearer ${token}` },
+                  cache: 'no-store'
+              });
+              if (getRes.ok) {
+                  const data = await getRes.json();
+                  currentSha = data.sha;
+              } else {
+                   // Fallback to proxy
+                   const proxyRes = await fetch(`/api/data?${proxyParams}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                   if (proxyRes.ok) {
+                       const data = await proxyRes.json();
+                       currentSha = data._sha;
+                   }
               }
-          }
-      } catch (e) {}
-      return [];
-  };
-  
-  // --- Trigger Deploy ---
-  const triggerDeploy = async () => {
-      const deployHook = localStorage.getItem('vercel_deploy_hook');
-      if (!deployHook) throw new Error("No Deploy Hook configured in Settings.");
-      
-      try {
-          const separator = deployHook.includes('?') ? '&' : '?';
-          const hookWithCache = `${deployHook}${separator}t=${Date.now()}`;
-          await fetch(hookWithCache, { method: 'POST', mode: 'no-cors' });
-          
-          await updateSyncLog({ 
-            action: 'Sync', status: 'Success', message: 'Manual Deploy Triggered', author: 'Admin'
+          } catch (e) { /* ignore read error, file might not exist yet */ }
+
+          // 2. PUT Request
+          const body = JSON.stringify({
+              message,
+              content: contentBase64,
+              sha: currentSha,
+              branch: branch
           });
-      } catch (e: any) {
-          throw new Error("Failed to trigger deploy hook.");
+
+          let putRes;
+          try {
+               putRes = await fetch(`https://api.github.com/repos/${sanitizedOwner}/${sanitizedRepo}/contents/${path}`, {
+                  method: 'PUT',
+                  headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                  body
+              });
+          } catch(e) {
+               putRes = await fetch(`/api/data?${proxyParams}`, {
+                  method: 'PUT',
+                  headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                  body
+              });
+          }
+
+          if (putRes && putRes.status === 409 && retries > 0) {
+              await new Promise(r => setTimeout(r, 1000));
+              return updateRepoFile(path, contentBase64, message, retries - 1);
+          }
+
+          if (!putRes || !putRes.ok) {
+              throw new Error(`Failed to update ${path}`);
+          }
+
+          const resJson = await putRes.json();
+          return resJson.content ? resJson.content.sha : resJson.sha;
+
+      } catch (e) {
+          if (retries > 0) {
+              await new Promise(r => setTimeout(r, 1000));
+              return updateRepoFile(path, contentBase64, message, retries - 1);
+          }
+          throw e;
       }
   };
 
-  // --- Core Logic: Sync (Push then Pull) ---
+  // --- Core Logic: Sync (Push to data.json AND data.ts) ---
   const syncData = async (commitMessage = "Update from CMS") => {
       if (!navigator.onLine) throw new Error("No internet connection.");
 
@@ -352,120 +272,54 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const now = new Date();
       const currentUser = localStorage.getItem('github_owner') || 'Admin';
       
-      const payload = {
-          projects: stateRef.current.projects,
-          experience: stateRef.current.experience,
-          clients: stateRef.current.clients,
-          skills: stateRef.current.skills,
-          config: stateRef.current.config,
-          socials: stateRef.current.socials,
-          lastUpdated: now.toISOString()
-      };
-      
-      const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
-      const sanitizedOwner = encodeURIComponent(owner);
-      const sanitizedRepo = encodeURIComponent(repo);
-      const sanitizedBranch = encodeURIComponent(branch);
-      
-      // Param string for proxy fallback
-      const proxyParams = `path=src/data.json&branch=${sanitizedBranch}`;
-
-      // Recursive attempt function for the Push
-      const attemptPush = async (retriesLeft: number): Promise<void> => {
-          try {
-              let currentSha: string | undefined = undefined;
-              
-              // 1. Get SHA (READ)
-              // Ensure we read from the same branch we intend to write to
-              try {
-                  const getRes = await fetch(`https://api.github.com/repos/${sanitizedOwner}/${sanitizedRepo}/contents/src/data.json?ref=${sanitizedBranch}&t=${Date.now()}`, {
-                      headers: { 'Authorization': `Bearer ${token}` },
-                      cache: 'no-store'
-                  });
-
-                  if (getRes.ok) {
-                      const currentFile = await getRes.json();
-                      currentSha = currentFile.sha;
-                  } else {
-                      // Try proxy read if direct read fails (e.g. 403/cors)
-                       const proxyRes = await fetch(`/api/data?${proxyParams}`, { headers: { 'Authorization': `Bearer ${token}` } });
-                       if (proxyRes.ok) {
-                           const data = await proxyRes.json();
-                           currentSha = data._sha;
-                       }
-                  }
-              } catch (readError) {
-                   console.warn("Read failed during push prep", readError);
-              }
-
-              // 2. Put Content (WRITE)
-              const body = JSON.stringify({
-                  message: commitMessage,
-                  content: contentBase64,
-                  sha: currentSha,
-                  branch: branch
-              });
-
-              let putRes;
-              
-              try {
-                  // Strategy A: Direct GitHub
-                  putRes = await fetch(`https://api.github.com/repos/${sanitizedOwner}/${sanitizedRepo}/contents/src/data.json`, {
-                      method: 'PUT',
-                      headers: {
-                          'Authorization': `Bearer ${token}`,
-                          'Content-Type': 'application/json',
-                      },
-                      body
-                  });
-              } catch (netErr) {
-                  // Strategy B: Proxy Fallback
-                  putRes = await fetch(`/api/data?${proxyParams}`, {
-                      method: 'PUT',
-                      headers: {
-                          'Authorization': `Bearer ${token}`,
-                          'Content-Type': 'application/json'
-                      },
-                      body
-                  });
-              }
-
-              if (putRes && putRes.status === 409 && retriesLeft > 0) {
-                  await new Promise(r => setTimeout(r, 800)); 
-                  return attemptPush(retriesLeft - 1);
-              }
-
-              if (!putRes || !putRes.ok) {
-                  const errData = putRes ? await putRes.json().catch(() => ({})) : {};
-                  throw new Error(errData.message || `API Error: ${putRes?.status}`);
-              }
-
-              const result = await putRes.json();
-              const newSha = result.content ? result.content.sha : result.sha; 
-              
-              setFileSha(newSha);
-              setLastUpdated(now);
-              setHasNewVersion(false);
-              
-              const url = `${window.location.origin}/preview?t=${now.getTime()}`;
-              setLatestPreviewUrl(url);
-
-          } catch (e: any) {
-              if (retriesLeft > 0) {
-                 await new Promise(r => setTimeout(r, 1000));
-                 return attemptPush(retriesLeft - 1);
-              }
-              throw e;
-          }
-      };
-
       try {
-          await attemptPush(3);
+          // --- 1. Update src/data.json (For Runtime Fetching) ---
+          const payload = {
+              projects: stateRef.current.projects,
+              experience: stateRef.current.experience,
+              clients: stateRef.current.clients,
+              skills: stateRef.current.skills,
+              config: stateRef.current.config,
+              socials: stateRef.current.socials,
+              lastUpdated: now.toISOString()
+          };
+          const jsonBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
           
+          const newJsonSha = await updateRepoFile('src/data.json', jsonBase64, commitMessage);
+          setFileSha(newJsonSha);
+
+          // --- 2. Update src/data.ts (For Codebase/Build Consistency) ---
+          // We generate valid TypeScript code so the repo source is always up to date
+          const tsContent = `import { Project, Experience, SocialLink, Client, SkillCategory, GlobalConfig } from './types';
+
+export const LAST_UPDATED = "${now.toISOString()}";
+
+export const INITIAL_CONFIG: GlobalConfig = ${JSON.stringify(stateRef.current.config, null, 2)};
+
+export const PROJECTS: Project[] = ${JSON.stringify(stateRef.current.projects, null, 2)};
+
+export const EXPERIENCE: Experience[] = ${JSON.stringify(stateRef.current.experience, null, 2)};
+
+export const CLIENTS: Client[] = ${JSON.stringify(stateRef.current.clients, null, 2)};
+
+export const SKILLS: SkillCategory[] = ${JSON.stringify(stateRef.current.skills, null, 2)};
+
+export const SOCIALS: SocialLink[] = ${JSON.stringify(stateRef.current.socials, null, 2)};
+`;
+          const tsBase64 = btoa(unescape(encodeURIComponent(tsContent)));
+          await updateRepoFile('src/data.ts', tsBase64, commitMessage);
+
+          // Success State
+          setLastUpdated(now);
+          setHasNewVersion(false);
+          setLatestPreviewUrl(`${window.location.origin}/preview?t=${now.getTime()}`);
+
+          // Log Success
           await updateSyncLog({ 
             action: 'Push', status: 'Success', message: commitMessage, author: currentUser
           });
 
+          // Trigger Vercel Deploy Hook if present
           const deployHook = localStorage.getItem('vercel_deploy_hook');
           if (deployHook) {
               fetch(deployHook, { method: 'POST', mode: 'no-cors' }).catch(() => {});
@@ -473,15 +327,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
           // Force Pull to verify consistency
           await new Promise(r => setTimeout(r, 1500));
-          const pulled = await fetchData(true);
-          
-          if (pulled) {
-              await updateSyncLog({ action: 'Pull', status: 'Success', message: 'Verified update', author: 'System' });
-          } else {
-              console.warn("Immediate pull verification failed, retrying in background...");
-              // Retry once more
-              setTimeout(() => fetchData(true), 4000);
-          }
+          fetchData(true);
 
       } catch (e: any) {
           console.error("Sync Data Failed", e);
@@ -503,39 +349,71 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (data.socials) setSocials(data.socials);
       if (data.lastUpdated) setLastUpdated(new Date(data.lastUpdated));
   };
-  
+
+  // --- Internal: Update Sync Log ---
+  const updateSyncLog = async (entry: Omit<SyncLogEntry, 'id' | 'timestamp'>) => {
+    // (Existing log logic kept intact but using updateRepoFile could simplify it. 
+    //  Keeping it explicit here to avoid recursion issues if updateRepoFile logs internally.)
+    const { token, owner, repo } = getAuth();
+    if (!token) return;
+
+    const logPath = 'public/admin/sync-log.json';
+    const newEntry: SyncLogEntry = {
+        id: self.crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        ...entry
+    };
+    
+    try {
+        let logs: SyncLogEntry[] = [];
+        let sha = '';
+        const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}?ref=${branch}&t=${Date.now()}`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+            cache: 'no-store'
+        });
+        if (getRes.ok) {
+            const data = await getRes.json();
+            sha = data.sha;
+            logs = JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\s/g, '')))));
+        }
+
+        const updatedLogs = [newEntry, ...logs].slice(0, 50);
+        const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(updatedLogs, null, 2))));
+
+        await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}`, {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: `Log: ${entry.action}`,
+                content: contentBase64,
+                sha: sha || undefined,
+                branch: branch
+            })
+        });
+    } catch (e) { /* ignore log errors */ }
+  };
+
   // --- Lifecycle ---
   useEffect(() => {
-      // Initial Load
       fetchData();
-      
-      // Polling Logic
-      // Check every 15 seconds to be more responsive to global updates
-      const interval = setInterval(() => {
-          fetchData(true);
-      }, 15000);
-      
+      const interval = setInterval(() => fetchData(true), 15000);
       return () => clearInterval(interval);
   }, [fetchData]);
 
-  // Wrappers (mostly unchanged)
+  // Wrappers
   const updateProject = (id: string, data: Partial<Project>) => setProjects(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
   const addProject = (p: Project) => setProjects(prev => [p, ...prev]);
   const deleteProject = (id: string) => setProjects(prev => prev.filter(p => p.id !== id));
-  
   const updateExperience = (id: string, data: Partial<Experience>) => setExperience(prev => prev.map(e => e.id === id ? { ...e, ...data } : e));
   const addExperience = (e: Experience) => setExperience(prev => [e, ...prev]);
   const deleteExperience = (id: string) => setExperience(prev => prev.filter(e => e.id !== id));
   const reorderExperience = (items: Experience[]) => setExperience(items);
-
   const updateClient = (id: string, data: Partial<Client>) => setClients(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
   const addClient = (c: Client) => setClients(prev => [...prev, c]);
   const deleteClient = (id: string) => setClients(prev => prev.filter(c => c.id !== id));
-
   const updateSkill = (id: string, data: Partial<SkillCategory>) => setSkills(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
   const addSkill = (s: SkillCategory) => setSkills(prev => [...prev, s]);
   const deleteSkill = (id: string) => setSkills(prev => prev.filter(s => s.id !== id));
-
   const updateConfig = (data: Partial<GlobalConfig>) => setConfig(prev => ({ ...prev, ...data }));
   const updateSocials = (data: SocialLink[]) => setSocials(data);
 
@@ -554,14 +432,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const { token, owner, repo } = getAuth();
       if (!token || !owner || !repo) return { success: false, message: "Missing Credentials" };
       try {
-          // Verify repo access
           const res = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`, {
               headers: { 'Authorization': `Bearer ${token}` }
           });
           if (res.ok) {
                const data = await res.json();
-               // IMPORTANT: Update branch state to match repo default if currently default 'main'
-               // This ensures we sync to the correct place
                if (branch === 'main' && data.default_branch !== 'main') {
                    setBranch(data.default_branch);
                }
@@ -602,6 +477,35 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const content = JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\s/g, '')))));
           applyData(content);
           setTimeout(() => syncData(`Restored version ${sha.substring(0,7)}`), 500);
+      }
+  };
+
+  const getSyncHistory = async (): Promise<SyncLogEntry[]> => {
+      const { token, owner, repo } = getAuth();
+      if (!token) return [];
+      const logPath = 'public/admin/sync-log.json';
+      try {
+          const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}?ref=${branch}&t=${Date.now()}`, {
+             headers: { 'Authorization': `Bearer ${token}` },
+             cache: 'no-store'
+          });
+          if (res.ok) {
+              const data = await res.json();
+              return JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\s/g, '')))));
+          }
+      } catch (e) {}
+      return [];
+  };
+
+  const triggerDeploy = async () => {
+       const deployHook = localStorage.getItem('vercel_deploy_hook');
+      if (!deployHook) throw new Error("No Deploy Hook configured in Settings.");
+      try {
+          const separator = deployHook.includes('?') ? '&' : '?';
+          const hookWithCache = `${deployHook}${separator}t=${Date.now()}`;
+          await fetch(hookWithCache, { method: 'POST', mode: 'no-cors' });
+      } catch (e: any) {
+          throw new Error("Failed to trigger deploy hook.");
       }
   };
 

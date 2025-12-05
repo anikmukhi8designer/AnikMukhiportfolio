@@ -26,7 +26,7 @@ declare const Buffer: {
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // 1. Kill Cache - Strict
+  // 1. Kill Cache - Strict Headers to prevent stale data on devices
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
@@ -54,10 +54,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Missing GitHub Token configuration' });
   }
 
-  // 4. Target Path & Branch
+  // 4. Target Path & Branch Handling
+  // We explicitly look for 'branch' or 'ref' to ensure we read/write the correct version
   const { path, branch, ref } = req.query;
   const targetPath = Array.isArray(path) ? path[0] : (path || 'src/data.json');
-  // Support 'branch' or 'ref' param, default to undefined (which lets GitHub use repo default)
   const targetRef = (Array.isArray(branch) ? branch[0] : branch) || (Array.isArray(ref) ? ref[0] : ref);
   
   const targetOwner = owner; 
@@ -69,14 +69,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const timestamp = Date.now(); 
-    // Add randomness to prevent GitHub edge caching
     const cacheBuster = Math.random().toString(36).substring(7);
 
     // --- HANDLE GET (READ) ---
     if (req.method === 'GET') {
         let ghUrl = `https://api.github.com/repos/${targetOwner}/${targetRepo}/contents/${targetPath}?t=${timestamp}&cb=${cacheBuster}`;
         
-        // Append ref if provided
+        // IMPORTANT: Append ref if provided to get data from specific branch
         if (targetRef) {
             ghUrl += `&ref=${encodeURIComponent(targetRef)}`;
         }
@@ -105,7 +104,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 }
                 return res.status(200).json(json);
             } catch (e) {
-                // If it's not JSON (e.g. image), return raw data structure
                 return res.status(200).json(data);
             }
         }
@@ -118,7 +116,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const ghUrl = `https://api.github.com/repos/${targetOwner}/${targetRepo}/contents/${targetPath}`;
         
         const body = req.body;
-        // Ensure body includes branch if we are writing to a specific one
+        
+        // IMPORTANT: If we are writing, we MUST specify the branch in the body if it's not the default
         if (targetRef && body && typeof body === 'object') {
             body.branch = targetRef;
         }
