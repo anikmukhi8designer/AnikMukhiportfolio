@@ -126,18 +126,22 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const cacheBuster = Math.random().toString(36).substring(7);
         let fetchSuccess = false;
 
+        const sanitizedBranch = encodeURIComponent(branch);
+        // Param string for proxy fallback
+        const proxyParams = `path=src/data.json&branch=${sanitizedBranch}&t=${timestamp}&cb=${cacheBuster}`;
+
         // PATH 1: Admin (Direct GitHub API)
         if (token && owner && repo) {
             try {
                 const sanitizedOwner = encodeURIComponent(owner);
                 const sanitizedRepo = encodeURIComponent(repo);
-                const sanitizedBranch = encodeURIComponent(branch);
                 
                 const url = `https://api.github.com/repos/${sanitizedOwner}/${sanitizedRepo}/contents/src/data.json?ref=${sanitizedBranch}&t=${timestamp}&cb=${cacheBuster}`;
                 const res = await fetch(url, { 
                     headers: { 
                         'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/vnd.github.v3+json'
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Cache-Control': 'no-cache'
                     },
                     cache: 'no-store'
                 });
@@ -154,12 +158,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         } 
         
         // PATH 2: Proxy (Fallback or Guest)
+        // Note: We now explicitly pass 'branch' to the proxy
         if (!fetchSuccess) {
-            // Include token if available to bypass rate limits or access private repos via proxy
-            const headers: HeadersInit = {};
+            const headers: HeadersInit = { 'Cache-Control': 'no-cache' };
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            const res = await fetch(`/api/data?path=src/data.json&t=${timestamp}&cb=${cacheBuster}`, { headers });
+            const res = await fetch(`/api/data?${proxyParams}`, { headers, cache: 'no-store' });
             if (res.ok) {
                 const data = await res.json();
                 if (!data.error) {
@@ -171,14 +175,25 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         if (fetchSuccess && content) {
-            // Check if data is new
+            // Check if data is new based on SHA difference
             if (fileSha && sha && fileSha !== sha) {
                 const isAdmin = !!token;
-                if (isAdmin) {
-                    setHasNewVersion(true);
+                
+                // If it's a silent poll (auto-refresh), we update logic
+                if (silent) {
+                    if (isAdmin) {
+                        // Admins get a notification/button
+                        setHasNewVersion(true);
+                    } else {
+                        // Guests get auto-updated
+                        applyData(content);
+                        setFileSha(sha);
+                    }
                 } else {
+                    // Manual refresh always applies
                     applyData(content);
                     setFileSha(sha);
+                    setHasNewVersion(false);
                 }
             } else if (!fileSha) {
                 // First load
@@ -207,6 +222,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         timestamp: new Date().toISOString(),
         ...entry
     };
+    
+    const sanitizedBranch = encodeURIComponent(branch);
+    const proxyParams = `path=${logPath}&branch=${sanitizedBranch}`;
 
     try {
         // Best-effort update via proxy fallback mechanism
@@ -225,7 +243,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 logs = JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\s/g, '')))));
             } else {
                 // Try proxy
-                const proxyRes = await fetch(`/api/data?path=${logPath}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const proxyRes = await fetch(`/api/data?${proxyParams}`, { headers: { 'Authorization': `Bearer ${token}` } });
                 if (proxyRes.ok) {
                     const data = await proxyRes.json();
                     if (!data.error) {
@@ -256,7 +274,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             });
         } catch(directErr) {
              // Proxy write fallback
-             await fetch(`/api/data?path=${logPath}`, {
+             await fetch(`/api/data?${proxyParams}`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -281,6 +299,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (!token) return [];
       
       const logPath = 'public/admin/sync-log.json';
+      const proxyParams = `path=${logPath}&branch=${encodeURIComponent(branch)}`;
+      
       try {
           // Try direct
           const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}?ref=${branch}&t=${Date.now()}`, {
@@ -293,7 +313,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               return JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\s/g, '')))));
           } else {
               // Try proxy
-              const proxyRes = await fetch(`/api/data?path=${logPath}`, { headers: { 'Authorization': `Bearer ${token}` } });
+              const proxyRes = await fetch(`/api/data?${proxyParams}`, { headers: { 'Authorization': `Bearer ${token}` } });
               if (proxyRes.ok) {
                   const data = await proxyRes.json();
                   return data.error ? [] : data;
@@ -346,6 +366,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const sanitizedOwner = encodeURIComponent(owner);
       const sanitizedRepo = encodeURIComponent(repo);
       const sanitizedBranch = encodeURIComponent(branch);
+      
+      // Param string for proxy fallback
+      const proxyParams = `path=src/data.json&branch=${sanitizedBranch}`;
 
       // Recursive attempt function for the Push
       const attemptPush = async (retriesLeft: number): Promise<void> => {
@@ -353,6 +376,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               let currentSha: string | undefined = undefined;
               
               // 1. Get SHA (READ)
+              // Ensure we read from the same branch we intend to write to
               try {
                   const getRes = await fetch(`https://api.github.com/repos/${sanitizedOwner}/${sanitizedRepo}/contents/src/data.json?ref=${sanitizedBranch}&t=${Date.now()}`, {
                       headers: { 'Authorization': `Bearer ${token}` },
@@ -364,7 +388,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                       currentSha = currentFile.sha;
                   } else {
                       // Try proxy read if direct read fails (e.g. 403/cors)
-                       const proxyRes = await fetch(`/api/data?path=src/data.json`, { headers: { 'Authorization': `Bearer ${token}` } });
+                       const proxyRes = await fetch(`/api/data?${proxyParams}`, { headers: { 'Authorization': `Bearer ${token}` } });
                        if (proxyRes.ok) {
                            const data = await proxyRes.json();
                            currentSha = data._sha;
@@ -396,7 +420,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                   });
               } catch (netErr) {
                   // Strategy B: Proxy Fallback
-                  putRes = await fetch(`/api/data?path=src/data.json`, {
+                  putRes = await fetch(`/api/data?${proxyParams}`, {
                       method: 'PUT',
                       headers: {
                           'Authorization': `Bearer ${token}`,
@@ -448,7 +472,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
 
           // Force Pull to verify consistency
-          // Wait slightly for GitHub propagation if needed
           await new Promise(r => setTimeout(r, 1500));
           const pulled = await fetchData(true);
           
@@ -483,8 +506,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   
   // --- Lifecycle ---
   useEffect(() => {
+      // Initial Load
       fetchData();
-      const interval = setInterval(() => fetchData(true), 30000);
+      
+      // Polling Logic
+      // Check every 15 seconds to be more responsive to global updates
+      const interval = setInterval(() => {
+          fetchData(true);
+      }, 15000);
+      
       return () => clearInterval(interval);
   }, [fetchData]);
 
@@ -524,12 +554,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const { token, owner, repo } = getAuth();
       if (!token || !owner || !repo) return { success: false, message: "Missing Credentials" };
       try {
+          // Verify repo access
           const res = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`, {
               headers: { 'Authorization': `Bearer ${token}` }
           });
           if (res.ok) {
                const data = await res.json();
-               setBranch(data.default_branch);
+               // IMPORTANT: Update branch state to match repo default if currently default 'main'
+               // This ensures we sync to the correct place
+               if (branch === 'main' && data.default_branch !== 'main') {
+                   setBranch(data.default_branch);
+               }
                return { success: true, message: `Connected to ${data.default_branch}` };
           }
           return { success: false, message: `GitHub Error: ${res.status}` };

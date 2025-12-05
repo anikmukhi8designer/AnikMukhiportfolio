@@ -26,8 +26,10 @@ declare const Buffer: {
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // 1. Kill Cache
+  // 1. Kill Cache - Strict
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   
   // 2. CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -39,7 +41,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  // 3. Auth Strategy: Prefer Header Token (from CMS User), Fallback to Env Var
+  // 3. Auth Strategy
   const authHeader = req.headers.authorization;
   const token = authHeader 
     ? authHeader.replace('Bearer ', '') 
@@ -48,20 +50,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const owner = process.env.VITE_GITHUB_OWNER || process.env.GITHUB_OWNER;
   const repo = process.env.VITE_GITHUB_REPO || process.env.GITHUB_REPO;
 
-  // Note: For custom CMS users (localStorage), owner/repo might need to be passed in query or body
-  // But for the default setup, we use env vars or assume the token has access to the env-configured repo.
-
   if (!token) {
     return res.status(500).json({ error: 'Missing GitHub Token configuration' });
   }
 
-  // 4. Target Path
-  const { path } = req.query;
+  // 4. Target Path & Branch
+  const { path, branch, ref } = req.query;
   const targetPath = Array.isArray(path) ? path[0] : (path || 'src/data.json');
+  // Support 'branch' or 'ref' param, default to undefined (which lets GitHub use repo default)
+  const targetRef = (Array.isArray(branch) ? branch[0] : branch) || (Array.isArray(ref) ? ref[0] : ref);
   
-  // Resolve Repository Context
-  // If the request body has specific repo details (optional enhancement), use them.
-  // Otherwise default to Env vars.
   const targetOwner = owner; 
   const targetRepo = repo;
 
@@ -71,15 +69,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const timestamp = Date.now(); 
+    // Add randomness to prevent GitHub edge caching
+    const cacheBuster = Math.random().toString(36).substring(7);
 
     // --- HANDLE GET (READ) ---
     if (req.method === 'GET') {
-        const ghUrl = `https://api.github.com/repos/${targetOwner}/${targetRepo}/contents/${targetPath}?t=${timestamp}`;
+        let ghUrl = `https://api.github.com/repos/${targetOwner}/${targetRepo}/contents/${targetPath}?t=${timestamp}&cb=${cacheBuster}`;
+        
+        // Append ref if provided
+        if (targetRef) {
+            ghUrl += `&ref=${encodeURIComponent(targetRef)}`;
+        }
         
         const ghRes = await fetch(ghUrl, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Accept': 'application/vnd.github.v3+json',
+            'Cache-Control': 'no-cache'
           }
         });
 
@@ -99,7 +105,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 }
                 return res.status(200).json(json);
             } catch (e) {
-                return res.status(500).json({ error: 'Invalid JSON in source file' });
+                // If it's not JSON (e.g. image), return raw data structure
+                return res.status(200).json(data);
             }
         }
         
@@ -110,8 +117,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'PUT') {
         const ghUrl = `https://api.github.com/repos/${targetOwner}/${targetRepo}/contents/${targetPath}`;
         
-        // Body is already parsed by Vercel for JSON requests
         const body = req.body;
+        // Ensure body includes branch if we are writing to a specific one
+        if (targetRef && body && typeof body === 'object') {
+            body.branch = targetRef;
+        }
 
         const ghRes = await fetch(ghUrl, {
             method: 'PUT',
