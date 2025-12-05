@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, RefreshCw, UserCircle, Check, AlertCircle, Loader2, AlertTriangle, ExternalLink, Rocket, Database } from 'lucide-react';
+import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, RefreshCw, UserCircle, Check, AlertCircle, Loader2, Rocket, Database, UploadCloud } from 'lucide-react';
 import WorkTable from './WorkTable';
 import ExperienceTable from './ExperienceTable';
 import SkillsTable from './SkillsTable';
@@ -15,14 +15,16 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   const [activeTab, setActiveTab] = useState<'work' | 'experience' | 'skills' | 'clients' | 'settings'>('work');
-  const { resetData, syncData, triggerDeploy, lastUpdated, latestPreviewUrl, verifyConnection, isLoading, isSaving } = useData();
+  const { resetData, syncData, triggerDeploy, projects, reloadContent, verifyConnection, isLoading, isSaving } = useData();
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [deployStatus, setDeployStatus] = useState<'idle' | 'deploying' | 'success' | 'error'>('idle');
   
   const [errorMessage, setErrorMessage] = useState('');
   const [connectionError, setConnectionError] = useState<string | null>(null);
 
+  // Refresh data on mount to ensure we are fetching with authenticated permissions
   useEffect(() => {
+      reloadContent();
       verifyConnection().then(result => {
           if (!result.success) {
               setConnectionError(result.message);
@@ -73,7 +75,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
       return (
           <div className="min-h-screen bg-neutral-100 flex items-center justify-center flex-col gap-4">
               <Loader2 className="w-10 h-10 animate-spin text-neutral-400" />
-              <p className="text-neutral-500 text-sm font-medium">Connecting to Database...</p>
+              <p className="text-neutral-500 text-sm font-medium">Loading CMS...</p>
           </div>
       );
   }
@@ -87,12 +89,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
                   initial={{ opacity: 0, y: -20, x: '-50%' }}
                   animate={{ opacity: 1, y: 0, x: '-50%' }}
                   exit={{ opacity: 0, y: -20, x: '-50%' }}
-                  className="fixed top-8 left-1/2 z-50 flex items-center gap-3 bg-neutral-900 text-white px-6 py-4 rounded-full shadow-2xl"
+                  className="fixed top-8 left-1/2 z-[100] flex items-center gap-3 bg-neutral-900 text-white px-6 py-4 rounded-full shadow-2xl"
               >
                   <Check className="w-5 h-5 text-green-400" />
                   <div className="flex flex-col">
-                      <span className="text-sm font-bold">Saved to Database</span>
-                      <span className="text-xs text-neutral-400">Your content is live.</span>
+                      <span className="text-sm font-bold">Backed up to GitHub</span>
+                      <span className="text-xs text-neutral-400">Repository synced successfully.</span>
                   </div>
               </motion.div>
           )}
@@ -141,10 +143,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
                         ? 'bg-green-50 text-green-600 border border-green-200'
                         : 'bg-neutral-900 text-white border border-neutral-900 hover:bg-neutral-800'
                     }`}
+                    title="Backup current data to GitHub repository"
                 >
-                    {syncStatus === 'syncing' ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                    {syncStatus === 'syncing' ? <Loader2 className="w-3 h-3 animate-spin" /> : <UploadCloud className="w-3 h-3" />}
                     <span className="hidden md:inline">
-                        {syncStatus === 'syncing' ? 'Saving...' : 'Save to DB'}
+                        {syncStatus === 'syncing' ? 'Backing up...' : 'Backup to GitHub'}
                     </span>
                 </button>
             </div>
@@ -161,6 +164,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
       {/* Main Content */}
       <main className="flex-grow p-4 md:p-8 max-w-7xl mx-auto w-full overflow-hidden flex flex-col">
         
+        {/* Error Banner */}
         {connectionError && (
              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-4">
                  <div className="p-2 bg-red-100 rounded-lg text-red-600">
@@ -171,6 +175,31 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
                      <p className="text-sm text-red-600 mb-3">{connectionError}</p>
                  </div>
              </div>
+        )}
+
+        {/* Empty State Banner - Prompt to Seed */}
+        {!connectionError && projects.length === 0 && (
+            <div className="mb-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+                <div className="flex gap-4">
+                    <div className="p-3 bg-white rounded-xl shadow-sm text-blue-600">
+                        <Database className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-blue-900">Database is Empty</h3>
+                        <p className="text-blue-700/80 text-sm leading-relaxed max-w-md">
+                            It looks like you just set up the database. 
+                            Would you like to populate it with the demo portfolio content?
+                        </p>
+                    </div>
+                </div>
+                <button 
+                    onClick={resetData}
+                    className="whitespace-nowrap px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2"
+                >
+                    <RefreshCw className="w-4 h-4" />
+                    Seed Demo Data
+                </button>
+            </div>
         )}
 
         {/* Tabs - Scrollable on mobile */}
@@ -228,10 +257,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
         <div className="mt-12 pt-8 border-t border-neutral-200 flex flex-col sm:flex-row justify-between items-center text-sm text-neutral-500 gap-4">
             <p className="flex items-center gap-2">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                Connected to Supabase
+                Real-time connection active
             </p>
             <button onClick={resetData} className="text-red-500 hover:text-red-700 underline text-xs">
-                Reset to Demo Data
+                Hard Reset Database (Dev Only)
             </button>
         </div>
       </main>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Database, Key, Loader2, AlertCircle } from 'lucide-react';
+import { Database, Key, Loader2, AlertCircle, UserPlus, LogIn } from 'lucide-react';
 import { supabase } from '../../src/supabaseClient';
 import DbStatus from '../DbStatus';
 
@@ -12,33 +12,38 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [message, setMessage] = useState('');
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setMessage('');
 
     try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
-
-        if (error) throw error;
-        
-        if (data.user) {
-            localStorage.setItem('supabase_user', data.user.id);
-            onLogin();
+        if (isSignUp) {
+            const { data, error } = await supabase.auth.signUp({
+                email,
+                password,
+            });
+            if (error) throw error;
+            if (data.user) {
+                setMessage("Account created! You can now log in.");
+                setIsSignUp(false);
+            }
+        } else {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+            if (error) throw error;
+            if (data.user) {
+                localStorage.setItem('supabase_user', data.user.id);
+                onLogin();
+            }
         }
     } catch (err: any) {
-        // Fallback for demo purposes if Supabase Auth isn't set up yet
-        // If the user enters 'admin@demo.com' and 'password' we let them in locally 
-        // IF and ONLY IF connection failed (meaning maybe no users table yet).
-        if (email === 'admin@demo.com' && password === 'password') {
-             localStorage.setItem('supabase_user', 'demo-user');
-             onLogin();
-             return;
-        }
         setError(err.message || "Authentication failed");
     } finally {
         setLoading(false);
@@ -55,17 +60,26 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
             <div className="w-12 h-12 bg-neutral-900 text-white rounded-xl flex items-center justify-center mx-auto mb-4">
                 <Database className="w-6 h-6" />
             </div>
-            <h1 className="text-2xl font-bold text-neutral-900 mb-2">CMS Login</h1>
+            <h1 className="text-2xl font-bold text-neutral-900 mb-2">
+                {isSignUp ? 'Create Admin Account' : 'CMS Login'}
+            </h1>
             <p className="text-sm text-neutral-500">
-                Sign in to your Supabase-backed Portfolio CMS.
+                {isSignUp ? 'Set up your secure access credentials.' : 'Sign in to your Supabase-backed Portfolio.'}
             </p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-5">
+        <form onSubmit={handleAuth} className="space-y-5">
             {error && (
                 <div className="p-3 bg-red-50 border border-red-100 rounded-lg flex items-start gap-2 text-sm text-red-600">
                     <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                     <span>{error}</span>
+                </div>
+            )}
+            
+            {message && (
+                <div className="p-3 bg-green-50 border border-green-100 rounded-lg flex items-start gap-2 text-sm text-green-600">
+                    <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <span>{message}</span>
                 </div>
             )}
 
@@ -91,6 +105,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••"
+                        minLength={6}
                     />
                     <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                 </div>
@@ -101,15 +116,18 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                 disabled={loading}
                 className="w-full py-3 bg-neutral-900 hover:bg-black text-white font-bold rounded-lg transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-4"
             >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
-                {loading ? 'Verifying...' : 'Sign In'}
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (isSignUp ? <UserPlus className="w-4 h-4"/> : <LogIn className="w-4 h-4" />)}
+                {loading ? 'Processing...' : (isSignUp ? 'Create Account' : 'Sign In')}
             </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-neutral-100 text-center">
-            <p className="text-xs text-neutral-400">
-                Data is securely stored in your linked Supabase database.
-            </p>
+        <div className="mt-6 pt-6 border-t border-neutral-100 text-center">
+            <button 
+                onClick={() => { setIsSignUp(!isSignUp); setError(''); setMessage(''); }}
+                className="text-xs text-neutral-500 hover:text-neutral-900 font-medium underline"
+            >
+                {isSignUp ? "Already have an account? Sign in" : "Need to configure a new user? Sign up"}
+            </button>
         </div>
       </div>
     </div>
