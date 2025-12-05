@@ -113,6 +113,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         let fetchSuccess = false;
 
         const sanitizedBranch = encodeURIComponent(branch);
+        // We always fetch data.json for runtime state
         const proxyParams = `path=src/data.json&branch=${sanitizedBranch}&t=${timestamp}&cb=${cacheBuster}`;
 
         // PATH 1: Admin (Direct GitHub API)
@@ -286,10 +287,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const jsonBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
           
           const newJsonSha = await updateRepoFile('src/data.json', jsonBase64, commitMessage);
-          setFileSha(newJsonSha);
-
+          
           // --- 2. Update src/data.ts (For Codebase/Build Consistency) ---
-          // We generate valid TypeScript code so the repo source is always up to date
+          // This ensures that when the site rebuilds, the source code matches the runtime JSON.
           const tsContent = `import { Project, Experience, SocialLink, Client, SkillCategory, GlobalConfig } from './types';
 
 export const LAST_UPDATED = "${now.toISOString()}";
@@ -309,7 +309,8 @@ export const SOCIALS: SocialLink[] = ${JSON.stringify(stateRef.current.socials, 
           const tsBase64 = btoa(unescape(encodeURIComponent(tsContent)));
           await updateRepoFile('src/data.ts', tsBase64, commitMessage);
 
-          // Success State
+          // Success State Update
+          setFileSha(newJsonSha);
           setLastUpdated(now);
           setHasNewVersion(false);
           setLatestPreviewUrl(`${window.location.origin}/preview?t=${now.getTime()}`);
@@ -325,9 +326,14 @@ export const SOCIALS: SocialLink[] = ${JSON.stringify(stateRef.current.socials, 
               fetch(deployHook, { method: 'POST', mode: 'no-cors' }).catch(() => {});
           }
 
-          // Force Pull to verify consistency
+          // --- 3. Validate by Pulling Back ---
+          // Force a fetch to verify the data is reachable and matches expectations
           await new Promise(r => setTimeout(r, 1500));
-          fetchData(true);
+          const verified = await fetchData(true);
+          
+          if (!verified) {
+              console.warn("Post-sync validation: Could not immediately fetch updated data. Caches might be stale.");
+          }
 
       } catch (e: any) {
           console.error("Sync Data Failed", e);
@@ -352,8 +358,6 @@ export const SOCIALS: SocialLink[] = ${JSON.stringify(stateRef.current.socials, 
 
   // --- Internal: Update Sync Log ---
   const updateSyncLog = async (entry: Omit<SyncLogEntry, 'id' | 'timestamp'>) => {
-    // (Existing log logic kept intact but using updateRepoFile could simplify it. 
-    //  Keeping it explicit here to avoid recursion issues if updateRepoFile logs internally.)
     const { token, owner, repo } = getAuth();
     if (!token) return;
 
@@ -367,19 +371,24 @@ export const SOCIALS: SocialLink[] = ${JSON.stringify(stateRef.current.socials, 
     try {
         let logs: SyncLogEntry[] = [];
         let sha = '';
-        const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}?ref=${branch}&t=${Date.now()}`, {
-            headers: { 'Authorization': `Bearer ${token}` },
-            cache: 'no-store'
-        });
-        if (getRes.ok) {
-            const data = await getRes.json();
-            sha = data.sha;
-            logs = JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\s/g, '')))));
-        }
+        
+        // Read existing logs
+        try {
+            const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}?ref=${branch}&t=${Date.now()}`, {
+                headers: { 'Authorization': `Bearer ${token}` },
+                cache: 'no-store'
+            });
+            if (getRes.ok) {
+                const data = await getRes.json();
+                sha = data.sha;
+                logs = JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\s/g, '')))));
+            }
+        } catch (e) {}
 
         const updatedLogs = [newEntry, ...logs].slice(0, 50);
         const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(updatedLogs, null, 2))));
 
+        // Write new logs
         await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${logPath}`, {
             method: 'PUT',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
