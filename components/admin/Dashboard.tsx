@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Radio, RefreshCw, UserCircle, Check, AlertCircle, History, ExternalLink, Clock, Loader2, AlertTriangle, Settings as SettingsIcon, GitBranch, List } from 'lucide-react';
+import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, Radio, RefreshCw, UserCircle, Check, AlertCircle, History, ExternalLink, Clock, Loader2, AlertTriangle, Settings as SettingsIcon, GitBranch, List, X } from 'lucide-react';
 import WorkTable from './WorkTable';
 import ExperienceTable from './ExperienceTable';
 import SkillsTable from './SkillsTable';
@@ -18,7 +18,7 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   const [activeTab, setActiveTab] = useState<'work' | 'experience' | 'skills' | 'clients' | 'settings' | 'history' | 'sync_logs'>('work');
-  const { resetData, syncData, lastUpdated, latestPreviewUrl, verifyConnection, isLoading, error, branch } = useData();
+  const { resetData, syncData, lastUpdated, latestPreviewUrl, verifyConnection, isLoading, error, branch, isSaving } = useData();
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -37,16 +37,28 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   }, []);
 
   const handleSync = async () => {
+    if (isSaving || syncStatus === 'syncing') return;
+
     setSyncStatus('syncing');
     setErrorMessage('');
+    const startTime = Date.now();
+
     try {
         await syncData("Manual Sync from Admin Dashboard");
+        
+        // Ensure spinner shows for at least 800ms for UX
+        const elapsed = Date.now() - startTime;
+        if (elapsed < 800) await new Promise(r => setTimeout(r, 800 - elapsed));
+        
         setSyncStatus('success');
-        setTimeout(() => setSyncStatus('idle'), 3000);
+        
+        // Reset to idle after 4 seconds
+        setTimeout(() => setSyncStatus('idle'), 4000);
     } catch (e: any) {
         console.error("Sync Error:", e);
         setSyncStatus('error');
-        setErrorMessage(e.message || "Sync Failed");
+        setErrorMessage(e.message || "Sync Failed. Check console or Logs.");
+        
         setTimeout(() => {
             setSyncStatus('idle');
             setErrorMessage('');
@@ -65,6 +77,40 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
 
   return (
     <div className="min-h-screen bg-neutral-100 flex flex-col">
+      {/* Toast Notification */}
+      <AnimatePresence>
+          {syncStatus === 'success' && (
+              <motion.div 
+                  initial={{ opacity: 0, y: -20, x: '-50%' }}
+                  animate={{ opacity: 1, y: 0, x: '-50%' }}
+                  exit={{ opacity: 0, y: -20, x: '-50%' }}
+                  className="fixed top-8 left-1/2 z-50 flex items-center gap-3 bg-neutral-900 text-white px-6 py-4 rounded-full shadow-2xl"
+              >
+                  <Check className="w-5 h-5 text-green-400" />
+                  <div className="flex flex-col">
+                      <span className="text-sm font-bold">Sync Successful</span>
+                      <span className="text-xs text-neutral-400">Updates will appear on the live site shortly.</span>
+                  </div>
+                  <button onClick={() => setSyncStatus('idle')} className="ml-4 p-1 hover:bg-white/10 rounded-full"><X className="w-4 h-4"/></button>
+              </motion.div>
+          )}
+          {(syncStatus === 'error' || errorMessage) && (
+              <motion.div 
+                  initial={{ opacity: 0, y: -20, x: '-50%' }}
+                  animate={{ opacity: 1, y: 0, x: '-50%' }}
+                  exit={{ opacity: 0, y: -20, x: '-50%' }}
+                  className="fixed top-8 left-1/2 z-50 flex items-center gap-3 bg-red-600 text-white px-6 py-4 rounded-full shadow-2xl"
+              >
+                  <AlertTriangle className="w-5 h-5 text-white" />
+                  <div className="flex flex-col">
+                      <span className="text-sm font-bold">Sync Failed</span>
+                      <span className="text-xs text-white/80">{errorMessage}</span>
+                  </div>
+                  <button onClick={() => setErrorMessage('')} className="ml-4 p-1 hover:bg-white/10 rounded-full"><X className="w-4 h-4"/></button>
+              </motion.div>
+          )}
+      </AnimatePresence>
+
       {/* CMS Header */}
       <header className="bg-white border-b border-neutral-200 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
@@ -116,10 +162,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
                         : 'bg-neutral-900 text-white border border-neutral-900 hover:bg-neutral-800'
                     }`}
                 >
-                    {syncStatus === 'syncing' && <RefreshCw className="w-3 h-3 animate-spin" />}
+                    {syncStatus === 'syncing' && <Loader2 className="w-3 h-3 animate-spin" />}
                     {syncStatus === 'success' && <Check className="w-3 h-3" />}
                     {(syncStatus === 'error' || connectionError) && <AlertCircle className="w-3 h-3" />}
-                    {syncStatus === 'idle' && !connectionError && <Radio className="w-3 h-3" />}
+                    {syncStatus === 'idle' && !connectionError && <RefreshCw className="w-3 h-3" />}
                     
                     <span className="hidden md:inline">
                         {syncStatus === 'syncing' ? 'Syncing...' : 
@@ -129,20 +175,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
                         'Sync Data'}
                     </span>
                 </button>
-                {/* Error Tooltip */}
-                <AnimatePresence>
-                {errorMessage && (
-                    <motion.div 
-                        initial={{ opacity: 0, y: 10 }} 
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0 }}
-                        className="absolute top-full right-0 mt-2 p-3 bg-red-100 border border-red-200 rounded-lg text-xs text-red-700 whitespace-nowrap z-50 shadow-lg min-w-[200px] flex items-center gap-2"
-                    >
-                        <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0"/>
-                        <span>{errorMessage}</span>
-                    </motion.div>
-                )}
-                </AnimatePresence>
             </div>
 
             <div className="h-6 w-px bg-neutral-200"></div>

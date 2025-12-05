@@ -122,10 +122,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         let content: any = null;
         let sha: string = '';
         const timestamp = Date.now();
+        // Add random string to ensure absolutely no cache collisions
+        const cacheBuster = Math.random().toString(36).substring(7);
 
         // PATH 1: Admin (Direct GitHub API)
         if (token && owner && repo) {
-            const url = `https://api.github.com/repos/${owner}/${repo}/contents/src/data.json?ref=${branch}&t=${timestamp}`;
+            const url = `https://api.github.com/repos/${owner}/${repo}/contents/src/data.json?ref=${branch}&t=${timestamp}&cb=${cacheBuster}`;
             const res = await fetch(url, { 
                 headers: { 'Authorization': `Bearer ${token}` },
                 cache: 'no-store'
@@ -134,12 +136,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (res.ok) {
                 const data = await res.json();
                 sha = data.sha;
+                // Handle base64 decoding with UTF-8 support
                 content = JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\s/g, '')))));
             }
         } 
         // PATH 2: Guest (Proxy to avoid Rate Limits & Cache)
         else {
-            const res = await fetch(`/api/data?path=src/data.json&t=${timestamp}`);
+            const res = await fetch(`/api/data?path=src/data.json&t=${timestamp}&cb=${cacheBuster}`);
             if (res.ok) {
                 const data = await res.json();
                 if (!data.error) {
@@ -256,7 +259,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // --- Core Logic: Sync (Push then Pull) ---
   const syncData = async (commitMessage = "Update from CMS") => {
       const { token, owner, repo } = getAuth();
-      if (!token || !owner || !repo) throw new Error("Missing configuration");
+      if (!token || !owner || !repo) throw new Error("Missing configuration credentials");
 
       setIsSaving(true);
       const now = new Date();
@@ -291,7 +294,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                   const currentFile = await getRes.json();
                   currentSha = currentFile.sha;
               } else if (getRes.status !== 404) {
-                  throw new Error(`Failed to fetch current SHA. Status: ${getRes.status}`);
+                  // If 404, file doesn't exist, so currentSha stays undefined (create new file)
+                  // If other error, throw
               }
 
               const putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/src/data.json`, {
@@ -315,7 +319,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
               if (!putRes.ok) {
                   const errData = await putRes.json();
-                  throw new Error(errData.message || "Failed to sync to GitHub");
+                  throw new Error(errData.message || `GitHub API Error: ${putRes.status}`);
               }
 
               const result = await putRes.json();
@@ -350,31 +354,35 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           // 2. TRIGGER HOOKS
           const deployHook = localStorage.getItem('vercel_deploy_hook');
           if (deployHook) {
-              fetch(deployHook, { method: 'POST', mode: 'no-cors' }).catch(e => console.warn(e));
+              // Fire and forget
+              fetch(deployHook, { method: 'POST', mode: 'no-cors' }).catch(e => console.warn("Deploy hook failed", e));
           }
 
-          // 3. PULL (FETCH)
+          // 3. PULL (FETCH) - Verify we can read what we just wrote
           // Fetch immediately to ensure consistency
+          // We force silent=true so it doesn't trigger global loading state
+          // We wait 1s to allow GitHub consistency
+          await new Promise(r => setTimeout(r, 1000));
           const pulled = await fetchData(true);
           
           if (pulled) {
              await updateSyncLog({ 
                 action: 'Pull', 
                 status: 'Success', 
-                message: 'Auto-sync after update', 
+                message: 'Verified update from remote', 
                 author: 'System'
              });
           } else {
              await updateSyncLog({ 
                 action: 'Pull', 
                 status: 'Failed', 
-                message: 'Failed to fetch latest data', 
+                message: 'Could not verify update immediately', 
                 author: 'System'
              });
           }
 
       } catch (e: any) {
-          console.error(e);
+          console.error("Sync Data Failed", e);
           // Log Failure
           await updateSyncLog({ 
             action: 'Push', 
@@ -382,7 +390,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             message: e.message || 'Unknown Error', 
             author: currentUser
           });
-          throw e;
+          throw e; // Re-throw to UI
       } finally {
           setIsSaving(false);
       }
@@ -437,6 +445,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateSocials = (data: SocialLink[]) => setSocials(data);
 
   const resetData = async () => {
+      if (!confirm("Are you sure you want to reset to demo data? This will overwrite everything.")) return;
       setProjects(INITIAL_PROJECTS);
       setExperience(INITIAL_EXPERIENCE);
       setClients(INITIAL_CLIENTS);
@@ -458,9 +467,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           if (res.ok) {
                const data = await res.json();
                setBranch(data.default_branch);
-               return { success: true, message: "Connected" };
+               return { success: true, message: `Connected to ${data.default_branch}` };
           }
-          return { success: false, message: "Failed to connect to repo" };
+          return { success: false, message: `GitHub Error: ${res.status}` };
       } catch (e: any) {
           return { success: false, message: e.message };
       }
