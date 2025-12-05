@@ -13,6 +13,7 @@ import ScrollToTop from './components/ScrollToTop';
 import LoadingScreen from './components/LoadingScreen';
 import InteractiveGradient from './components/InteractiveGradient';
 import RefreshHandler from './components/RefreshHandler';
+import DbStatus from './components/DbStatus';
 import { ArrowDown, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 
@@ -25,7 +26,7 @@ import BlockEditor from './components/admin/BlockEditor';
 const AdminRoute = () => {
     const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
         // Check for the actual token, not just a boolean flag
-        const token = localStorage.getItem('github_token');
+        const token = localStorage.getItem('supabase_user');
         return !!token && token.length > 0;
     });
     
@@ -35,7 +36,6 @@ const AdminRoute = () => {
 
     if (!isAdminLoggedIn) {
         return <AdminLogin onLogin={() => {
-            // Token is already set in localStorage by AdminLogin
             setIsAdminLoggedIn(true);
         }} />;
     }
@@ -61,8 +61,7 @@ const AdminRoute = () => {
     return (
         <Dashboard 
             onLogout={() => { 
-                localStorage.removeItem('github_token');
-                // We keep owner/repo for convenience, but remove token to logout
+                localStorage.removeItem('supabase_user');
                 setIsAdminLoggedIn(false); 
                 window.location.hash = '';
                 window.location.reload();
@@ -146,6 +145,9 @@ const AppContent: React.FC = () => {
       
       {/* Real-time Update Notification */}
       <RefreshHandler />
+      
+      {/* Connection Status Indicator */}
+      <DbStatus />
 
       {/* Preview Mode Banner */}
       {isPreviewMode && (

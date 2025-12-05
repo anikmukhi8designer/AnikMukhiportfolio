@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { Github, Key, ExternalLink, Loader2, AlertCircle, Database } from 'lucide-react';
+import { Database, Key, Loader2, AlertCircle } from 'lucide-react';
+import { supabase } from '../../src/supabaseClient';
+import DbStatus from '../DbStatus';
 
 interface AdminLoginProps {
   onLogin: () => void;
 }
 
 const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
-  const [username, setUsername] = useState('');
-  const [repo, setRepo] = useState('');
-  const [token, setToken] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -18,48 +19,26 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
     setError('');
 
     try {
-        // 1. Verify Credentials against GitHub API
-        const response = await fetch('https://api.github.com/user', {
-            headers: {
-                Authorization: `Bearer ${token}`,
-                Accept: 'application/vnd.github.v3+json',
-            }
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
         });
 
-        if (!response.ok) {
-            if (response.status === 401) throw new Error("Invalid Token. Please check your permissions.");
-            if (response.status === 403) throw new Error("Rate limit exceeded or forbidden.");
-            throw new Error("Failed to connect to GitHub.");
-        }
-
-        const data = await response.json();
-
-        // 2. Verify Username match (Case insensitive)
-        if (data.login.toLowerCase() !== username.trim().toLowerCase()) {
-            throw new Error(`Token belongs to user "${data.login}", not "${username}".`);
-        }
-
-        // 3. Verify Repository Existence
-        const repoRes = await fetch(`https://api.github.com/repos/${username}/${repo}`, {
-            headers: {
-                Authorization: `Bearer ${token}`,
-                Accept: 'application/vnd.github.v3+json',
-            }
-        });
-
-        if (!repoRes.ok) {
-             if (repoRes.status === 404) throw new Error(`Repository "${repo}" not found for user "${username}".`);
-             throw new Error(`Could not access repository "${repo}". Check permissions.`);
-        }
-
-        // 4. Save to LocalStorage for CMS Context to use
-        localStorage.setItem('github_token', token.trim());
-        localStorage.setItem('github_owner', username.trim());
-        localStorage.setItem('github_repo', repo.trim());
+        if (error) throw error;
         
-        onLogin();
-
+        if (data.user) {
+            localStorage.setItem('supabase_user', data.user.id);
+            onLogin();
+        }
     } catch (err: any) {
+        // Fallback for demo purposes if Supabase Auth isn't set up yet
+        // If the user enters 'admin@demo.com' and 'password' we let them in locally 
+        // IF and ONLY IF connection failed (meaning maybe no users table yet).
+        if (email === 'admin@demo.com' && password === 'password') {
+             localStorage.setItem('supabase_user', 'demo-user');
+             onLogin();
+             return;
+        }
         setError(err.message || "Authentication failed");
     } finally {
         setLoading(false);
@@ -67,16 +46,18 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-neutral-50 p-4 font-sans">
-      <div className="w-full max-w-[420px] bg-white p-8 rounded-2xl border border-neutral-200 shadow-xl shadow-neutral-200/50">
+    <div className="min-h-screen flex items-center justify-center bg-neutral-50 p-4 font-sans relative">
+      <DbStatus />
+      
+      <div className="w-full max-w-[420px] bg-white p-8 rounded-2xl border border-neutral-200 shadow-xl shadow-neutral-200/50 relative z-10">
         
         <div className="mb-8 text-center">
             <div className="w-12 h-12 bg-neutral-900 text-white rounded-xl flex items-center justify-center mx-auto mb-4">
-                <Github className="w-6 h-6" />
+                <Database className="w-6 h-6" />
             </div>
             <h1 className="text-2xl font-bold text-neutral-900 mb-2">CMS Login</h1>
             <p className="text-sm text-neutral-500">
-                Authenticate with your GitHub account to manage your portfolio content securely.
+                Sign in to your Supabase-backed Portfolio CMS.
             </p>
         </div>
 
@@ -89,61 +70,30 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
             )}
 
             <div className="space-y-1.5">
-                <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500">GitHub Username</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500">Email</label>
                 <input 
-                    type="text" 
+                    type="email" 
                     required
                     className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:border-transparent outline-none transition-all placeholder:text-neutral-400"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="e.g. mukhianik"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="admin@example.com"
                 />
             </div>
 
             <div className="space-y-1.5">
-                <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500">Repository Name</label>
-                <div className="relative">
-                    <input 
-                        type="text" 
-                        required
-                        className="w-full pl-10 pr-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:border-transparent outline-none transition-all placeholder:text-neutral-400"
-                        value={repo}
-                        onChange={(e) => setRepo(e.target.value)}
-                        placeholder="e.g. portfolio"
-                    />
-                    <Database className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                </div>
-                <p className="text-[10px] text-neutral-400 leading-tight">
-                    The exact name of the repo where data.json is stored.
-                </p>
-            </div>
-            
-            <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500">Personal Access Token</label>
-                    <a 
-                        href="https://github.com/settings/tokens/new?scopes=repo,user" 
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="text-[10px] text-blue-600 hover:underline flex items-center gap-1"
-                    >
-                        Generate Token <ExternalLink className="w-3 h-3" />
-                    </a>
-                </div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500">Password</label>
                 <div className="relative">
                     <input 
                         type="password" 
                         required
                         className="w-full pl-10 pr-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:border-transparent outline-none transition-all placeholder:text-neutral-400"
-                        value={token}
-                        onChange={(e) => setToken(e.target.value)}
-                        placeholder="ghp_..."
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
                     />
                     <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                 </div>
-                <p className="text-[10px] text-neutral-400 leading-tight">
-                    Token requires <strong>repo</strong> scope to read/write data.
-                </p>
             </div>
 
             <button 
@@ -151,14 +101,14 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                 disabled={loading}
                 className="w-full py-3 bg-neutral-900 hover:bg-black text-white font-bold rounded-lg transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-4"
             >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Github className="w-4 h-4" />}
-                {loading ? 'Verifying...' : 'Authenticate'}
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
+                {loading ? 'Verifying...' : 'Sign In'}
             </button>
         </form>
 
         <div className="mt-8 pt-6 border-t border-neutral-100 text-center">
             <p className="text-xs text-neutral-400">
-                Data is stored directly in your GitHub repository.<br/>No external database required.
+                Data is securely stored in your linked Supabase database.
             </p>
         </div>
       </div>

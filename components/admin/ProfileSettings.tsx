@@ -1,21 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Save, Plus, Trash2, Loader2, Check, Github, Key, Database, Lock, AlertTriangle, Wifi, ExternalLink } from 'lucide-react';
+import { Save, Plus, Trash2, Loader2, Check, Database, AlertTriangle, Wifi, ExternalLink } from 'lucide-react';
 
 const ProfileSettings: React.FC = () => {
   const { config, socials, updateConfig, updateSocials, isSaving, verifyConnection } = useData();
   
-  // Local state to prevent rapid context updates while typing
   const [localConfig, setLocalConfig] = useState(config);
   const [localSocials, setLocalSocials] = useState(socials);
-  
-  // GitHub Config State
-  const [ghConfig, setGhConfig] = useState({
-      owner: '',
-      repo: '',
-      token: '',
-      deployHook: ''
-  });
+  const [deployHook, setDeployHook] = useState('');
 
   const [hasChanges, setHasChanges] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -24,29 +16,16 @@ const ProfileSettings: React.FC = () => {
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [connectionMsg, setConnectionMsg] = useState('');
 
-  // Sync with context and localStorage on mount
   useEffect(() => {
     setLocalConfig(config);
     setLocalSocials(socials);
-    setGhConfig({
-        owner: localStorage.getItem('github_owner') || '',
-        repo: localStorage.getItem('github_repo') || '',
-        token: localStorage.getItem('github_token') || '',
-        deployHook: localStorage.getItem('vercel_deploy_hook') || ''
-    });
+    setDeployHook(localStorage.getItem('vercel_deploy_hook') || '');
   }, [config, socials]);
 
   const handleConfigChange = (field: keyof typeof config, value: string) => {
       setLocalConfig(prev => ({ ...prev, [field]: value }));
       setHasChanges(true);
       setJustSaved(false);
-  };
-
-  const handleGhChange = (field: keyof typeof ghConfig, value: string) => {
-      setGhConfig(prev => ({ ...prev, [field]: value }));
-      setHasChanges(true);
-      setJustSaved(false);
-      setConnectionStatus('idle'); // Reset status on edit
   };
 
   const handleSocialChange = (index: number, field: keyof typeof localSocials[0], value: string) => {
@@ -72,41 +51,25 @@ const ProfileSettings: React.FC = () => {
   };
 
   const saveChanges = () => {
-      // Save Data
       updateConfig(localConfig);
       updateSocials(localSocials);
       
-      // Save GitHub Config
-      localStorage.setItem('github_owner', ghConfig.owner);
-      localStorage.setItem('github_repo', ghConfig.repo);
-      if (ghConfig.token) {
-          localStorage.setItem('github_token', ghConfig.token);
-      }
-      if (ghConfig.deployHook) {
-          localStorage.setItem('vercel_deploy_hook', ghConfig.deployHook);
+      if (deployHook) {
+          localStorage.setItem('vercel_deploy_hook', deployHook);
       } else {
           localStorage.removeItem('vercel_deploy_hook');
       }
       
       setHasChanges(false);
       setJustSaved(true);
-      
-      // Reset success message after 3s
       setTimeout(() => setJustSaved(false), 3000);
   };
 
   const testConnection = async () => {
       setConnectionStatus('testing');
       setConnectionMsg('');
-      
-      // Temporarily save to localStorage for the verify function to pick it up immediately
-      localStorage.setItem('github_owner', ghConfig.owner);
-      localStorage.setItem('github_repo', ghConfig.repo);
-      if (ghConfig.token) localStorage.setItem('github_token', ghConfig.token);
-      
       try {
         const result = await verifyConnection();
-        
         if (result.success) {
             setConnectionStatus('success');
             setConnectionMsg(result.message);
@@ -114,7 +77,8 @@ const ProfileSettings: React.FC = () => {
             setConnectionStatus('error');
             setConnectionMsg(result.message);
         }
-      } finally {
+      } catch(e) {
+          setConnectionStatus('error');
       }
   };
 
@@ -140,7 +104,7 @@ const ProfileSettings: React.FC = () => {
           </button>
       </div>
 
-      {/* GitHub CMS Configuration */}
+      {/* Database Connection */}
       <section className="space-y-6 bg-white p-6 rounded-xl border border-neutral-200 shadow-sm">
         <div className="flex justify-between items-start border-b border-neutral-100 pb-4">
             <div className="flex items-center gap-3">
@@ -148,8 +112,8 @@ const ProfileSettings: React.FC = () => {
                     <Database className="w-5 h-5" />
                 </div>
                 <div>
-                    <h3 className="text-lg font-bold text-neutral-900">CMS Configuration</h3>
-                    <p className="text-xs text-neutral-500">Connected via GitHub API.</p>
+                    <h3 className="text-lg font-bold text-neutral-900">Database Status</h3>
+                    <p className="text-xs text-neutral-500">Connected via Supabase.</p>
                 </div>
             </div>
             <button 
@@ -157,11 +121,10 @@ const ProfileSettings: React.FC = () => {
                 className="flex items-center gap-2 px-3 py-1.5 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded text-xs font-bold text-neutral-600 transition-colors"
             >
                 {connectionStatus === 'testing' ? <Loader2 className="w-3 h-3 animate-spin"/> : <Wifi className="w-3 h-3"/>}
-                Test Connection
+                Check Connection
             </button>
         </div>
         
-        {/* Status Messages */}
         {connectionStatus === 'error' && (
             <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-xs text-red-600 flex items-center gap-2 font-medium">
                 <AlertTriangle className="w-4 h-4"/>
@@ -174,74 +137,6 @@ const ProfileSettings: React.FC = () => {
                 {connectionMsg}
             </div>
         )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-                <label className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${!ghConfig.owner ? 'text-red-500' : 'text-neutral-500'}`}>
-                    <Github className="w-3 h-3" /> Repository Owner
-                </label>
-                <input 
-                    type="text" 
-                    value={ghConfig.owner}
-                    onChange={(e) => handleGhChange('owner', e.target.value)}
-                    className={`w-full px-4 py-2.5 bg-neutral-50 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-neutral-900 focus:bg-white focus:outline-none transition-all ${!ghConfig.owner ? 'border-red-300 bg-red-50' : 'border-neutral-200'}`}
-                    placeholder="GitHub Username"
-                />
-                 {!ghConfig.owner && <p className="text-[10px] text-red-500">Required.</p>}
-            </div>
-            <div className="space-y-2">
-                <label className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${!ghConfig.repo ? 'text-red-500' : 'text-neutral-500'}`}>
-                    <Database className="w-3 h-3" /> Repository Name
-                </label>
-                <input 
-                    type="text" 
-                    value={ghConfig.repo}
-                    onChange={(e) => handleGhChange('repo', e.target.value)}
-                    className={`w-full px-4 py-2.5 bg-neutral-50 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-neutral-900 focus:bg-white focus:outline-none transition-all ${!ghConfig.repo ? 'border-red-300 bg-red-50' : 'border-neutral-200'}`}
-                    placeholder="Repository Name"
-                />
-                {!ghConfig.repo && <p className="text-[10px] text-red-500">Required.</p>}
-            </div>
-            <div className="space-y-2 md:col-span-2">
-                <label className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${!ghConfig.token ? 'text-red-500' : 'text-neutral-500'}`}>
-                    <Key className="w-3 h-3" /> Personal Access Token (PAT)
-                </label>
-                <div className="relative">
-                    <input 
-                        type="password"
-                        value={ghConfig.token}
-                        onChange={(e) => handleGhChange('token', e.target.value)}
-                        className={`w-full pl-10 pr-4 py-2.5 bg-neutral-50 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-neutral-900 focus:bg-white focus:outline-none transition-all ${!ghConfig.token ? 'border-red-300 bg-red-50' : 'border-neutral-200'}`}
-                        placeholder="ghp_..."
-                    />
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                </div>
-                <p className="text-[10px] text-neutral-400">
-                    Token must have <strong>repo</strong> scope. Changes are saved to local storage.
-                </p>
-            </div>
-            
-             <div className="space-y-2 md:col-span-2 pt-4 border-t border-neutral-100">
-                <div className="flex justify-between items-center mb-2">
-                    <label className="text-xs font-bold uppercase tracking-wider flex items-center gap-2 text-neutral-500">
-                        <Wifi className="w-3 h-3" /> Vercel Deploy Hook (Optional)
-                    </label>
-                    <a href="https://vercel.com/docs/deployments/deploy-hooks" target="_blank" rel="noreferrer" className="text-[10px] text-blue-600 flex items-center gap-1 hover:underline">
-                        Get Hook URL <ExternalLink className="w-3 h-3"/>
-                    </a>
-                </div>
-                <input 
-                    type="password"
-                    value={ghConfig.deployHook}
-                    onChange={(e) => handleGhChange('deployHook', e.target.value)}
-                    className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-neutral-900 focus:bg-white focus:outline-none transition-all placeholder:text-neutral-400"
-                    placeholder="https://api.vercel.com/v1/integrations/deploy/..."
-                />
-                <p className="text-[10px] text-neutral-400">
-                    If provided, the "Sync Data" button will trigger this URL to ensure a fresh deployment.
-                </p>
-            </div>
-        </div>
       </section>
 
       {/* Hero Section Configuration */}
@@ -269,17 +164,15 @@ const ProfileSettings: React.FC = () => {
                     className="w-full px-4 py-2 bg-white border border-neutral-300 rounded-lg focus:ring-2 focus:ring-neutral-900 focus:outline-none"
                     placeholder="e.g. & Creative Dev."
                 />
-                <p className="text-xs text-neutral-500">This text appears in a lighter gray color below or next to the main headline.</p>
             </div>
 
             <div className="space-y-2">
                 <label className="text-sm font-bold text-neutral-700">Introduction Text</label>
                 <textarea 
-                    value={localConfig.heroDescription || "Building digital products that blend aesthetics with function..."}
+                    value={localConfig.heroDescription || ""}
                     onChange={(e) => handleConfigChange('heroDescription', e.target.value)}
                     rows={3}
                     className="w-full px-4 py-2 bg-white border border-neutral-300 rounded-lg focus:ring-2 focus:ring-neutral-900 focus:outline-none resize-none"
-                    placeholder="Brief intro text..."
                 />
             </div>
         </div>
@@ -288,7 +181,6 @@ const ProfileSettings: React.FC = () => {
       {/* General Configuration */}
       <section className="space-y-6">
         <h3 className="text-lg font-medium border-b border-neutral-200 pb-2">General Information</h3>
-        
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-2">
                 <label className="text-sm font-bold text-neutral-700">Contact Email</label>
@@ -297,96 +189,45 @@ const ProfileSettings: React.FC = () => {
                     value={localConfig.email}
                     onChange={(e) => handleConfigChange('email', e.target.value)}
                     className="w-full px-4 py-2 bg-white border border-neutral-300 rounded-lg focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-                    placeholder="hello@example.com"
                 />
-                <p className="text-xs text-neutral-500">Displayed in footer and navigation.</p>
             </div>
-
             <div className="space-y-2">
                 <label className="text-sm font-bold text-neutral-700">Resume URL</label>
-                <div className="flex gap-2">
-                    <input 
-                        type="text" 
-                        value={localConfig.resumeUrl}
-                        onChange={(e) => handleConfigChange('resumeUrl', e.target.value)}
-                        className="w-full px-4 py-2 bg-white border border-neutral-300 rounded-lg focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-                        placeholder="/resume.pdf or https://..."
-                    />
-                </div>
-                <p className="text-xs text-neutral-500">Link used for the "Download Resume" button.</p>
+                <input 
+                    type="text" 
+                    value={localConfig.resumeUrl}
+                    onChange={(e) => handleConfigChange('resumeUrl', e.target.value)}
+                    className="w-full px-4 py-2 bg-white border border-neutral-300 rounded-lg focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+                />
             </div>
         </div>
       </section>
 
-      {/* Social Links */}
+      {/* Deploy Hook */}
       <section className="space-y-6">
-        <div className="flex justify-between items-center border-b border-neutral-200 pb-2">
-             <h3 className="text-lg font-medium">Social Links</h3>
-             <button 
-                onClick={handleAddSocial}
-                className="flex items-center gap-2 px-3 py-1.5 bg-neutral-900 text-white text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-neutral-800"
-             >
-                <Plus className="w-3 h-3" /> Add Link
-             </button>
-        </div>
-
-        <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden shadow-sm">
-            <table className="w-full text-sm text-left">
-                <thead className="bg-neutral-50 border-b border-neutral-200 text-neutral-500 uppercase tracking-wider text-xs">
-                    <tr>
-                        <th className="px-6 py-4 font-semibold w-1/4">Platform</th>
-                        <th className="px-6 py-4 font-semibold w-1/4">Label</th>
-                        <th className="px-6 py-4 font-semibold w-1/3">URL</th>
-                        <th className="px-6 py-4 font-semibold text-right">Actions</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-100">
-                    {localSocials.map((social, index) => (
-                        <tr key={index} className="hover:bg-neutral-50/50 transition-colors">
-                            <td className="px-6 py-4">
-                                <input 
-                                    className="bg-transparent border-none p-0 font-bold text-neutral-900 w-full focus:ring-0 placeholder:text-neutral-300"
-                                    value={social.platform}
-                                    onChange={(e) => handleSocialChange(index, 'platform', e.target.value)}
-                                    placeholder="Platform Name"
-                                />
-                            </td>
-                            <td className="px-6 py-4">
-                                <input 
-                                    className="bg-transparent border-none p-0 text-neutral-600 w-full focus:ring-0 placeholder:text-neutral-300"
-                                    value={social.label}
-                                    onChange={(e) => handleSocialChange(index, 'label', e.target.value)}
-                                    placeholder="@handle"
-                                />
-                            </td>
-                            <td className="px-6 py-4">
-                                <input 
-                                    className="bg-transparent border-none p-0 text-blue-600 w-full focus:ring-0 placeholder:text-neutral-300"
-                                    value={social.url}
-                                    onChange={(e) => handleSocialChange(index, 'url', e.target.value)}
-                                    placeholder="https://..."
-                                />
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                                <button 
-                                    onClick={() => handleDeleteSocial(index)}
-                                    className="text-neutral-400 hover:text-red-600 p-2"
-                                    title="Delete Link"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-            {localSocials.length === 0 && (
-                <div className="p-8 text-center text-neutral-400 text-sm">
-                    No social links added yet.
-                </div>
-            )}
-        </div>
+         <h3 className="text-lg font-medium border-b border-neutral-200 pb-2">Deploy Automation</h3>
+         <div className="space-y-2">
+            <div className="flex justify-between items-center mb-2">
+                <label className="text-sm font-bold text-neutral-700 flex items-center gap-2">
+                    <Wifi className="w-3 h-3" /> Vercel Deploy Hook (Optional)
+                </label>
+                <a href="https://vercel.com/docs/deployments/deploy-hooks" target="_blank" rel="noreferrer" className="text-[10px] text-blue-600 flex items-center gap-1 hover:underline">
+                    Get Hook URL <ExternalLink className="w-3 h-3"/>
+                </a>
+            </div>
+            <input 
+                type="password"
+                value={deployHook}
+                onChange={(e) => setDeployHook(e.target.value)}
+                className="w-full px-4 py-2 bg-white border border-neutral-300 rounded-lg focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+                placeholder="https://api.vercel.com/v1/integrations/deploy/..."
+            />
+            <p className="text-xs text-neutral-500">
+                Trigger a site rebuild automatically when you click "Sync Data".
+            </p>
+         </div>
       </section>
+
     </div>
   );
 };
