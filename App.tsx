@@ -13,7 +13,6 @@ import ScrollToTop from './components/ScrollToTop';
 import LoadingScreen from './components/LoadingScreen';
 import InteractiveGradient from './components/InteractiveGradient';
 import RefreshHandler from './components/RefreshHandler';
-import DbStatus from './components/DbStatus';
 import { ArrowDown, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 
@@ -145,9 +144,6 @@ const AppContent: React.FC = () => {
       
       {/* Real-time Update Notification */}
       <RefreshHandler />
-      
-      {/* Connection Status Indicator */}
-      <DbStatus />
 
       {/* Preview Mode Banner */}
       {isPreviewMode && (
