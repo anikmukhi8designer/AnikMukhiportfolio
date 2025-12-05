@@ -75,3 +75,13 @@ export interface SyncLogEntry {
   message: string;
   author: string;
 }
+
+export interface CMSData {
+    projects: Project[];
+    experience: Experience[];
+    clients: Client[];
+    skills: SkillCategory[];
+    config: GlobalConfig;
+    socials: SocialLink[];
+    lastUpdated: string;
+}
