@@ -75,7 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // 2. CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-github-owner, x-github-repo');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).send('ok');
@@ -84,11 +84,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // 3. Auth Extraction
   const authHeader = req.headers.authorization;
   const token = authHeader ? authHeader.replace('Bearer ', '') : (process.env.VITE_GITHUB_TOKEN || process.env.GITHUB_TOKEN);
-  const owner = process.env.VITE_GITHUB_OWNER || process.env.GITHUB_OWNER;
-  const repo = process.env.VITE_GITHUB_REPO || process.env.GITHUB_REPO;
+  
+  // SUPPORT LOCAL STORAGE CONFIG: Check headers first, then env vars
+  const ownerHeader = req.headers['x-github-owner'];
+  const repoHeader = req.headers['x-github-repo'];
+  
+  const owner = ownerHeader || process.env.VITE_GITHUB_OWNER || process.env.GITHUB_OWNER;
+  const repo = repoHeader || process.env.VITE_GITHUB_REPO || process.env.GITHUB_REPO;
 
   if (!token || !owner || !repo) {
-    return res.status(500).json({ error: 'Missing GitHub Configuration' });
+    return res.status(500).json({ 
+        error: 'Missing GitHub Configuration', 
+        details: 'Owner, Repo, or Token not found in headers or env.' 
+    });
   }
 
   const { branch = 'main' } = req.query;
@@ -108,7 +116,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         });
 
-        if (!ghRes.ok) return res.status(ghRes.status).json({ error: 'Failed to fetch data' });
+        if (!ghRes.ok) {
+             const errText = await ghRes.text();
+             console.error(`GitHub Fetch Error (${ghRes.status}):`, errText);
+             return res.status(ghRes.status).json({ error: 'Failed to fetch data from GitHub', details: errText });
+        }
 
         const data: any = await ghRes.json();
         const content = Buffer.from(data.content, 'base64').toString('utf-8');
@@ -136,7 +148,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const currentJsonSha = await getFileSha(token, owner, repo, 'src/data.json', branchName);
         
         // Safety: If client provided a SHA, and it doesn't match server, reject.
-        // This prevents overwriting if someone else pushed code in the meantime.
         if (clientSha && currentJsonSha && clientSha !== currentJsonSha) {
              return res.status(409).json({ 
                  error: "Conflict detected. The data has changed on the server since you loaded it. Please refresh.",
@@ -146,7 +157,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // 3. Update src/data.json (Runtime Data)
-        // Remove internal flags before saving
         const dataToSave = { ...payload };
         delete dataToSave._sha;
         delete dataToSave._commitMessage;
@@ -155,7 +165,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const jsonResult = await updateFile(token, owner, repo, 'src/data.json', jsonString, commitMessage, branchName, currentJsonSha || undefined);
 
         // 4. Update src/data.ts (Source Code)
-        // We generate the TS file programmatically to ensure the repo stays buildable
         const tsContent = `import { Project, Experience, SocialLink, Client, SkillCategory, GlobalConfig } from './types';
 
 export const LAST_UPDATED = "${new Date().toISOString()}";
@@ -172,7 +181,6 @@ export const SKILLS: SkillCategory[] = ${JSON.stringify(payload.skills, null, 2)
 
 export const SOCIALS: SocialLink[] = ${JSON.stringify(payload.socials, null, 2)};
 `;
-        // We don't strictly lock SHA on .ts file as it is derivative, we just overwrite
         const currentTsSha = await getFileSha(token, owner, repo, 'src/data.ts', branchName);
         await updateFile(token, owner, repo, 'src/data.ts', tsContent, commitMessage, branchName, currentTsSha || undefined);
 

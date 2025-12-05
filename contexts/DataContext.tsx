@@ -113,8 +113,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             t: Date.now().toString()
         });
 
+        // HEADERS: Pass credentials to API so it can talk to GitHub
         const headers: HeadersInit = { 'Cache-Control': 'no-cache' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
+        if (owner) headers['x-github-owner'] = owner;
+        if (repo) headers['x-github-repo'] = repo;
 
         const res = await fetch(`/api/data?${params.toString()}`, { headers });
         
@@ -155,8 +158,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // --- Core Logic: Sync (Atomic Update via API) ---
   const syncData = async (commitMessage = "Update from CMS") => {
       if (!navigator.onLine) throw new Error("No internet connection.");
-      const { token } = getAuth();
+      const { token, owner, repo } = getAuth();
       if (!token) throw new Error("Authentication Token Missing.");
+      if (!owner || !repo) throw new Error("Repository Configuration Missing.");
 
       setIsSaving(true);
       const now = new Date();
@@ -181,7 +185,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               method: 'PUT',
               headers: {
                   'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json'
+                  'Content-Type': 'application/json',
+                  'x-github-owner': owner,
+                  'x-github-repo': repo
               },
               body: JSON.stringify(payload)
           });
