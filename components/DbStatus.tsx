@@ -12,7 +12,6 @@ const DbStatus: React.FC = () => {
         setStatus('loading');
         
         // Extract project ID from the supabase client URL for display
-        // Supabase URL format: https://[project-id].supabase.co
         try {
             // @ts-ignore - access private property to help user debug
             const url = supabase.supabaseUrl || '';
@@ -31,7 +30,7 @@ const DbStatus: React.FC = () => {
             if (error) throw error;
             
             setStatus('success');
-            setMessage(`Connected (${count ?? 0} records found)`);
+            setMessage(`Connected (${count ?? 0} records)`);
         } catch (e: any) {
             console.error("DB Connection Check Failed:", e);
             setStatus('error');
@@ -63,11 +62,11 @@ const DbStatus: React.FC = () => {
                 <div className="flex flex-col leading-none">
                     <span className="text-xs font-bold tracking-wide uppercase">
                         {status === 'loading' && "Connecting..."}
-                        {status === 'success' && "Supabase Live"}
-                        {status === 'error' && "Connection Error"}
+                        {status === 'success' && "DB Connected"}
+                        {status === 'error' && "DB Error"}
                     </span>
-                    {projectUrl && isExpanded && (
-                         <span className="text-[9px] opacity-60 font-mono mt-0.5">{projectUrl}</span>
+                    {projectUrl && (
+                         <span className="text-[9px] opacity-60 font-mono mt-0.5 max-w-[100px] truncate">{projectUrl}</span>
                     )}
                 </div>
 
@@ -87,7 +86,7 @@ const DbStatus: React.FC = () => {
                     {message}
                     {status === 'error' && (
                         <div className="mt-1 pt-1 border-t border-white/20 opacity-75">
-                            Check Supabase URL in src/supabaseClient.ts
+                            Verify URL/Key in Settings.
                         </div>
                     )}
                 </div>

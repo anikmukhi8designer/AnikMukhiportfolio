@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Database, Key, Loader2, AlertCircle, UserPlus, LogIn } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Database, Key, Loader2, AlertCircle, UserPlus, LogIn, Settings, X, Save } from 'lucide-react';
 import { supabase } from '../../src/supabaseClient';
 import DbStatus from '../DbStatus';
 
@@ -14,6 +14,19 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
   const [error, setError] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [message, setMessage] = useState('');
+  
+  // Connection Settings State
+  const [showSettings, setShowSettings] = useState(false);
+  const [customUrl, setCustomUrl] = useState('');
+  const [customKey, setCustomKey] = useState('');
+
+  useEffect(() => {
+      // Load existing custom settings
+      const storedUrl = localStorage.getItem('sb_url');
+      const storedKey = localStorage.getItem('sb_key');
+      if (storedUrl) setCustomUrl(storedUrl);
+      if (storedKey) setCustomKey(storedKey);
+  }, []);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,8 +52,6 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
             });
             if (error) throw error;
             if (data.session) {
-                // No need to set localStorage manually; Supabase client handles it.
-                // The parent App component listening to onAuthStateChange will handle the route switch.
                 onLogin();
             }
         }
@@ -51,12 +62,86 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
     }
   };
 
+  const saveConnectionSettings = () => {
+      if (!customUrl.trim() || !customKey.trim()) {
+          setError("URL and Key are required.");
+          return;
+      }
+      localStorage.setItem('sb_url', customUrl.trim());
+      localStorage.setItem('sb_key', customKey.trim());
+      // Reload to re-initialize supabase client with new keys
+      window.location.reload();
+  };
+
+  const clearConnectionSettings = () => {
+      if(confirm("Reset to default connection?")) {
+          localStorage.removeItem('sb_url');
+          localStorage.removeItem('sb_key');
+          window.location.reload();
+      }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-50 p-4 font-sans relative">
       <DbStatus />
       
       <div className="w-full max-w-[420px] bg-white p-8 rounded-2xl border border-neutral-200 shadow-xl shadow-neutral-200/50 relative z-10">
         
+        {/* Settings Modal Overlay */}
+        {showSettings && (
+            <div className="absolute inset-0 bg-white z-20 rounded-2xl p-8 flex flex-col">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                        <Settings className="w-5 h-5" /> Connection Settings
+                    </h3>
+                    <button onClick={() => setShowSettings(false)} className="p-1 hover:bg-neutral-100 rounded-full">
+                        <X className="w-5 h-5 text-neutral-500" />
+                    </button>
+                </div>
+                
+                <div className="space-y-4 flex-grow">
+                    <p className="text-xs text-neutral-500 bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
+                        Connect to your own Supabase project to enable editing. Find these in Project Settings &rarr; API.
+                    </p>
+                    
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-neutral-500">Project URL</label>
+                        <input 
+                            className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded text-sm focus:ring-2 focus:ring-neutral-900 outline-none"
+                            placeholder="https://xyz.supabase.co"
+                            value={customUrl}
+                            onChange={(e) => setCustomUrl(e.target.value)}
+                        />
+                    </div>
+                    
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-neutral-500">Anon / Public Key</label>
+                        <input 
+                            className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded text-sm focus:ring-2 focus:ring-neutral-900 outline-none"
+                            placeholder="eyJhbGciOiJIUzI1NiIsIn..."
+                            value={customKey}
+                            onChange={(e) => setCustomKey(e.target.value)}
+                        />
+                    </div>
+                </div>
+
+                <div className="flex gap-2 mt-6">
+                    <button 
+                        onClick={clearConnectionSettings}
+                        className="flex-1 py-2 text-red-600 text-sm font-bold hover:bg-red-50 rounded"
+                    >
+                        Reset Default
+                    </button>
+                    <button 
+                        onClick={saveConnectionSettings}
+                        className="flex-1 py-2 bg-neutral-900 text-white text-sm font-bold rounded hover:bg-black flex items-center justify-center gap-2"
+                    >
+                        <Save className="w-4 h-4" /> Save & Reload
+                    </button>
+                </div>
+            </div>
+        )}
+
         <div className="mb-8 text-center">
             <div className="w-12 h-12 bg-neutral-900 text-white rounded-xl flex items-center justify-center mx-auto mb-4">
                 <Database className="w-6 h-6" />
@@ -122,12 +207,19 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
             </button>
         </form>
 
-        <div className="mt-6 pt-6 border-t border-neutral-100 text-center">
+        <div className="mt-6 pt-6 border-t border-neutral-100 flex flex-col items-center gap-4">
             <button 
                 onClick={() => { setIsSignUp(!isSignUp); setError(''); setMessage(''); }}
                 className="text-xs text-neutral-500 hover:text-neutral-900 font-medium underline"
             >
                 {isSignUp ? "Already have an account? Sign in" : "Need to configure a new user? Sign up"}
+            </button>
+
+            <button 
+                onClick={() => setShowSettings(true)}
+                className="text-xs text-neutral-400 hover:text-neutral-600 flex items-center gap-1"
+            >
+                <Settings className="w-3 h-3" /> Connection Settings
             </button>
         </div>
       </div>
