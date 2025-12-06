@@ -1,6 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Edit2, Trash2, Plus, Loader2 } from 'lucide-react';
+import { Edit2, Trash2, Plus, Loader2, Check, AlertCircle } from 'lucide-react';
+
+// Robust UUID Generator
+const generateUUID = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
 
 interface WorkTableProps {
   onEdit?: (projectId: string) => void;
@@ -8,39 +20,79 @@ interface WorkTableProps {
 
 const WorkTable: React.FC<WorkTableProps> = ({ onEdit }) => {
   const { projects, updateProject, deleteProject, addProject } = useData();
-  const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  
+  // Status Notification State
+  const [status, setStatus] = useState<{ type: 'success' | 'error' | 'loading' | null; message: string }>({ type: null, message: '' });
+
+  const showStatus = (type: 'success' | 'error' | 'loading', message: string) => {
+    setStatus({ type, message });
+    if (type !== 'loading') {
+      setTimeout(() => setStatus({ type: null, message: '' }), 3000);
+    }
+  };
 
   const handleAddNew = async () => {
-    // Generate UUID locally so we can use it immediately in the UI (Optimistic Update)
-    const newId = self.crypto.randomUUID();
-    const newProject = {
-      id: newId,
-      title: "New Project",
-      client: "Client Name",
-      roles: ["Design"],
-      description: "Short description...",
-      year: new Date().getFullYear(),
-      heroImage: "https://picsum.photos/1200/800",
-      thumb: "https://picsum.photos/800/600",
-      tags: ["Tag 1"],
-      published: true, // Default to true so it shows up immediately
-      images: [],
-      content: []
-    };
-    
-    await addProject(newProject);
-    if (onEdit) onEdit(newId);
+    try {
+        showStatus('loading', 'Creating new project in Database...');
+        
+        const newId = generateUUID();
+        const newProject = {
+          id: newId,
+          title: "New Project",
+          client: "Client Name",
+          roles: ["Design"],
+          description: "Short description...",
+          year: new Date().getFullYear(),
+          heroImage: "https://picsum.photos/1200/800",
+          thumb: "https://picsum.photos/800/600",
+          tags: ["Tag 1"],
+          published: true, 
+          images: [],
+          content: []
+        };
+        
+        await addProject(newProject);
+        showStatus('success', 'Project created successfully!');
+        
+        // Delay opening editor slightly so user sees the success message
+        setTimeout(() => {
+            if (onEdit) onEdit(newId);
+        }, 500);
+
+    } catch (e: any) {
+        console.error("Add Project Failed:", e);
+        showStatus('error', `Failed to create project: ${e.message || 'Unknown error'}`);
+    }
   };
   
   const handleDelete = async (id: string) => {
       if(!confirm("Delete this project?")) return;
-      setDeletingId(id);
-      await deleteProject(id);
-      setDeletingId(null);
+      
+      try {
+          setDeletingId(id);
+          showStatus('loading', 'Deleting project...');
+          await deleteProject(id);
+          showStatus('success', 'Project deleted from Database');
+      } catch (e: any) {
+          showStatus('error', 'Failed to delete project');
+      } finally {
+          setDeletingId(null);
+      }
+  };
+
+  const handleTogglePublish = async (id: string, currentStatus: boolean) => {
+      try {
+          showStatus('loading', 'Updating status...');
+          await updateProject(id, { published: !currentStatus });
+          showStatus('success', `Project ${!currentStatus ? 'Published' : 'Unpublished'}`);
+      } catch (e) {
+          showStatus('error', 'Failed to update status');
+      }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">All Projects ({projects.length})</h3>
         <button 
@@ -68,11 +120,11 @@ const WorkTable: React.FC<WorkTableProps> = ({ onEdit }) => {
                 <tr key={project.id} className="hover:bg-neutral-50/50 transition-colors">
                   <td className="px-6 py-4">
                     <button 
-                      onClick={() => updateProject(project.id, { published: !project.published })}
-                      className={`flex items-center gap-2 px-2 py-1 rounded-full text-xs font-bold w-fit ${
+                      onClick={() => handleTogglePublish(project.id, project.published)}
+                      className={`flex items-center gap-2 px-2 py-1 rounded-full text-xs font-bold w-fit transition-colors ${
                         project.published 
-                          ? 'bg-green-100 text-green-700' 
-                          : 'bg-neutral-100 text-neutral-500'
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                          : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200'
                       }`}
                     >
                       {project.published ? 'Live' : 'Draft'}
@@ -111,6 +163,20 @@ const WorkTable: React.FC<WorkTableProps> = ({ onEdit }) => {
           </table>
         </div>
       </div>
+
+      {/* Status Toast Notification */}
+      {status.message && (
+        <div className={`fixed bottom-8 right-8 px-4 py-3 rounded-xl shadow-2xl text-sm font-bold flex items-center gap-3 animate-in slide-in-from-bottom-4 fade-in z-[9999] border backdrop-blur-md ${
+            status.type === 'error' ? 'bg-red-50/90 text-red-700 border-red-200' : 
+            status.type === 'success' ? 'bg-green-50/90 text-green-700 border-green-200' : 
+            'bg-neutral-900/90 text-white border-neutral-800'
+        }`}>
+            {status.type === 'loading' && <Loader2 className="w-4 h-4 animate-spin" />}
+            {status.type === 'success' && <Check className="w-4 h-4" />}
+            {status.type === 'error' && <AlertCircle className="w-4 h-4" />}
+            <span className="pr-1">{status.message}</span>
+        </div>
+      )}
     </div>
   );
 };

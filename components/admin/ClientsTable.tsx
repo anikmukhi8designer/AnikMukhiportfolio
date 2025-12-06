@@ -1,27 +1,75 @@
 import React, { useState } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Trash2, Plus, Link as LinkIcon, Image as ImageIcon } from 'lucide-react';
+import { Trash2, Plus, Link as LinkIcon, Image as ImageIcon, Loader2, Check, AlertCircle } from 'lucide-react';
+
+const generateUUID = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+};
 
 const ClientsTable: React.FC = () => {
   const { clients, updateClient, deleteClient, addClient } = useData();
+  const [status, setStatus] = useState<{ type: 'success' | 'error' | 'loading' | null; message: string }>({ type: null, message: '' });
 
-  const handleAddNew = () => {
-    const newId = self.crypto.randomUUID();
-    addClient({
-      id: newId,
-      name: "New Client",
-      url: "",
-      logo: ""
-    });
+  const showStatus = (type: 'success' | 'error' | 'loading', message: string) => {
+    setStatus({ type, message });
+    if (type !== 'loading') {
+      setTimeout(() => setStatus({ type: null, message: '' }), 3000);
+    }
+  };
+
+  const handleAddNew = async () => {
+    try {
+        showStatus('loading', 'Adding client to Database...');
+        const newId = generateUUID();
+        await addClient({
+            id: newId,
+            name: "New Client",
+            url: "",
+            logo: ""
+        });
+        showStatus('success', 'Client added successfully');
+    } catch (e: any) {
+        showStatus('error', 'Failed to add client');
+    }
+  };
+
+  const handleUpdate = async (id: string, data: any) => {
+      try {
+          await updateClient(id, data);
+          // Optional: Don't show success on every keystroke, maybe only on blur or specific actions
+          // For now we assume optimistic update handles UI, real error handles toast
+      } catch (e) {
+          showStatus('error', 'Failed to save changes');
+      }
+  };
+
+  const handleDelete = async (id: string) => {
+      if(!confirm("Delete this client?")) return;
+      try {
+          showStatus('loading', 'Deleting client...');
+          await deleteClient(id);
+          showStatus('success', 'Client deleted');
+      } catch (e) {
+          showStatus('error', 'Failed to delete client');
+      }
   };
 
   const handleUpdateLogo = (id: string) => {
       const url = prompt("Enter Logo URL:");
-      if (url) updateClient(id, { logo: url });
+      if (url) {
+          showStatus('loading', 'Updating logo...');
+          handleUpdate(id, { logo: url })
+             .then(() => showStatus('success', 'Logo updated'))
+             .catch(() => showStatus('error', 'Failed to update logo'));
+      }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">Clients & Collaborations ({clients.length})</h3>
         <button 
@@ -61,9 +109,9 @@ const ClientsTable: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 align-top">
                     <input 
-                      className="bg-transparent border-none p-0 font-bold text-neutral-900 w-full focus:ring-0 placeholder:text-neutral-300"
+                      className="bg-transparent border-none p-0 font-bold text-neutral-900 w-full focus:ring-0 placeholder:text-neutral-300 transition-colors focus:bg-neutral-50 px-1 rounded"
                       value={client.name}
-                      onChange={(e) => updateClient(client.id, { name: e.target.value })}
+                      onChange={(e) => handleUpdate(client.id, { name: e.target.value })}
                       placeholder="e.g. Google"
                     />
                   </td>
@@ -71,16 +119,16 @@ const ClientsTable: React.FC = () => {
                     <div className="flex items-center gap-2 text-neutral-400">
                         <LinkIcon className="w-3 h-3 flex-shrink-0" />
                         <input 
-                            className="bg-transparent border-none p-0 text-neutral-600 w-full focus:ring-0 placeholder:text-neutral-300 text-xs"
+                            className="bg-transparent border-none p-0 text-neutral-600 w-full focus:ring-0 placeholder:text-neutral-300 text-xs transition-colors focus:bg-neutral-50 px-1 rounded"
                             value={client.url || ''}
-                            onChange={(e) => updateClient(client.id, { url: e.target.value })}
+                            onChange={(e) => handleUpdate(client.id, { url: e.target.value })}
                             placeholder="https://..."
                         />
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right align-top">
                     <button 
-                        onClick={() => deleteClient(client.id)}
+                        onClick={() => handleDelete(client.id)}
                         className="text-neutral-400 hover:text-red-600 p-2"
                         title="Delete Client"
                     >
@@ -93,6 +141,20 @@ const ClientsTable: React.FC = () => {
           </table>
         </div>
       </div>
+
+       {/* Status Toast */}
+       {status.message && (
+        <div className={`fixed bottom-8 right-8 px-4 py-3 rounded-xl shadow-2xl text-sm font-bold flex items-center gap-3 animate-in slide-in-from-bottom-4 fade-in z-[9999] border backdrop-blur-md ${
+            status.type === 'error' ? 'bg-red-50/90 text-red-700 border-red-200' : 
+            status.type === 'success' ? 'bg-green-50/90 text-green-700 border-green-200' : 
+            'bg-neutral-900/90 text-white border-neutral-800'
+        }`}>
+            {status.type === 'loading' && <Loader2 className="w-4 h-4 animate-spin" />}
+            {status.type === 'success' && <Check className="w-4 h-4" />}
+            {status.type === 'error' && <AlertCircle className="w-4 h-4" />}
+            <span className="pr-1">{status.message}</span>
+        </div>
+      )}
     </div>
   );
 };

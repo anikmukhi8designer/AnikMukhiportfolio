@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ArrowUpRight } from 'lucide-react';
+import { X, ArrowUpRight, Github } from 'lucide-react';
 import { Project } from '../types';
 import ContentRenderer from './ContentRenderer';
 
@@ -121,16 +121,29 @@ const Modal: React.FC<ModalProps> = ({ project, onClose }) => {
                                         ))}
                                     </div>
                                 </div>
-                                {project.link && (
-                                    <a 
-                                        href={project.link} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-neutral-900 dark:text-white hover:text-neutral-500 dark:hover:text-neutral-300 transition-colors mt-4"
-                                    >
-                                        Visit Live Site <ArrowUpRight className="w-4 h-4" />
-                                    </a>
-                                )}
+                                
+                                <div className="flex flex-col gap-3 pt-2">
+                                    {project.link && (
+                                        <a 
+                                            href={project.link} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-neutral-900 dark:text-white hover:text-neutral-500 dark:hover:text-neutral-300 transition-colors"
+                                        >
+                                            Visit Live Site <ArrowUpRight className="w-4 h-4" />
+                                        </a>
+                                    )}
+                                    {project.githubRepoUrl && (
+                                        <a 
+                                            href={project.githubRepoUrl} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-neutral-900 dark:text-white hover:text-neutral-500 dark:hover:text-neutral-300 transition-colors"
+                                        >
+                                            View Source <Github className="w-4 h-4" />
+                                        </a>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>

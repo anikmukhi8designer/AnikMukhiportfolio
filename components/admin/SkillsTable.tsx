@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Trash2, Plus, X, Check, Search, Loader2, Upload } from 'lucide-react';
+import { Trash2, Plus, X, Check, Search, Loader2, Upload, AlertCircle } from 'lucide-react';
 import { ICON_KEYS, SkillIcon } from '../SkillIcons';
 
 // Use the provided Brandfetch API Key
@@ -29,6 +29,14 @@ const getGitHubConfig = () => ({
     repo: getEnv('VITE_GITHUB_REPO') || localStorage.getItem('github_repo') || ""
 });
 
+const generateUUID = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+};
+
 const SkillsTable: React.FC = () => {
   const { skills, updateSkill, deleteSkill, addSkill } = useData();
   
@@ -47,30 +55,52 @@ const SkillsTable: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  const handleAddNewCategory = () => {
-    const newId = self.crypto.randomUUID();
-    addSkill({
-      id: newId,
-      title: "New Category",
-      items: []
-    });
+  // Status Notification State
+  const [status, setStatus] = useState<{ type: 'success' | 'error' | 'loading' | null; message: string }>({ type: null, message: '' });
+
+  const showStatus = (type: 'success' | 'error' | 'loading', message: string) => {
+    setStatus({ type, message });
+    if (type !== 'loading') {
+      setTimeout(() => setStatus({ type: null, message: '' }), 3000);
+    }
   };
 
-  const handleAddItem = (categoryId: string) => {
+  const handleAddNewCategory = async () => {
+    try {
+        showStatus('loading', 'Creating category...');
+        const newId = generateUUID();
+        await addSkill({
+            id: newId,
+            title: "New Category",
+            items: []
+        });
+        showStatus('success', 'Category created');
+    } catch (e) {
+        showStatus('error', 'Failed to create category');
+    }
+  };
+
+  const handleAddItem = async (categoryId: string) => {
     if (!newItemName.trim()) return;
     const category = skills.find(s => s.id === categoryId);
     if (!category) return;
 
-    // Use newItemImage if present, otherwise fall back to icon
-    const updatedItems = [...category.items, { 
-        name: newItemName, 
-        icon: newItemImage ? undefined : newItemIcon, 
-        image: newItemImage 
-    }];
-    updateSkill(categoryId, { items: updatedItems });
-    
-    // Reset form
-    resetForm();
+    try {
+        showStatus('loading', 'Adding skill item...');
+        // Use newItemImage if present, otherwise fall back to icon
+        const updatedItems = [...category.items, { 
+            name: newItemName, 
+            icon: newItemImage ? undefined : newItemIcon, 
+            image: newItemImage 
+        }];
+        await updateSkill(categoryId, { items: updatedItems });
+        showStatus('success', 'Skill item added');
+        
+        // Reset form
+        resetForm();
+    } catch (e) {
+        showStatus('error', 'Failed to add item');
+    }
   };
 
   const resetForm = () => {
@@ -82,11 +112,29 @@ const SkillsTable: React.FC = () => {
     setShowResults(false);
   };
 
-  const handleDeleteItem = (categoryId: string, itemIndex: number) => {
+  const handleDeleteItem = async (categoryId: string, itemIndex: number) => {
      const category = skills.find(s => s.id === categoryId);
      if (!category) return;
-     const updatedItems = category.items.filter((_, idx) => idx !== itemIndex);
-     updateSkill(categoryId, { items: updatedItems });
+     
+     try {
+         showStatus('loading', 'Removing item...');
+         const updatedItems = category.items.filter((_, idx) => idx !== itemIndex);
+         await updateSkill(categoryId, { items: updatedItems });
+         showStatus('success', 'Item removed');
+     } catch(e) {
+         showStatus('error', 'Failed to remove item');
+     }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+      if (!confirm("Delete this entire category?")) return;
+      try {
+          showStatus('loading', 'Deleting category...');
+          await deleteSkill(id);
+          showStatus('success', 'Category deleted');
+      } catch(e) {
+          showStatus('error', 'Failed to delete category');
+      }
   };
 
   const searchBrandfetch = async (query: string) => {
@@ -104,6 +152,7 @@ const SkillsTable: React.FC = () => {
         setSearchResults(data as any[]);
     } catch (error) {
         console.error("Brandfetch search error:", error);
+        showStatus('error', 'Brandfetch search failed');
     } finally {
         setIsSearching(false);
     }
@@ -150,6 +199,7 @@ const SkillsTable: React.FC = () => {
     }
 
     setIsUploading(true);
+    showStatus('loading', 'Uploading image...');
     
     try {
         const fileExt = file.name.split('.').pop();
@@ -186,10 +236,11 @@ const SkillsTable: React.FC = () => {
                 if (!newItemName) {
                     setNewItemName(file.name.replace(`.${fileExt}`, ''));
                 }
+                showStatus('success', 'Image uploaded');
 
             } catch (err) {
                 console.error(err);
-                alert("Upload failed. Verify permissions.");
+                showStatus('error', 'Upload failed. Verify permissions.');
             } finally {
                 setIsUploading(false);
                 if (fileInputRef.current) fileInputRef.current.value = '';
@@ -199,11 +250,12 @@ const SkillsTable: React.FC = () => {
     } catch (error) {
         console.error("Upload failed", error);
         setIsUploading(false);
+        showStatus('error', 'Upload failed');
     }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       <input 
         type="file" 
         ref={fileInputRef} 
@@ -237,7 +289,7 @@ const SkillsTable: React.FC = () => {
                 <tr key={skill.id} className="hover:bg-neutral-50/50 transition-colors">
                   <td className="px-6 py-4 align-top">
                     <input 
-                      className="bg-transparent border-none p-0 font-bold text-neutral-900 w-full focus:ring-0 placeholder:text-neutral-300"
+                      className="bg-transparent border-none p-0 font-bold text-neutral-900 w-full focus:ring-0 placeholder:text-neutral-300 transition-colors focus:bg-neutral-50 px-1 rounded"
                       value={skill.title}
                       onChange={(e) => updateSkill(skill.id, { title: e.target.value })}
                       placeholder="e.g. Design"
@@ -391,7 +443,7 @@ const SkillsTable: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 text-right align-top">
                     <button 
-                        onClick={() => deleteSkill(skill.id)}
+                        onClick={() => handleDeleteCategory(skill.id)}
                         className="text-neutral-400 hover:text-red-600 p-2"
                         title="Delete Category"
                     >
@@ -404,6 +456,20 @@ const SkillsTable: React.FC = () => {
           </table>
         </div>
       </div>
+
+       {/* Status Toast */}
+       {status.message && (
+        <div className={`fixed bottom-8 right-8 px-4 py-3 rounded-xl shadow-2xl text-sm font-bold flex items-center gap-3 animate-in slide-in-from-bottom-4 fade-in z-[9999] border backdrop-blur-md ${
+            status.type === 'error' ? 'bg-red-50/90 text-red-700 border-red-200' : 
+            status.type === 'success' ? 'bg-green-50/90 text-green-700 border-green-200' : 
+            'bg-neutral-900/90 text-white border-neutral-800'
+        }`}>
+            {status.type === 'loading' && <Loader2 className="w-4 h-4 animate-spin" />}
+            {status.type === 'success' && <Check className="w-4 h-4" />}
+            {status.type === 'error' && <AlertCircle className="w-4 h-4" />}
+            <span className="pr-1">{status.message}</span>
+        </div>
+      )}
     </div>
   );
 };

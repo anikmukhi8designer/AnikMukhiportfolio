@@ -1,6 +1,14 @@
 import React, { useRef, useState } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Edit2, Trash2, Plus, GripVertical } from 'lucide-react';
+import { Edit2, Trash2, Plus, GripVertical, Loader2, Check, AlertCircle } from 'lucide-react';
+
+const generateUUID = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+};
 
 const ExperienceTable: React.FC = () => {
   const { experience, updateExperience, deleteExperience, addExperience, reorderExperience } = useData();
@@ -10,18 +18,53 @@ const ExperienceTable: React.FC = () => {
   const dragOverItem = useRef<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  const handleAddNew = () => {
-    // Generate UUID
-    const newId = self.crypto.randomUUID();
-    
-    addExperience({
-      id: newId,
-      role: "Role Title",
-      company: "Company Name",
-      period: "2024 — Present",
-      description: "Description of responsibilities...",
-      published: true // Default to live
-    });
+  // Status Notification State
+  const [status, setStatus] = useState<{ type: 'success' | 'error' | 'loading' | null; message: string }>({ type: null, message: '' });
+
+  const showStatus = (type: 'success' | 'error' | 'loading', message: string) => {
+    setStatus({ type, message });
+    if (type !== 'loading') {
+      setTimeout(() => setStatus({ type: null, message: '' }), 3000);
+    }
+  };
+
+  const handleAddNew = async () => {
+    try {
+        showStatus('loading', 'Adding experience...');
+        const newId = generateUUID();
+        await addExperience({
+            id: newId,
+            role: "Role Title",
+            company: "Company Name",
+            period: "2024 — Present",
+            description: "Description of responsibilities...",
+            published: true 
+        });
+        showStatus('success', 'Experience added successfully');
+    } catch (e) {
+        showStatus('error', 'Failed to add experience');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+      if (!confirm("Delete this experience entry?")) return;
+      try {
+          showStatus('loading', 'Deleting...');
+          await deleteExperience(id);
+          showStatus('success', 'Deleted successfully');
+      } catch (e) {
+          showStatus('error', 'Failed to delete');
+      }
+  };
+
+  const handleUpdate = async (id: string, data: any) => {
+      try {
+          // Optimistic updates are handled by Context, we just trigger saving logic in background usually
+          // But here we await to catch errors
+          await updateExperience(id, data);
+      } catch (e) {
+          showStatus('error', 'Failed to save changes');
+      }
   };
 
   const onDragStart = (e: React.DragEvent<HTMLTableRowElement>, index: number) => {
@@ -34,7 +77,7 @@ const ExperienceTable: React.FC = () => {
     dragOverItem.current = index;
   };
 
-  const onDragEnd = () => {
+  const onDragEnd = async () => {
     const dragIndex = dragItem.current;
     const dragOverIndex = dragOverItem.current;
 
@@ -47,7 +90,12 @@ const ExperienceTable: React.FC = () => {
         // Insert at new position
         _experience.splice(dragOverIndex, 0, draggedItemContent);
         
-        reorderExperience(_experience);
+        try {
+            await reorderExperience(_experience);
+            showStatus('success', 'Order updated');
+        } catch (e) {
+            showStatus('error', 'Failed to update order');
+        }
     }
     
     dragItem.current = null;
@@ -56,7 +104,7 @@ const ExperienceTable: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">Work History ({experience.length})</h3>
         <button 
@@ -101,11 +149,11 @@ const ExperienceTable: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 align-top">
                     <button 
-                      onClick={() => updateExperience(exp.id, { published: !exp.published })}
-                      className={`flex items-center gap-2 px-2 py-1 rounded-full text-xs font-bold w-fit ${
+                      onClick={() => handleUpdate(exp.id, { published: !exp.published })}
+                      className={`flex items-center gap-2 px-2 py-1 rounded-full text-xs font-bold w-fit transition-colors ${
                         exp.published 
-                          ? 'bg-green-100 text-green-700' 
-                          : 'bg-neutral-100 text-neutral-500'
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                          : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200'
                       }`}
                     >
                       {exp.published ? 'Live' : 'Draft'}
@@ -117,7 +165,7 @@ const ExperienceTable: React.FC = () => {
                         <input 
                             className="bg-neutral-50 border border-transparent focus:bg-white focus:border-neutral-300 rounded px-2 py-1 text-neutral-900 font-bold w-full text-sm transition-colors focus:outline-none"
                             value={exp.role}
-                            onChange={(e) => updateExperience(exp.id, { role: e.target.value })}
+                            onChange={(e) => handleUpdate(exp.id, { role: e.target.value })}
                             placeholder="e.g. Senior Designer"
                         />
                      </div>
@@ -126,7 +174,7 @@ const ExperienceTable: React.FC = () => {
                         <input 
                             className="bg-neutral-50 border border-transparent focus:bg-white focus:border-neutral-300 rounded px-2 py-1 text-neutral-700 w-full text-sm transition-colors focus:outline-none"
                             value={exp.company}
-                            onChange={(e) => updateExperience(exp.id, { company: e.target.value })}
+                            onChange={(e) => handleUpdate(exp.id, { company: e.target.value })}
                             placeholder="e.g. TechFlow"
                         />
                      </div>
@@ -135,7 +183,7 @@ const ExperienceTable: React.FC = () => {
                     <input 
                       className="bg-neutral-50 border border-transparent focus:bg-white focus:border-neutral-300 rounded px-2 py-1 text-neutral-600 w-full text-sm transition-colors focus:outline-none"
                       value={exp.period}
-                      onChange={(e) => updateExperience(exp.id, { period: e.target.value })}
+                      onChange={(e) => handleUpdate(exp.id, { period: e.target.value })}
                       placeholder="e.g. 2023 - Present"
                     />
                   </td>
@@ -143,13 +191,13 @@ const ExperienceTable: React.FC = () => {
                     <textarea 
                         className="w-full bg-neutral-50 border border-transparent hover:border-neutral-200 focus:border-neutral-300 focus:bg-white rounded p-3 text-sm text-neutral-600 leading-relaxed resize-y focus:outline-none transition-colors min-h-[100px]"
                         value={exp.description || ''}
-                        onChange={(e) => updateExperience(exp.id, { description: e.target.value })}
+                        onChange={(e) => handleUpdate(exp.id, { description: e.target.value })}
                         placeholder="Description of responsibilities..."
                     />
                   </td>
                   <td className="px-6 py-4 text-right align-top">
                     <button 
-                        onClick={() => deleteExperience(exp.id)}
+                        onClick={() => handleDelete(exp.id)}
                         className="text-neutral-400 hover:text-red-600 p-2 rounded hover:bg-red-50 transition-colors"
                         title="Delete Experience"
                     >
@@ -162,6 +210,20 @@ const ExperienceTable: React.FC = () => {
           </table>
         </div>
       </div>
+
+       {/* Status Toast */}
+       {status.message && (
+        <div className={`fixed bottom-8 right-8 px-4 py-3 rounded-xl shadow-2xl text-sm font-bold flex items-center gap-3 animate-in slide-in-from-bottom-4 fade-in z-[9999] border backdrop-blur-md ${
+            status.type === 'error' ? 'bg-red-50/90 text-red-700 border-red-200' : 
+            status.type === 'success' ? 'bg-green-50/90 text-green-700 border-green-200' : 
+            'bg-neutral-900/90 text-white border-neutral-800'
+        }`}>
+            {status.type === 'loading' && <Loader2 className="w-4 h-4 animate-spin" />}
+            {status.type === 'success' && <Check className="w-4 h-4" />}
+            {status.type === 'error' && <AlertCircle className="w-4 h-4" />}
+            <span className="pr-1">{status.message}</span>
+        </div>
+      )}
     </div>
   );
 };
