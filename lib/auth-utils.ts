@@ -54,19 +54,20 @@ export function serializeCookie(name: string, value: string, options: any = {}) 
 }
 
 export async function createSession(payload: any) {
+  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const token = await generateSessionToken(payload);
+
   cookies().set('admin_session', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: 60 * 60 * 24 // 24 hours
+    expires,
   });
 }
 
 export async function getSession() {
-  const cookieStore = cookies();
-  const token = cookieStore.get('admin_session')?.value;
+  const token = cookies().get('admin_session')?.value;
   if (!token) return null;
   return await verifySessionToken(token);
 }
