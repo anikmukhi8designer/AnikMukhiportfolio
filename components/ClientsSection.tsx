@@ -56,14 +56,16 @@ const ClientLogo: React.FC<{ client: Client }> = ({ client }) => {
             {/* 
                 Logo Filters:
                 Light Mode: Grayscale & Faded -> Color & Opaque
-                Dark Mode: Brightness 0 & Invert (White Silhouette) -> Color (No Invert)
+                Dark Mode: Brightness 0 & Invert (White Silhouette) -> Brightness 0 & Invert (White Silhouette) but full Opacity
+                (We avoid restoring original color in dark mode because black text logos would disappear)
             */}
             <img 
                 src={logoUrl} 
                 alt={client.name} 
                 className="h-full w-auto object-contain 
                            opacity-50 grayscale group-hover:opacity-100 group-hover:grayscale-0
-                           dark:opacity-70 dark:invert dark:group-hover:invert-0 dark:group-hover:opacity-100
+                           dark:opacity-50 dark:brightness-0 dark:invert dark:grayscale-0
+                           dark:group-hover:opacity-100
                            transition-all duration-300" 
                 onError={() => setImgError(true)}
             />
@@ -74,7 +76,7 @@ const ClientLogo: React.FC<{ client: Client }> = ({ client }) => {
   // 4. Render Text Fallback
   return (
     <div className="w-full h-full flex items-center justify-center px-8 whitespace-nowrap">
-        <span className={`text-3xl md:text-4xl text-neutral-400 dark:text-neutral-600 group-hover:text-neutral-900 dark:group-hover:text-white transition-colors duration-300 ${fontStyles[styleIndex]}`}>
+        <span className={`text-3xl md:text-4xl text-neutral-400 dark:text-neutral-600 group-hover:text-neutral-900 dark:group-hover:text-neutral-200 transition-colors duration-300 ${fontStyles[styleIndex]}`}>
             {client.name}
         </span>
     </div>

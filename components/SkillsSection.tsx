@@ -67,11 +67,11 @@ const SkillCard: React.FC<SkillCardProps> = ({ item, index }) => {
             viewport={{ once: true }}
             transition={{ delay: index * 0.05, duration: 0.4, ease: "easeOut" }}
             className="group relative flex flex-col items-center justify-center p-6 
-                       bg-white/60 dark:bg-white/5 
+                       bg-white/60 dark:bg-white/[0.03] 
                        backdrop-blur-xl border border-neutral-200 dark:border-white/5
                        rounded-3xl
-                       hover:bg-white dark:hover:bg-neutral-800 
-                       hover:border-neutral-300 dark:hover:border-neutral-600
+                       hover:bg-white dark:hover:bg-neutral-800/40 
+                       hover:border-neutral-300 dark:hover:border-white/10
                        hover:shadow-2xl dark:hover:shadow-black/20
                        transition-all duration-500 ease-out aspect-square cursor-default overflow-hidden"
         >
@@ -119,7 +119,7 @@ const SkillCard: React.FC<SkillCardProps> = ({ item, index }) => {
             </span>
 
             {/* Shine/Glare Effect on Hover */}
-            <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none mix-blend-overlay" />
+            <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/40 to-transparent opacity-0 group-hover:opacity-100 dark:group-hover:opacity-10 transition-opacity duration-700 pointer-events-none mix-blend-overlay" />
         </motion.div>
     );
 }
@@ -146,7 +146,7 @@ const SkillsSection: React.FC = () => {
                 <div key={category.id}>
                     <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400 dark:text-neutral-600 mb-8 pl-1 transition-colors flex items-center gap-4">
                         {category.title}
-                        <div className="h-px bg-neutral-200 dark:bg-white/10 flex-grow"></div>
+                        <div className="h-px bg-neutral-200 dark:bg-white/5 flex-grow"></div>
                     </h3>
                     
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">

@@ -33,20 +33,20 @@ const InteractiveGradient: React.FC = () => {
     <div className="fixed inset-0 overflow-hidden pointer-events-none select-none z-0">
       
       {/* 
-         Enhanced Gradient Blobs for visibility 
-         Increased opacity to ensure they are visible behind glass cards
+         Enhanced Gradient Blobs 
+         Dark mode: deeper colors, lower opacity to merge with dark bg
       */}
       
       {/* Top Left: Deep Indigo/Purple */}
       <motion.div 
         style={{ x: x1, y: y1 }}
-        className="absolute -top-[20%] -left-[10%] w-[60%] h-[60%] rounded-full bg-gradient-to-br from-indigo-500/40 via-purple-500/40 to-transparent blur-[120px]"
+        className="absolute -top-[20%] -left-[10%] w-[60%] h-[60%] rounded-full bg-gradient-to-br from-indigo-500/30 via-purple-500/30 to-transparent dark:from-indigo-900/20 dark:via-purple-900/10 blur-[120px]"
       />
       
       {/* Bottom Right: Cyan/Blue */}
       <motion.div 
         style={{ x: x2, y: y2 }}
-        className="absolute top-[30%] -right-[10%] w-[70%] h-[70%] rounded-full bg-gradient-to-tl from-cyan-500/40 via-blue-500/40 to-transparent blur-[120px]"
+        className="absolute top-[30%] -right-[10%] w-[70%] h-[70%] rounded-full bg-gradient-to-tl from-cyan-500/30 via-blue-500/30 to-transparent dark:from-cyan-900/20 dark:via-blue-900/10 blur-[120px]"
       />
 
       {/* Center Dynamic: Pink/Fuchsia Accent */}
@@ -55,7 +55,7 @@ const InteractiveGradient: React.FC = () => {
             x: useTransform(smoothX, [0, 1], [-20, 20]),
             y: useTransform(smoothY, [0, 1], [-20, 20]),
         }}
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40%] h-[40%] rounded-full bg-pink-500/30 blur-[100px]"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40%] h-[40%] rounded-full bg-pink-500/20 dark:bg-pink-900/10 blur-[100px]"
       />
 
     </div>
