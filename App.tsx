@@ -21,22 +21,41 @@ import { DataProvider, useData } from './contexts/DataContext';
 import AdminLogin from './components/admin/AdminLogin';
 import Dashboard from './components/admin/Dashboard';
 import BlockEditor from './components/admin/BlockEditor';
+import { supabase } from './src/supabaseClient';
 
 const AdminRoute = () => {
-    const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
-        // Check for the actual token, not just a boolean flag
-        const token = localStorage.getItem('supabase_user');
-        return !!token && token.length > 0;
-    });
-    
+    const [session, setSession] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
     const [currentView, setCurrentView] = useState<'dashboard' | 'editor'>('dashboard');
     const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
     const { projects, updateProject } = useData();
 
-    if (!isAdminLoggedIn) {
-        return <AdminLogin onLogin={() => {
-            setIsAdminLoggedIn(true);
-        }} />;
+    useEffect(() => {
+        // 1. Get initial session
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+            setLoading(false);
+        });
+
+        // 2. Listen for auth changes (login/logout)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+                 {/* Simple loading spinner while checking auth */}
+                 <div className="w-8 h-8 border-4 border-neutral-900 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        );
+    }
+
+    if (!session) {
+        return <AdminLogin onLogin={() => { /* Handled by onAuthStateChange */ }} />;
     }
 
     if (currentView === 'editor' && editingProjectId) {
@@ -59,12 +78,7 @@ const AdminRoute = () => {
 
     return (
         <Dashboard 
-            onLogout={() => { 
-                localStorage.removeItem('supabase_user');
-                setIsAdminLoggedIn(false); 
-                window.location.hash = '';
-                window.location.reload();
-            }}
+            onLogout={() => supabase.auth.signOut()}
             onEditProject={(id) => {
                 setEditingProjectId(id);
                 setCurrentView('editor');
@@ -117,7 +131,6 @@ const AppContent: React.FC = () => {
       setIsLoading(false);
     } else if (window.location.pathname === '/preview') {
         setIsPreviewMode(true);
-        // Loading screen still runs, but data fetches freshly via DataContext using ?update=
     }
 
     const handleHashChange = () => {

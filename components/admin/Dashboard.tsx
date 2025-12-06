@@ -157,14 +157,20 @@ alter table socials enable row level security;
 -- 3. DROP EXISTING POLICIES (To prevent conflict errors on re-run)
 drop policy if exists "Public read projects" on projects;
 drop policy if exists "Auth all projects" on projects;
+drop policy if exists "Enable insert for authenticated users only" on projects;
+
 drop policy if exists "Public read experience" on experience;
 drop policy if exists "Auth all experience" on experience;
+
 drop policy if exists "Public read clients" on clients;
 drop policy if exists "Auth all clients" on clients;
+
 drop policy if exists "Public read skills" on skills;
 drop policy if exists "Auth all skills" on skills;
+
 drop policy if exists "Public read config" on config;
 drop policy if exists "Auth all config" on config;
+
 drop policy if exists "Public read socials" on socials;
 drop policy if exists "Auth all socials" on socials;
 
@@ -185,13 +191,16 @@ create policy "Auth all skills" on skills for all to authenticated using (true) 
 create policy "Auth all config" on config for all to authenticated using (true) with check (true);
 create policy "Auth all socials" on socials for all to authenticated using (true) with check (true);
 
+-- Explicit Insert Policy for clarity
+create policy "Enable insert for authenticated users only" on projects for insert to authenticated with check (true);
+
 -- 5. SEED INITIAL CONFIG DATA (To prevent empty config errors)
 -- Config
 insert into config (id, email, "heroHeadline", "heroSubheadline", "heroDescription") 
 values (1, 'hello@mukhianik.com', 'Product Designer', '& Creative Dev.', 'Building digital products that blend aesthetics with function. Currently crafting experiences in San Francisco.') 
 on conflict (id) do nothing;
 
--- Projects (Ravens + Others)
+-- Projects (Ravens PDF Content + Others)
 delete from projects where id in ('ravens-tablet-2024', 'fintech-dashboard-2024');
 
 insert into projects (id, title, client, roles, description, year, "heroImage", thumb, tags, published, content)

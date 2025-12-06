@@ -23,8 +23,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
 
     try {
         if (isSignUp) {
-            // Casting auth to any to bypass potential type mismatch where signUp might not be recognized in strict mode or old types
-            const { data, error } = await (supabase.auth as any).signUp({
+            const { data, error } = await supabase.auth.signUp({
                 email,
                 password,
             });
@@ -34,14 +33,14 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                 setIsSignUp(false);
             }
         } else {
-            // Casting auth to any to bypass potential type mismatch for signInWithPassword
-            const { data, error } = await (supabase.auth as any).signInWithPassword({
+            const { data, error } = await supabase.auth.signInWithPassword({
                 email,
                 password,
             });
             if (error) throw error;
-            if (data.user) {
-                localStorage.setItem('supabase_user', data.user.id);
+            if (data.session) {
+                // No need to set localStorage manually; Supabase client handles it.
+                // The parent App component listening to onAuthStateChange will handle the route switch.
                 onLogin();
             }
         }
