@@ -1,6 +1,6 @@
 
 import { NextResponse } from 'next/server';
-import { supabase } from '@/src/supabaseClient';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getSession, hashPassword, generateTempPassword } from '@/lib/auth-utils';
 
 export async function POST(req: Request) {
@@ -11,13 +11,10 @@ export async function POST(req: Request) {
     }
 
     const { email, full_name, role } = await req.json();
-
-    // 1. Generate Temp Password
     const tempPassword = generateTempPassword();
     const hash = await hashPassword(tempPassword);
 
-    // 2. Insert User
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('auth_users')
       .insert({
         email,
@@ -31,12 +28,7 @@ export async function POST(req: Request) {
 
     if (error) throw error;
 
-    // 3. Return temp password to Super Admin (to copy/share)
-    return NextResponse.json({ 
-        success: true, 
-        user: data,
-        temp_password: tempPassword 
-    });
+    return NextResponse.json({ success: true, user: data, temp_password: tempPassword });
 
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });

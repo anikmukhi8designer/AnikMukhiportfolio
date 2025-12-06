@@ -1,37 +1,29 @@
 
 import { NextResponse } from 'next/server';
-import { supabase } from '@/src/supabaseClient';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export async function POST(req: Request) {
   try {
     const { email, reason } = await req.json();
 
-    // 1. Check if user exists
-    const { data: user } = await supabase
+    const { data: user } = await supabaseAdmin
       .from('auth_users')
       .select('id')
       .eq('email', email)
       .single();
 
-    // Security: Always return success even if email not found to prevent enumeration
-    if (!user) {
-      return NextResponse.json({ success: true, message: 'If account exists, request sent.' });
-    }
+    if (!user) return NextResponse.json({ success: true, message: 'If account exists, request sent.' });
 
-    // 2. Check for existing pending requests
-    const { data: existing } = await supabase
+    const { data: existing } = await supabaseAdmin
         .from('password_reset_requests')
         .select('id')
         .eq('user_id', user.id)
         .eq('status', 'pending')
         .single();
     
-    if (existing) {
-        return NextResponse.json({ success: true, message: 'Request already pending.' });
-    }
+    if (existing) return NextResponse.json({ success: true, message: 'Request already pending.' });
 
-    // 3. Create Request
-    const { error } = await supabase.from('password_reset_requests').insert({
+    const { error } = await supabaseAdmin.from('password_reset_requests').insert({
         user_id: user.id,
         reason: reason || 'User requested reset via login screen',
         status: 'pending'

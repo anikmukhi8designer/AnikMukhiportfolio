@@ -3,23 +3,20 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
-const SECRET_KEY = process.env.JWT_SECRET_KEY || 'default-dev-secret-key-change-me';
+const SECRET_KEY = process.env.JWT_SECRET_KEY || 'default-dev-secret-key-change-me-at-least-32-chars';
 const key = new TextEncoder().encode(SECRET_KEY);
 
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
   
-  // 1. Define Protected Paths
   const isAdminPath = path.startsWith('/admin');
   const isSuperAdminPath = path.startsWith('/admin/super');
   const isLoginPath = path === '/admin/login';
   const isResetRequestPath = path === '/admin/forgot-password';
 
-  // 2. Get Token
   const token = req.cookies.get('admin_session')?.value;
+  let session: any = null;
 
-  // 3. Verify Token
-  let session = null;
   if (token) {
     try {
       const { payload } = await jwtVerify(token, key);
@@ -29,9 +26,7 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // 4. Redirect Logic
-  
-  // If trying to access login while logged in
+  // 1. Redirect to Dashboard if already logged in
   if (isLoginPath && session) {
     if (session.is_temp_password) {
         return NextResponse.redirect(new URL('/admin/change-password', req.url));
@@ -39,19 +34,19 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL('/admin/dashboard', req.url));
   }
 
-  // If trying to access protected route without session
+  // 2. Redirect to Login if accessing admin without session
   if (isAdminPath && !isLoginPath && !isResetRequestPath && !session) {
     return NextResponse.redirect(new URL('/admin/login', req.url));
   }
 
-  // Force Password Change Check
-  if (session && session.is_temp_password && path !== '/admin/change-password' && path !== '/api/auth/change-password') {
+  // 3. Force Password Change
+  if (session && session.is_temp_password && path !== '/admin/change-password' && !path.startsWith('/api/')) {
     return NextResponse.redirect(new URL('/admin/change-password', req.url));
   }
 
-  // Role Based Access Control
+  // 4. Role Based Access
   if (isSuperAdminPath && session?.role !== 'super_admin') {
-    return NextResponse.redirect(new URL('/admin/dashboard', req.url)); // Access Denied
+    return NextResponse.redirect(new URL('/admin/dashboard', req.url));
   }
 
   return NextResponse.next();

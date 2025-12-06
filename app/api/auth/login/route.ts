@@ -1,14 +1,14 @@
 
 import { NextResponse } from 'next/server';
-import { supabase } from '@/src/supabaseClient';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { verifyPassword, createSession } from '@/lib/auth-utils';
 
 export async function POST(req: Request) {
   try {
     const { email, password } = await req.json();
 
-    // 1. Find User
-    const { data: user, error } = await supabase
+    // Use Admin Client to bypass RLS for login lookup
+    const { data: user, error } = await supabaseAdmin
       .from('auth_users')
       .select('*')
       .eq('email', email)
@@ -18,13 +18,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    // 2. Verify Password
     const isValid = await verifyPassword(password, user.password_hash);
     if (!isValid) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    // 3. Create Session
     await createSession({
       id: user.id,
       email: user.email,
