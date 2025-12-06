@@ -2,11 +2,8 @@ import React, { useState } from 'react';
 import { useData } from '../../contexts/DataContext';
 import { Edit2, Trash2, Plus, Loader2, Check, AlertCircle } from 'lucide-react';
 
-// Robust UUID Generator
+// Universally compatible UUID Generator (works in non-secure contexts)
 const generateUUID = () => {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
     const r = Math.random() * 16 | 0;
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
@@ -28,7 +25,7 @@ const WorkTable: React.FC<WorkTableProps> = ({ onEdit }) => {
   const showStatus = (type: 'success' | 'error' | 'loading', message: string) => {
     setStatus({ type, message });
     if (type !== 'loading') {
-      setTimeout(() => setStatus({ type: null, message: '' }), 3000);
+      setTimeout(() => setStatus({ type: null, message: '' }), 5000); // Extended time for error reading
     }
   };
 
@@ -47,7 +44,7 @@ const WorkTable: React.FC<WorkTableProps> = ({ onEdit }) => {
           heroImage: "https://picsum.photos/1200/800",
           thumb: "https://picsum.photos/800/600",
           tags: ["Tag 1"],
-          published: true, 
+          published: true, // Set to true so it reflects on site immediately
           images: [],
           content: []
         };
@@ -62,7 +59,11 @@ const WorkTable: React.FC<WorkTableProps> = ({ onEdit }) => {
 
     } catch (e: any) {
         console.error("Add Project Failed:", e);
-        showStatus('error', `Failed to create project: ${e.message || 'Unknown error'}`);
+        if (e.message && e.message.includes("row-level security")) {
+            showStatus('error', 'Permission Denied: Click "Setup DB" in the header to fix RLS policies.');
+        } else {
+            showStatus('error', `Failed to create project: ${e.message || 'Unknown error'}`);
+        }
     }
   };
   
@@ -75,7 +76,12 @@ const WorkTable: React.FC<WorkTableProps> = ({ onEdit }) => {
           await deleteProject(id);
           showStatus('success', 'Project deleted from Database');
       } catch (e: any) {
-          showStatus('error', 'Failed to delete project');
+          console.error("Delete Project Failed:", e);
+          if (e.message && e.message.includes("row-level security")) {
+              showStatus('error', 'Permission Denied: Click "Setup DB" to fix RLS.');
+          } else {
+              showStatus('error', 'Failed to delete project');
+          }
       } finally {
           setDeletingId(null);
       }
@@ -86,8 +92,12 @@ const WorkTable: React.FC<WorkTableProps> = ({ onEdit }) => {
           showStatus('loading', 'Updating status...');
           await updateProject(id, { published: !currentStatus });
           showStatus('success', `Project ${!currentStatus ? 'Published' : 'Unpublished'}`);
-      } catch (e) {
-          showStatus('error', 'Failed to update status');
+      } catch (e: any) {
+          if (e.message && e.message.includes("row-level security")) {
+              showStatus('error', 'Permission Denied: Click "Setup DB" to fix RLS.');
+          } else {
+              showStatus('error', 'Failed to update status');
+          }
       }
   };
 
@@ -97,7 +107,7 @@ const WorkTable: React.FC<WorkTableProps> = ({ onEdit }) => {
         <h3 className="text-lg font-medium">All Projects ({projects.length})</h3>
         <button 
           onClick={handleAddNew}
-          className="flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white text-sm font-medium rounded-lg hover:bg-neutral-800"
+          className="flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white text-sm font-medium rounded-lg hover:bg-neutral-800 transition-all hover:shadow-lg"
         >
           <Plus className="w-4 h-4" /> Add Project
         </button>
@@ -143,7 +153,7 @@ const WorkTable: React.FC<WorkTableProps> = ({ onEdit }) => {
                     <div className="flex items-center justify-end gap-3 text-neutral-400">
                       <button 
                         onClick={() => onEdit && onEdit(project.id)}
-                        className="hover:text-neutral-900 flex items-center gap-1"
+                        className="hover:text-neutral-900 flex items-center gap-1 p-1"
                         title="Open Editor"
                       >
                         <Edit2 className="w-4 h-4" />
@@ -151,7 +161,7 @@ const WorkTable: React.FC<WorkTableProps> = ({ onEdit }) => {
                       <button 
                         onClick={() => handleDelete(project.id)}
                         disabled={deletingId === project.id}
-                        className="hover:text-red-600 disabled:opacity-50"
+                        className="hover:text-red-600 disabled:opacity-50 p-1"
                       >
                         {deletingId === project.id ? <Loader2 className="w-4 h-4 animate-spin"/> : <Trash2 className="w-4 h-4" />}
                       </button>

@@ -3,7 +3,6 @@ import { useData } from '../../contexts/DataContext';
 import { Edit2, Trash2, Plus, GripVertical, Loader2, Check, AlertCircle } from 'lucide-react';
 
 const generateUUID = () => {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
       const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
       return v.toString(16);
@@ -38,7 +37,7 @@ const ExperienceTable: React.FC = () => {
             company: "Company Name",
             period: "2024 — Present",
             description: "Description of responsibilities...",
-            published: true 
+            published: true // Default to true for visibility
         });
         showStatus('success', 'Experience added successfully');
     } catch (e) {
@@ -59,8 +58,6 @@ const ExperienceTable: React.FC = () => {
 
   const handleUpdate = async (id: string, data: any) => {
       try {
-          // Optimistic updates are handled by Context, we just trigger saving logic in background usually
-          // But here we await to catch errors
           await updateExperience(id, data);
       } catch (e) {
           showStatus('error', 'Failed to save changes');
@@ -109,7 +106,7 @@ const ExperienceTable: React.FC = () => {
         <h3 className="text-lg font-medium">Work History ({experience.length})</h3>
         <button 
           onClick={handleAddNew}
-          className="flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white text-sm font-medium rounded-lg hover:bg-neutral-800"
+          className="flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white text-sm font-medium rounded-lg hover:bg-neutral-800 transition-all hover:shadow-lg"
         >
           <Plus className="w-4 h-4" /> Add Experience
         </button>

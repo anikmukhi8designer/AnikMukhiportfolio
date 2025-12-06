@@ -3,7 +3,6 @@ import { useData } from '../../contexts/DataContext';
 import { Trash2, Plus, Link as LinkIcon, Image as ImageIcon, Loader2, Check, AlertCircle } from 'lucide-react';
 
 const generateUUID = () => {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
       const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
       return v.toString(16);
@@ -40,8 +39,6 @@ const ClientsTable: React.FC = () => {
   const handleUpdate = async (id: string, data: any) => {
       try {
           await updateClient(id, data);
-          // Optional: Don't show success on every keystroke, maybe only on blur or specific actions
-          // For now we assume optimistic update handles UI, real error handles toast
       } catch (e) {
           showStatus('error', 'Failed to save changes');
       }
@@ -74,7 +71,7 @@ const ClientsTable: React.FC = () => {
         <h3 className="text-lg font-medium">Clients & Collaborations ({clients.length})</h3>
         <button 
           onClick={handleAddNew}
-          className="flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white text-sm font-medium rounded-lg hover:bg-neutral-800"
+          className="flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white text-sm font-medium rounded-lg hover:bg-neutral-800 transition-all hover:shadow-lg"
         >
           <Plus className="w-4 h-4" /> Add Client
         </button>
