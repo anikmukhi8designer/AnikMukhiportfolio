@@ -1,7 +1,7 @@
 
 import { serializeCookie } from '../../lib/auth-utils';
 
-export default async function handler(req: any, res: any) {
+export default async function handler(_req: any, res: any) {
   const cookie = serializeCookie('admin_session', '', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',

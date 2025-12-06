@@ -1,3 +1,4 @@
+
 {
   "name": "mukhi-anik-portfolio",
   "private": true,
@@ -13,11 +14,14 @@
     "react-dom": "^18.3.1",
     "framer-motion": "^11.0.8",
     "lucide-react": "^0.344.0",
-    "@supabase/supabase-js": "^2.39.3"
+    "@supabase/supabase-js": "^2.39.3",
+    "bcryptjs": "^2.4.3",
+    "jose": "^5.2.3"
   },
   "devDependencies": {
     "@types/react": "^18.2.64",
     "@types/react-dom": "^18.2.21",
+    "@types/bcryptjs": "^2.4.6",
     "@vitejs/plugin-react": "^4.2.1",
     "typescript": "^5.2.2",
     "vite": "^5.1.4"
