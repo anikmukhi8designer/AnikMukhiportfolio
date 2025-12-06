@@ -192,6 +192,8 @@ values (1, 'hello@mukhianik.com', 'Product Designer', '& Creative Dev.', 'Buildi
 on conflict (id) do nothing;
 
 -- Projects (Ravens + Others)
+delete from projects where id in ('ravens-tablet-2024', 'fintech-dashboard-2024');
+
 insert into projects (id, title, client, roles, description, year, "heroImage", thumb, tags, published, content)
 values 
 ('ravens-tablet-2024', 'Stadium Suite Tablet', 'Baltimore Ravens', ARRAY['UX Architecture', 'UI Design', 'Wireframing'], 'A premium in-suite digital experience allowing guests to control the TV, order food, and request assistance.', 2024, 'https://images.unsplash.com/photo-1516280440614-6697288d5d38?q=80&w=2070&auto=format&fit=crop', 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070&auto=format&fit=crop', ARRAY['Tablet App', 'Hospitality', 'Sports Tech'], true, 
@@ -217,12 +219,14 @@ values
 ('fintech-dashboard-2024', 'Nova Financial', 'Nova Inc.', ARRAY['Product Design', 'Design System'], 'A comprehensive dashboard for modern financial tracking.', 2024, 'https://picsum.photos/id/1/1200/800', 'https://picsum.photos/id/1/800/600', ARRAY['Fintech', 'SaaS', 'Dashboard'], true, '[]'::jsonb);
 
 -- Experience
+delete from experience;
 insert into experience (id, role, company, period, description, published, "order")
 values
 ('senior-pd-2023', 'Senior Product Designer', 'TechFlow Systems', '2023 — Present', 'Leading the design system team and overseeing core product UX.', true, 0),
 ('pd-2021', 'Product Designer', 'Creative Studio X', '2021 — 2023', 'Worked on various client projects ranging from fintech to healthcare.', true, 1);
 
 -- Clients
+delete from clients;
 insert into clients (id, name, "order")
 values
 ('ravens', 'Baltimore Ravens', 0),
@@ -235,11 +239,13 @@ values
 ('c9', 'Airbnb', 7);
 
 -- Skills
+delete from skills;
 insert into skills (id, title, items, "order")
 values
 ('s1', 'Design', '[{"name": "Figma", "image": "https://cdn.brandfetch.io/figma.com/w/200/h/200"}, {"name": "Adobe", "image": "https://cdn.brandfetch.io/adobe.com/w/200/h/200"}, {"name": "Framer", "image": "https://cdn.brandfetch.io/framer.com/w/200/h/200"}]'::jsonb, 0);
 
 -- Socials
+delete from socials;
 insert into socials (id, platform, url, label, "order")
 values
 ('twitter-link', 'Twitter', 'https://twitter.com', '@mukhi_anik', 0),
