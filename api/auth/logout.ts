@@ -1,4 +1,3 @@
-
 import { serializeCookie } from '../../lib/auth-utils';
 
 export default async function handler(_req: any, res: any) {
