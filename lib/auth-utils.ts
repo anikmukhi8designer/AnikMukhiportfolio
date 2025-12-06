@@ -53,23 +53,19 @@ export function serializeCookie(name: string, value: string, options: any = {}) 
   return str;
 }
 
-// Next.js App Router Session Management
 export async function createSession(payload: any) {
-  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const token = await generateSessionToken(payload);
-  const cookieStore = await cookies();
-
-  cookieStore.set('admin_session', token, {
+  cookies().set('admin_session', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    expires,
+    maxAge: 60 * 60 * 24 // 24 hours
   });
 }
 
 export async function getSession() {
-  const cookieStore = await cookies();
+  const cookieStore = cookies();
   const token = cookieStore.get('admin_session')?.value;
   if (!token) return null;
   return await verifySessionToken(token);
