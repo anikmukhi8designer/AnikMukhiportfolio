@@ -51,6 +51,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
     try {
         await syncData("Manual Sync from Admin Dashboard");
         setSyncStatus('success');
+        // Reload content to ensure frontend is in sync with backend state if needed
+        await reloadContent();
         setTimeout(() => setSyncStatus('idle'), 4000);
     } catch (e: any) {
         console.error("Sync Error:", e);
@@ -287,17 +289,21 @@ values
     <div className="min-h-screen bg-neutral-100 flex flex-col">
       {/* Toast Notification */}
       <AnimatePresence>
-          {syncStatus === 'success' && (
+          {(syncStatus === 'success' || syncStatus === 'error') && (
               <motion.div 
                   initial={{ opacity: 0, y: -20, x: '-50%' }}
                   animate={{ opacity: 1, y: 0, x: '-50%' }}
                   exit={{ opacity: 0, y: -20, x: '-50%' }}
-                  className="fixed top-8 left-1/2 z-[100] flex items-center gap-3 bg-neutral-900 text-white px-6 py-4 rounded-full shadow-2xl"
+                  className={`fixed top-8 left-1/2 z-[100] flex items-center gap-3 px-6 py-4 rounded-full shadow-2xl ${
+                      syncStatus === 'error' ? 'bg-red-600 text-white' : 'bg-neutral-900 text-white'
+                  }`}
               >
-                  <Check className="w-5 h-5 text-green-400" />
+                  {syncStatus === 'error' ? <AlertCircle className="w-5 h-5 text-white" /> : <Check className="w-5 h-5 text-green-400" />}
                   <div className="flex flex-col">
-                      <span className="text-sm font-bold">Backed up to GitHub</span>
-                      <span className="text-xs text-neutral-400">Repository synced successfully.</span>
+                      <span className="text-sm font-bold">{syncStatus === 'error' ? 'Sync Failed' : 'Backed up to GitHub'}</span>
+                      <span className={`text-xs ${syncStatus === 'error' ? 'text-white/80' : 'text-neutral-400'}`}>
+                          {syncStatus === 'error' ? errorMessage : 'Repository synced successfully.'}
+                      </span>
                   </div>
               </motion.div>
           )}
@@ -416,19 +422,21 @@ values
 
             <button 
                 onClick={handleSync}
-                disabled={syncStatus === 'syncing' || !!connectionError}
+                disabled={isSaving || syncStatus === 'syncing' || !!connectionError}
                 className={`flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-sm min-w-[120px] justify-center ${
-                    syncStatus === 'syncing'
+                    (isSaving || syncStatus === 'syncing')
                     ? 'bg-neutral-100 text-neutral-400 border border-neutral-200 cursor-not-allowed'
                     : syncStatus === 'success'
                     ? 'bg-green-50 text-green-600 border border-green-200'
+                    : syncStatus === 'error'
+                    ? 'bg-red-50 text-red-600 border border-red-200'
                     : 'bg-neutral-900 text-white border border-neutral-900 hover:bg-neutral-800'
                 }`}
                 title="Backup current data to GitHub repository"
             >
-                {syncStatus === 'syncing' ? <Loader2 className="w-3 h-3 animate-spin" /> : <UploadCloud className="w-3 h-3" />}
+                {(isSaving || syncStatus === 'syncing') ? <Loader2 className="w-3 h-3 animate-spin" /> : <UploadCloud className="w-3 h-3" />}
                 <span className="hidden md:inline">
-                    {syncStatus === 'syncing' ? 'Backing up...' : 'Backup to GitHub'}
+                    {(isSaving || syncStatus === 'syncing') ? 'Backing up...' : 'Backup to GitHub'}
                 </span>
             </button>
 

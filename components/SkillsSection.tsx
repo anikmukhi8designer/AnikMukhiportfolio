@@ -28,7 +28,12 @@ const DOMAIN_MAP: Record<string, string> = {
     "Arc": "arc.net",
     "GitHub": "github.com",
     "Python": "python.org",
-    "Git": "git-scm.com"
+    "Git": "git-scm.com",
+    "Supabase": "supabase.com",
+    "PostgreSQL": "postgresql.org",
+    "Vercel": "vercel.com",
+    "Stripe": "stripe.com",
+    "Shopify": "shopify.com"
 };
 
 interface SkillCardProps {
@@ -38,15 +43,21 @@ interface SkillCardProps {
 
 const SkillCard: React.FC<SkillCardProps> = ({ item, index }) => {
     // 1. Resolve effective image URL
+    // Priority: Manual Upload/URL > Domain Map Auto-fetch
     let imageUrl = item.image;
-    const domain = DOMAIN_MAP[item.name];
 
-    if (domain) {
-         imageUrl = `https://cdn.brandfetch.io/${domain}/w/200/h/200?c=${BRANDFETCH_KEY}`;
-    } 
-    else if (imageUrl && imageUrl.includes('brandfetch.io') && !imageUrl.includes('c=')) {
-         const separator = imageUrl.includes('?') ? '&' : '?';
-         imageUrl = `${imageUrl}${separator}c=${BRANDFETCH_KEY}`;
+    if (!imageUrl) {
+         // Fallback to domain map if no image provided in CMS
+         const domain = DOMAIN_MAP[item.name];
+         if (domain) {
+              imageUrl = `https://cdn.brandfetch.io/${domain}/w/128/h/128?c=${BRANDFETCH_KEY}`;
+         }
+    } else {
+         // If image is a raw Brandfetch URL without key (from CMS search), append key
+         if (imageUrl.includes('brandfetch.io') && !imageUrl.includes('c=')) {
+              const separator = imageUrl.includes('?') ? '&' : '?';
+              imageUrl = `${imageUrl}${separator}c=${BRANDFETCH_KEY}`;
+         }
     }
     
     return (
@@ -59,33 +70,35 @@ const SkillCard: React.FC<SkillCardProps> = ({ item, index }) => {
                        bg-white/60 dark:bg-white/5 
                        backdrop-blur-xl border border-neutral-200 dark:border-white/5
                        rounded-3xl
-                       hover:bg-white dark:hover:bg-white/10 
-                       hover:border-neutral-300 dark:hover:border-white/20
-                       hover:shadow-2xl dark:hover:shadow-purple-500/10 
+                       hover:bg-white dark:hover:bg-neutral-800 
+                       hover:border-neutral-300 dark:hover:border-neutral-600
+                       hover:shadow-2xl dark:hover:shadow-black/20
                        transition-all duration-500 ease-out aspect-square cursor-default overflow-hidden"
         >
             {/* 
                 Icon Container 
                 - Starts at w-10 (40px)
-                - Scales 1.8x on hover (~72px)
-                - Translates up slightly to stay centered visually if text remains or moves
+                - Scales 1.5x on hover (~60px)
             */}
-            <div className="w-10 h-10 mb-4 flex items-center justify-center relative z-10 transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.8] group-hover:-translate-y-2">
+            <div className="w-10 h-10 mb-4 flex items-center justify-center relative z-10 transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-150 group-hover:-translate-y-2">
                  {imageUrl ? (
                     <img 
                         src={imageUrl} 
                         alt={item.name} 
                         loading="lazy"
                         className="w-full h-full object-contain drop-shadow-sm 
-                                   filter grayscale opacity-70 
-                                   dark:brightness-0 dark:invert 
+                                   filter grayscale opacity-60 
+                                   dark:brightness-0 dark:invert dark:opacity-70
                                    group-hover:grayscale-0 group-hover:opacity-100 
-                                   dark:group-hover:brightness-100 dark:group-hover:invert-0
+                                   dark:group-hover:brightness-100 dark:group-hover:invert-0 dark:group-hover:opacity-100
                                    transition-all duration-500"
                         onError={(e) => {
+                            // Hide broken image
                             e.currentTarget.style.display = 'none';
+                            // Show fallback icon
                             const fallback = e.currentTarget.parentElement?.querySelector('.fallback-icon');
-                            if (fallback) (fallback as HTMLElement).style.display = 'flex';
+                            if (fallback) (fallback as HTMLElement).classList.remove('hidden');
+                            (fallback as HTMLElement).style.display = 'flex';
                         }}
                     />
                 ) : (
@@ -94,19 +107,19 @@ const SkillCard: React.FC<SkillCardProps> = ({ item, index }) => {
                     </div>
                 )}
                  
-                 {/* Fallback Icon */}
+                 {/* Fallback Icon (Hidden by default, shown on Error or if no image) */}
                  <div className="fallback-icon hidden absolute inset-0 items-center justify-center text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-white transition-colors">
                     <SkillIcon icon={item.icon || item.name || 'Default'} className="w-full h-full" />
                 </div>
             </div>
 
             {/* Label */}
-            <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-neutral-500 dark:text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-white transition-all duration-300 text-center relative z-10 group-hover:translate-y-2 group-hover:opacity-80">
+            <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-neutral-500 dark:text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-white transition-all duration-300 text-center relative z-10 group-hover:translate-y-1">
                 {item.name}
             </span>
 
             {/* Shine/Glare Effect on Hover */}
-            <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none mix-blend-overlay" />
         </motion.div>
     );
 }
