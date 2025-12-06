@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import './index.css';
 import { Project } from './types';
@@ -22,8 +21,7 @@ import { DataProvider, useData } from './contexts/DataContext';
 import AdminLogin from './components/admin/AdminLogin';
 import Dashboard from './components/admin/Dashboard';
 import BlockEditor from './components/admin/BlockEditor';
-// We don't use supabase auth client side anymore for the custom admin
-// import { supabase } from './src/supabaseClient'; 
+import { supabase } from './src/supabaseClient'; 
 
 const AdminRoute = () => {
     const [user, setUser] = useState<any>(null);
@@ -32,13 +30,12 @@ const AdminRoute = () => {
     const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
     const { projects, updateProject } = useData();
 
-    // Check Auth via API
+    // Check Auth via Supabase Client
     const checkAuth = async () => {
         try {
-            const res = await fetch('/api/auth/check');
-            if (res.ok) {
-                const data = await res.json();
-                setUser(data.user);
+            const { data } = await supabase.auth.getSession();
+            if (data.session?.user) {
+                setUser(data.session.user);
             } else {
                 setUser(null);
             }
@@ -51,10 +48,24 @@ const AdminRoute = () => {
 
     useEffect(() => {
         checkAuth();
+        
+        // Listen for auth changes
+        const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (session?.user) {
+                setUser(session.user);
+            } else {
+                setUser(null);
+            }
+            setLoading(false);
+        });
+
+        return () => {
+            authListener.subscription.unsubscribe();
+        };
     }, []);
 
     const handleLogout = async () => {
-        await fetch('/api/auth/logout');
+        await supabase.auth.signOut();
         setUser(null);
     };
 
@@ -68,18 +79,6 @@ const AdminRoute = () => {
 
     if (!user) {
         return <AdminLogin onLogin={checkAuth} />;
-    }
-
-    // Force password change check
-    // Note: In a full routing setup we'd use a separate page, but for this SPA 
-    // we can conditionally render the Change Password component here or 
-    // rely on the Dashboard to show a modal. 
-    // For now, if the user is temp, we could show a warning or a specific screen.
-    if (user.is_temp_password) {
-        // You would ideally render the ChangePassword component here
-        // For simplicity in this fix, we render Dashboard but you should implement 
-        // the logic to force the view to ChangePassword
-        // return <ChangePassword user={user} onUpdate={checkAuth} />
     }
 
     if (currentView === 'editor' && editingProjectId) {
