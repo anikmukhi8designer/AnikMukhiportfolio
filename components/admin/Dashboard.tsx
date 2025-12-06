@@ -285,6 +285,39 @@ values
       );
   }
 
+  const getButtonContent = () => {
+    if (isSaving || syncStatus === 'syncing') {
+        return (
+            <>
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span className="hidden md:inline">Backing up...</span>
+            </>
+        );
+    }
+    if (syncStatus === 'success') {
+        return (
+            <>
+                <Check className="w-3 h-3" />
+                <span className="hidden md:inline">Synced!</span>
+            </>
+        );
+    }
+    if (syncStatus === 'error') {
+        return (
+            <>
+                <AlertCircle className="w-3 h-3" />
+                <span className="hidden md:inline">Sync Failed</span>
+            </>
+        );
+    }
+    return (
+        <>
+            <UploadCloud className="w-3 h-3" />
+            <span className="hidden md:inline">Backup to GitHub</span>
+        </>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-neutral-100 flex flex-col">
       {/* Toast Notification */}
@@ -434,10 +467,7 @@ values
                 }`}
                 title="Backup current data to GitHub repository"
             >
-                {(isSaving || syncStatus === 'syncing') ? <Loader2 className="w-3 h-3 animate-spin" /> : <UploadCloud className="w-3 h-3" />}
-                <span className="hidden md:inline">
-                    {(isSaving || syncStatus === 'syncing') ? 'Backing up...' : 'Backup to GitHub'}
-                </span>
+                {getButtonContent()}
             </button>
 
             <div className="h-6 w-px bg-neutral-200 mx-2"></div>
