@@ -1,3 +1,4 @@
+
 {
   "compilerOptions": {
     "target": "ES2020",
@@ -17,6 +18,6 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["."],
-  "exclude": ["node_modules", "firebase.ts", "src/firebase.ts"],
+  "exclude": ["node_modules", "firebase.ts", "src/firebase.ts", "app", "middleware.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
