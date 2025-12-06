@@ -1,4 +1,5 @@
 import { Project, Experience, SocialLink, Client, SkillCategory, GlobalConfig } from './types';
+import { PROJECT_APEX } from './project_apex';
 
 // Placeholder data simulating extraction from mukhianik.framer.website
 // Images are from Unsplash/Picsum to ensure visibility in this demo environment.
@@ -91,6 +92,7 @@ export const PROJECTS: Project[] = [
       { id: '7', type: 'quote', content: 'The new dashboard has completely transformed how our users interact with their finances.' },
     ]
   },
+  PROJECT_APEX,
   {
     id: "ecom-mobile-2023",
     title: "Lumina App",

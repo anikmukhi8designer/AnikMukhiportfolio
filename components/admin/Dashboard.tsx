@@ -201,7 +201,7 @@ values (1, 'hello@mukhianik.com', 'Product Designer', '& Creative Dev.', 'Buildi
 on conflict (id) do nothing;
 
 -- Projects (Ravens PDF Content + Others)
-delete from projects where id in ('ravens-tablet-2024', 'fintech-dashboard-2024');
+delete from projects where id in ('ravens-tablet-2024', 'fintech-dashboard-2024', 'apex-logistics-2023');
 
 insert into projects (id, title, client, roles, description, year, "heroImage", thumb, tags, published, content)
 values 
@@ -225,7 +225,15 @@ values
   {"id": "20", "type": "paragraph", "content": "The final UI employs a dark, modern theme with the Baltimore Ravens signature purple accents. Visual elements are large and bold, optimized for visibility from various seating angles."}
 ]'::jsonb
 ),
-('fintech-dashboard-2024', 'Nova Financial', 'Nova Inc.', ARRAY['Product Design', 'Design System'], 'A comprehensive dashboard for modern financial tracking.', 2024, 'https://picsum.photos/id/1/1200/800', 'https://picsum.photos/id/1/800/600', ARRAY['Fintech', 'SaaS', 'Dashboard'], true, '[]'::jsonb);
+('fintech-dashboard-2024', 'Nova Financial', 'Nova Inc.', ARRAY['Product Design', 'Design System'], 'A comprehensive dashboard for modern financial tracking.', 2024, 'https://picsum.photos/id/1/1200/800', 'https://picsum.photos/id/1/800/600', ARRAY['Fintech', 'SaaS', 'Dashboard'], true, '[]'::jsonb),
+('apex-logistics-2023', 'Apex Logistics', 'Apex Global', ARRAY['Product Design', 'UX Research'], 'Real-time logistics tracking platform for global supply chains.', 2023, 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?q=80&w=2070&auto=format&fit=crop', 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=2070&auto=format&fit=crop', ARRAY['SaaS', 'B2B', 'Logistics'], true, 
+'[
+  {"id": "1", "type": "h2", "content": "Overview"},
+  {"id": "2", "type": "paragraph", "content": "Apex Global manages thousands of shipments daily. Their existing tools were fragmented, leading to operational inefficiencies. We built a unified dashboard to centralize tracking."},
+  {"id": "3", "type": "h2", "content": "Key Features"},
+  {"id": "4", "type": "paragraph", "content": "• Real-time map visualization of assets • Automated delay risk alerts • One-click document generation"},
+  {"id": "5", "type": "image", "content": "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070&auto=format&fit=crop", "caption": "Shipment Detail View"}
+]'::jsonb);
 
 -- Experience
 delete from experience;
