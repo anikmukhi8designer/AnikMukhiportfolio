@@ -1,4 +1,3 @@
-
 import { compare, hash } from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
@@ -11,7 +10,6 @@ export async function hashPassword(password: string): Promise<string> {
 }
 
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  // If hash is a placeholder from SQL, fail immediately or handle dev mode
   if (hash.startsWith('$2a$12$Files')) return password === 'password123';
   return await compare(password, hash);
 }
@@ -25,32 +23,55 @@ export function generateTempPassword(length = 12): string {
   return retVal;
 }
 
-export async function createSession(payload: any) {
-  const token = await new SignJWT(payload)
+// Helper to generate the JWT token string
+export async function generateSessionToken(payload: any): Promise<string> {
+  return await new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('24h')
     .sign(key);
-
-  cookies().set('admin_session', token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-  });
 }
 
-export async function getSession() {
-  const session = cookies().get('admin_session')?.value;
-  if (!session) return null;
+// Helper to verify a token string
+export async function verifySessionToken(token: string) {
   try {
-    const { payload } = await jwtVerify(session, key);
+    const { payload } = await jwtVerify(token, key);
     return payload;
   } catch (error) {
     return null;
   }
 }
 
-export async function destroySession() {
-  cookies().delete('admin_session');
+// Helper to serialize cookie (avoids external 'cookie' dependency)
+export function serializeCookie(name: string, value: string, options: any = {}) {
+  let str = `${name}=${encodeURIComponent(value)}`;
+  if (options.httpOnly) str += '; HttpOnly';
+  if (options.secure) str += '; Secure';
+  if (options.path) str += `; Path=${options.path}`;
+  if (options.sameSite) str += `; SameSite=${options.sameSite}`;
+  if (options.maxAge) str += `; Max-Age=${options.maxAge}`;
+  return str;
+}
+
+// Next.js App Router Session Helpers
+export async function createSession(payload: any) {
+  const token = await generateSessionToken(payload);
+  const cookieStore = await cookies();
+  
+  cookieStore.set('admin_session', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 60 * 60 * 24 // 24 hours
+  });
+}
+
+export async function getSession() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('admin_session')?.value;
+  
+  if (!token) return null;
+  
+  return await verifySessionToken(token);
 }
