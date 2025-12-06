@@ -21,6 +21,7 @@ import { DataProvider, useData } from './contexts/DataContext';
 import AdminLogin from './components/admin/AdminLogin';
 import Dashboard from './components/admin/Dashboard';
 import BlockEditor from './components/admin/BlockEditor';
+import UpdatePassword from './components/admin/UpdatePassword';
 import { supabase } from './src/supabaseClient'; 
 
 const AdminRoute = () => {
@@ -28,6 +29,7 @@ const AdminRoute = () => {
     const [loading, setLoading] = useState(true);
     const [currentView, setCurrentView] = useState<'dashboard' | 'editor'>('dashboard');
     const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+    const [isRecovery, setIsRecovery] = useState(false);
     const { projects, updateProject } = useData();
 
     // Check Auth via Supabase Client
@@ -50,7 +52,11 @@ const AdminRoute = () => {
         checkAuth();
         
         // Listen for auth changes
-        const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'PASSWORD_RECOVERY') {
+                setIsRecovery(true);
+            }
+
             if (session?.user) {
                 setUser(session.user);
             } else {
@@ -67,6 +73,7 @@ const AdminRoute = () => {
     const handleLogout = async () => {
         await supabase.auth.signOut();
         setUser(null);
+        setIsRecovery(false);
     };
 
     if (loading) {
@@ -75,6 +82,10 @@ const AdminRoute = () => {
                  <div className="w-8 h-8 border-4 border-neutral-900 border-t-transparent rounded-full animate-spin"></div>
             </div>
         );
+    }
+
+    if (isRecovery) {
+        return <UpdatePassword onComplete={() => setIsRecovery(false)} />;
     }
 
     if (!user) {

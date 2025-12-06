@@ -375,8 +375,8 @@ values
         <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <span className="font-bold text-neutral-900 text-base md:text-lg truncate flex items-center gap-2">
-                <Database className="w-5 h-5 text-blue-600" />
-                New Genre CMS
+                <img src="/favicon.svg" alt="Logo" className="w-6 h-6" />
+                Mukhi Anik
             </span>
           </div>
           
