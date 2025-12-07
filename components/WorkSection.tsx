@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef } from 'react';
 import { useData } from '../contexts/DataContext';
 import { Project } from '../types';
 import ProjectCard from './ProjectCard';
-import { motion, useMotionValue, useSpring, AnimatePresence } from 'framer-motion';
+import { ArrowRight, ArrowLeft } from 'lucide-react';
 
 interface WorkSectionProps {
   onProjectClick: (project: Project) => void;
@@ -11,100 +11,69 @@ interface WorkSectionProps {
 const WorkSection: React.FC<WorkSectionProps> = ({ onProjectClick }) => {
   const { projects, lastUpdated } = useData();
   const publishedProjects = projects.filter(p => p.published);
-  
-  const [hoveredProject, setHoveredProject] = useState<string | null>(null);
-  
-  // Mouse tracking for floating image
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-  
-  const springConfig = { damping: 20, stiffness: 300, mass: 0.5 };
-  const springX = useSpring(mouseX, springConfig);
-  const springY = useSpring(mouseY, springConfig);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handleMove = (e: MouseEvent) => {
-      mouseX.set(e.clientX);
-      mouseY.set(e.clientY);
-    };
-    window.addEventListener('mousemove', handleMove);
-    return () => window.removeEventListener('mousemove', handleMove);
-  }, []);
+  const scroll = (direction: 'left' | 'right') => {
+    if (scrollContainerRef.current) {
+        // Reduced scroll amount for smaller cards (260px card + gap)
+        const scrollAmount = direction === 'left' ? -300 : 300;
+        scrollContainerRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
 
   return (
-    <section id="work" className="py-32 relative z-10">
-      <div className="max-w-screen-xl mx-auto px-4 md:px-8">
-        
-        {/* Main Header */}
-        <div className="flex items-end justify-between mb-24">
-           <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-400">
-             Our Work
-           </h2>
-           <span className="text-sm text-neutral-400">
-             {publishedProjects.length} Projects
-           </span>
-        </div>
-
-        {/* Table Header (Desktop Only) */}
-        <div className="hidden md:grid grid-cols-12 gap-6 pb-6 px-6 md:px-10 border-b border-neutral-200 text-xs font-bold uppercase tracking-widest text-neutral-400 mb-4">
-           <div className="col-span-4">Project</div>
-           <div className="col-span-2">Client</div>
-           <div className="col-span-3">Services</div>
-           <div className="col-span-2">Links</div>
-           <div className="col-span-1 text-right">Year</div>
-        </div>
-
-        {/* Projects List */}
-        <div key={lastUpdated?.getTime()}>
-          {publishedProjects.map((project) => (
-            <ProjectCard 
-              key={project.id} 
-              project={project} 
-              onClick={onProjectClick} 
-              onMouseEnter={() => setHoveredProject(project.id)}
-              onMouseLeave={() => setHoveredProject(null)}
-            />
-          ))}
-          {publishedProjects.length === 0 && (
-             <div className="py-24 text-center text-neutral-400">
-                <p>No published projects found.</p>
-                <p className="text-xs mt-2 opacity-60">Check the Admin Dashboard to add or publish projects.</p>
-             </div>
-          )}
-        </div>
+    <section id="work" className="py-24 md:py-32 relative z-10 overflow-hidden bg-transparent transition-colors duration-500">
+      <div className="max-w-screen-xl mx-auto px-4 md:px-8 mb-12 md:mb-16 flex items-end justify-between">
+         <div className="flex flex-col gap-2">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-500 dark:text-neutral-400">
+                Selected Work
+            </h2>
+         </div>
+         
+         {/* Desktop Navigation Controls */}
+         <div className="hidden md:flex gap-4">
+            <button 
+                onClick={() => scroll('left')}
+                className="p-3 rounded-full border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors text-neutral-900 dark:text-white"
+                aria-label="Scroll left"
+            >
+                <ArrowLeft className="w-5 h-5" />
+            </button>
+            <button 
+                onClick={() => scroll('right')}
+                className="p-3 rounded-full border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors text-neutral-900 dark:text-white"
+                aria-label="Scroll right"
+            >
+                <ArrowRight className="w-5 h-5" />
+            </button>
+         </div>
       </div>
 
-      {/* Floating Image Preview */}
-      <AnimatePresence>
-        {hoveredProject && (
-           <motion.div
-             initial={{ opacity: 0, scale: 0.9, y: 10 }}
-             animate={{ opacity: 1, scale: 1, y: 0 }}
-             exit={{ opacity: 0, scale: 0.9, y: 10 }}
-             transition={{ type: "spring", stiffness: 400, damping: 25 }}
-             style={{ 
-               position: 'fixed', 
-               left: springX, 
-               top: springY,
-               x: 20, 
-               y: 20,
-               zIndex: 60,
-               pointerEvents: 'none'
-             }}
-             className="hidden md:block w-[450px] aspect-video rounded-xl overflow-hidden shadow-2xl shadow-neutral-900/10 bg-white border border-neutral-100 isolate"
-           >
-             <motion.img 
-               src={projects.find(p => p.id === hoveredProject)?.thumb} 
-               alt="" 
-               className="w-full h-full object-cover"
-               initial={{ scale: 1.1 }}
-               animate={{ scale: 1 }}
-               transition={{ duration: 0.4 }}
-             />
-             <div className="absolute inset-0 bg-neutral-900/5 mix-blend-multiply" />
-           </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Horizontal Scroll Container - Aligned padding with header */}
+      <div 
+        ref={scrollContainerRef}
+        className="flex overflow-x-auto gap-6 md:gap-8 px-4 md:px-8 pb-12 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+      >
+        <div key={lastUpdated?.getTime()} className="flex gap-6 md:gap-8">
+          {publishedProjects.map((project) => (
+            <div key={project.id} className="snap-start">
+                <ProjectCard 
+                  project={project} 
+                  onClick={onProjectClick} 
+                />
+            </div>
+          ))}
+          
+          {publishedProjects.length === 0 && (
+             <div className="w-[45vw] sm:w-[220px] md:w-[260px] aspect-[4/5] flex items-center justify-center bg-neutral-50 dark:bg-neutral-900 rounded-xl border border-dashed border-neutral-200 dark:border-neutral-800 text-neutral-400">
+                <p className="text-xs">No projects.</p>
+             </div>
+          )}
+
+          {/* Spacer for right padding in scroll view */}
+          <div className="w-4 md:w-8 flex-shrink-0" />
+        </div>
+      </div>
     </section>
   );
 };
