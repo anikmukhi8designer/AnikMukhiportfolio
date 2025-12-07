@@ -16,10 +16,31 @@ const ProfileSettings: React.FC = () => {
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [connectionMsg, setConnectionMsg] = useState('');
 
+  // Helper to run connection test
+  const testConnection = async () => {
+      setConnectionStatus('testing');
+      setConnectionMsg('');
+      try {
+        const result = await verifyConnection();
+        if (result.success) {
+            setConnectionStatus('success');
+            setConnectionMsg(result.message);
+        } else {
+            setConnectionStatus('error');
+            setConnectionMsg(result.message);
+        }
+      } catch(e) {
+          setConnectionStatus('error');
+      }
+  };
+
   useEffect(() => {
     setLocalConfig(config);
     setLocalSocials(socials);
     setDeployHook(localStorage.getItem('vercel_deploy_hook') || '');
+    
+    // Auto-check connection on mount to show status immediately
+    testConnection();
   }, [config, socials]);
 
   const handleConfigChange = (field: keyof typeof config, value: string) => {
@@ -65,23 +86,6 @@ const ProfileSettings: React.FC = () => {
       setHasChanges(false);
       setJustSaved(true);
       setTimeout(() => setJustSaved(false), 3000);
-  };
-
-  const testConnection = async () => {
-      setConnectionStatus('testing');
-      setConnectionMsg('');
-      try {
-        const result = await verifyConnection();
-        if (result.success) {
-            setConnectionStatus('success');
-            setConnectionMsg(result.message);
-        } else {
-            setConnectionStatus('error');
-            setConnectionMsg(result.message);
-        }
-      } catch(e) {
-          setConnectionStatus('error');
-      }
   };
 
   return (
@@ -134,7 +138,7 @@ const ProfileSettings: React.FC = () => {
             </div>
         )}
         {connectionStatus === 'success' && (
-            <div className="p-3 bg-green-50 border border-green-100 rounded-lg text-xs text-green-700 flex items-center gap-2 font-medium">
+            <div className="p-3 bg-green-50 border border-green-100 rounded-lg text-xs text-green-700 flex items-center gap-2 font-medium animate-in fade-in slide-in-from-top-1">
                 <Check className="w-4 h-4"/>
                 {connectionMsg}
             </div>

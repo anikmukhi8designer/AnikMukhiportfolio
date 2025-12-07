@@ -30,7 +30,8 @@ const DbStatus: React.FC = () => {
             if (error) throw error;
             
             setStatus('success');
-            setMessage(`Connected (${count ?? 0} records)`);
+            // Matched text format with ProfileSettings component
+            setMessage(`Connected. Projects found: ${count ?? 0}`);
         } catch (e: any) {
             console.error("DB Connection Check Failed:", e);
             setStatus('error');
