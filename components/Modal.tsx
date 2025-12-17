@@ -4,15 +4,19 @@ import { X, ArrowUpRight, Github, ArrowLeft } from 'lucide-react';
 import { Project } from '../types';
 import ContentRenderer from './ContentRenderer';
 import { getOptimizedSrc, getOptimizedSrcSet } from '../utils/imageOptimizer';
+import { useData } from '../contexts/DataContext';
+import ProjectCard from './ProjectCard';
 
 interface ModalProps {
   project: Project | null;
   onClose: () => void;
+  onProjectClick: (project: Project) => void;
 }
 
-const Modal: React.FC<ModalProps> = ({ project, onClose }) => {
+const Modal: React.FC<ModalProps> = ({ project, onClose, onProjectClick }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ container: containerRef });
+  const { projects, config, socials } = useData();
   
   // Parallax effects
   const heroScale = useTransform(scrollYProgress, [0, 0.2], [1, 1.1]);
@@ -38,12 +42,17 @@ const Modal: React.FC<ModalProps> = ({ project, onClose }) => {
   if (!project) return null;
 
   const heroImgSrc = project.heroImage || project.thumb;
+  
+  // Filter other projects for the footer suggestions
+  const otherProjects = projects
+    .filter(p => p.id !== project.id && p.published)
+    .slice(0, 2);
 
   return (
     <AnimatePresence mode="wait">
       {project && (
         <motion.div
-          key="modal-container"
+          key={project.id}
           className="fixed inset-0 z-[60] bg-background text-foreground overflow-y-auto overflow-x-hidden"
           initial={{ y: "100%" }}
           animate={{ y: "0%" }}
@@ -98,20 +107,6 @@ const Modal: React.FC<ModalProps> = ({ project, onClose }) => {
                         >
                             {project.title}
                         </motion.h1>
-                        
-                        <div className="flex flex-wrap gap-3">
-                            {project.tags.map((tag, i) => (
-                                <motion.span 
-                                    key={tag}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.5 + (i * 0.1) }}
-                                    className="px-4 py-1.5 border border-white/30 text-white rounded-full text-xs font-bold uppercase tracking-widest backdrop-blur-sm"
-                                >
-                                    {tag}
-                                </motion.span>
-                            ))}
-                        </div>
                     </div>
                 </motion.div>
             </div>
@@ -212,12 +207,61 @@ const Modal: React.FC<ModalProps> = ({ project, onClose }) => {
                     </div>
                 </div>
 
-                {/* Footer / Next Project */}
-                <div className="bg-foreground text-background py-32 px-6 text-center cursor-pointer hover:bg-neutral-900 transition-colors" onClick={onClose}>
-                    <span className="text-xs font-bold uppercase tracking-widest opacity-50 mb-4 block">Next Project</span>
-                    <h2 className="text-5xl md:text-8xl font-bold tracking-tighter">
-                        Keep Exploring
-                    </h2>
+                {/* More Projects & Footer */}
+                <div className="bg-background border-t border-border mt-0 relative z-20">
+                    <div className="max-w-screen-2xl mx-auto px-4 md:px-6 py-24">
+                        <div className="flex justify-between items-end mb-12">
+                            <h3 className="text-4xl md:text-5xl font-bold tracking-tighter">More Projects</h3>
+                            <button onClick={onClose} className="hidden md:block text-sm font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors">
+                                Back to All
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            {otherProjects.map(p => (
+                                <ProjectCard 
+                                    key={p.id} 
+                                    project={p} 
+                                    onClick={(p) => {
+                                        if (containerRef.current) containerRef.current.scrollTop = 0;
+                                        onProjectClick(p);
+                                    }} 
+                                />
+                            ))}
+                        </div>
+                    </div>
+                    
+                    {/* Standard Footer */}
+                    <footer className="py-24 border-t border-border bg-background">
+                        <div className="max-w-screen-2xl mx-auto px-4 md:px-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-24">
+                            <div>
+                                <h2 className="text-4xl md:text-6xl font-bold text-foreground mb-8 tracking-tighter">
+                                Let's build<br/>something great.
+                                </h2>
+                                <a href={`mailto:${config.email}`} className="text-2xl md:text-3xl text-primary hover:text-foreground transition-colors underline decoration-2 underline-offset-8 decoration-border hover:decoration-primary">
+                                {config.email}
+                                </a>
+                            </div>
+                            <div className="flex flex-col justify-end items-start md:items-end gap-6">
+                                {socials.map((social, index) => (
+                                <a 
+                                    key={`${social.platform}-${index}`} 
+                                    href={social.url} 
+                                    className="text-lg text-muted-foreground hover:text-primary transition-colors uppercase tracking-widest font-bold" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                >
+                                    {social.platform}
+                                </a>
+                                ))}
+                            </div>
+                            </div>
+                            <div className="flex flex-col md:flex-row justify-between items-center text-xs uppercase tracking-widest text-muted-foreground border-t border-border pt-8">
+                            <p>&copy; {new Date().getFullYear()} Mukhi Anik. All rights reserved.</p>
+                            <p>Designed with New Genre Principles.</p>
+                            </div>
+                        </div>
+                    </footer>
                 </div>
             </div>
         </motion.div>

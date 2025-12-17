@@ -227,6 +227,7 @@ const AppContent: React.FC = () => {
       <Modal 
         project={selectedProject} 
         onClose={() => setSelectedProject(null)} 
+        onProjectClick={setSelectedProject}
       />
     </div>
   );
