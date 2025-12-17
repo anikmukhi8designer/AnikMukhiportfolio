@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Trash2, Plus, Link as LinkIcon, Image as ImageIcon, Loader2, Check, AlertCircle } from 'lucide-react';
+import { Trash2, Plus, Link as LinkIcon, Image as ImageIcon, Loader2, Check, AlertCircle, Save, RotateCcw } from 'lucide-react';
+import { Client } from '../../types';
 
 const generateUUID = () => {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -11,6 +12,19 @@ const generateUUID = () => {
 
 const ClientsTable: React.FC = () => {
   const { clients, updateClient, deleteClient, addClient } = useData();
+  
+  // Local State
+  const [localClients, setLocalClients] = useState<Client[]>([]);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Initialize
+  useEffect(() => {
+      if (clients.length > 0 && localClients.length === 0 && !hasChanges) {
+          setLocalClients(JSON.parse(JSON.stringify(clients)));
+      }
+  }, [clients]);
+
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'loading' | null; message: string }>({ type: null, message: '' });
 
   const showStatus = (type: 'success' | 'error' | 'loading', message: string) => {
@@ -20,61 +34,105 @@ const ClientsTable: React.FC = () => {
     }
   };
 
-  const handleAddNew = async () => {
-    try {
-        showStatus('loading', 'Adding client to Database...');
-        const newId = generateUUID();
-        await addClient({
-            id: newId,
-            name: "New Client",
-            url: "",
-            logo: ""
-        });
-        showStatus('success', 'Client added successfully');
-    } catch (e: any) {
-        showStatus('error', 'Failed to add client');
-    }
+  const handleLocalUpdate = (id: string, data: Partial<Client>) => {
+      setLocalClients(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
+      setHasChanges(true);
   };
 
-  const handleUpdate = async (id: string, data: any) => {
-      try {
-          await updateClient(id, data);
-      } catch (e) {
-          showStatus('error', 'Failed to save changes');
-      }
+  const handleLocalAdd = () => {
+      const newId = generateUUID();
+      const newClient = { id: newId, name: "New Client", url: "", logo: "" };
+      setLocalClients(prev => [...prev, newClient]);
+      setHasChanges(true);
   };
 
-  const handleDelete = async (id: string) => {
-      if(!confirm("Delete this client?")) return;
-      try {
-          showStatus('loading', 'Deleting client...');
-          await deleteClient(id);
-          showStatus('success', 'Client deleted');
-      } catch (e) {
-          showStatus('error', 'Failed to delete client');
-      }
+  const handleLocalDelete = (id: string) => {
+      if(!confirm("Delete this client locally?")) return;
+      setLocalClients(prev => prev.filter(c => c.id !== id));
+      setHasChanges(true);
   };
 
   const handleUpdateLogo = (id: string) => {
       const url = prompt("Enter Logo URL:");
-      if (url) {
-          showStatus('loading', 'Updating logo...');
-          handleUpdate(id, { logo: url })
-             .then(() => showStatus('success', 'Logo updated'))
-             .catch(() => showStatus('error', 'Failed to update logo'));
+      if (url !== null) {
+          handleLocalUpdate(id, { logo: url });
+      }
+  };
+
+  const handleReset = () => {
+      if (hasChanges && !confirm("Discard unsaved changes?")) return;
+      setLocalClients(JSON.parse(JSON.stringify(clients)));
+      setHasChanges(false);
+      showStatus('success', 'Changes discarded');
+  };
+
+  const handleSaveChanges = async () => {
+      setIsSaving(true);
+      showStatus('loading', 'Saving changes...');
+      
+      try {
+          const dbIds = clients.map(c => c.id);
+          const localIds = localClients.map(c => c.id);
+          
+          // 1. Deletions
+          const toDelete = dbIds.filter(id => !localIds.includes(id));
+          for (const id of toDelete) {
+              await deleteClient(id);
+          }
+
+          // 2. Updates / Adds
+          for (let i = 0; i < localClients.length; i++) {
+            const item = localClients[i];
+            const original = clients.find(c => c.id === item.id);
+            const itemWithOrder = { ...item, order: i };
+
+            if (!original) {
+                await addClient(itemWithOrder);
+            } else if (JSON.stringify(original) !== JSON.stringify(itemWithOrder) || i !== clients.findIndex(c => c.id === item.id)) {
+                await updateClient(item.id, itemWithOrder);
+            }
+          }
+
+          setHasChanges(false);
+          showStatus('success', 'All changes saved!');
+      } catch (e: any) {
+          console.error(e);
+          showStatus('error', 'Failed to save changes');
+      } finally {
+          setIsSaving(false);
       }
   };
 
   return (
     <div className="space-y-6 relative">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Clients & Collaborations ({clients.length})</h3>
-        <button 
-          onClick={handleAddNew}
-          className="flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white text-sm font-medium rounded-lg hover:bg-neutral-800 transition-all hover:shadow-lg"
-        >
-          <Plus className="w-4 h-4" /> Add Client
-        </button>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h3 className="text-lg font-medium">Clients & Collaborations ({localClients.length})</h3>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+             <button 
+                onClick={handleReset}
+                disabled={!hasChanges || isSaving}
+                className="px-3 py-2 text-neutral-500 hover:text-neutral-900 text-sm font-medium rounded-lg hover:bg-neutral-100 disabled:opacity-50 transition-colors"
+                title="Discard Changes"
+            >
+                <RotateCcw className="w-4 h-4" />
+            </button>
+            <button 
+                onClick={handleLocalAdd}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-neutral-200 text-neutral-700 text-sm font-bold rounded-lg hover:bg-neutral-50 transition-all"
+            >
+                <Plus className="w-4 h-4" /> Add Client
+            </button>
+            <button 
+                onClick={handleSaveChanges}
+                disabled={!hasChanges || isSaving}
+                className={`flex items-center gap-2 px-4 py-2 text-white text-sm font-bold rounded-lg transition-all shadow-sm ${
+                    hasChanges ? 'bg-neutral-900 hover:bg-black hover:shadow-lg' : 'bg-neutral-300 cursor-not-allowed'
+                }`}
+            >
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />}
+                {isSaving ? 'Saving...' : 'Save Changes'}
+            </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden shadow-sm">
@@ -89,7 +147,7 @@ const ClientsTable: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
-              {clients.map((client) => (
+              {localClients.map((client) => (
                 <tr key={client.id} className="hover:bg-neutral-50/50 transition-colors">
                   <td className="px-6 py-4 align-top">
                     <button 
@@ -108,7 +166,7 @@ const ClientsTable: React.FC = () => {
                     <input 
                       className="bg-transparent border-none p-0 font-bold text-neutral-900 w-full focus:ring-0 placeholder:text-neutral-300 transition-colors focus:bg-neutral-50 px-1 rounded"
                       value={client.name}
-                      onChange={(e) => handleUpdate(client.id, { name: e.target.value })}
+                      onChange={(e) => handleLocalUpdate(client.id, { name: e.target.value })}
                       placeholder="e.g. Google"
                     />
                   </td>
@@ -118,14 +176,14 @@ const ClientsTable: React.FC = () => {
                         <input 
                             className="bg-transparent border-none p-0 text-neutral-600 w-full focus:ring-0 placeholder:text-neutral-300 text-xs transition-colors focus:bg-neutral-50 px-1 rounded"
                             value={client.url || ''}
-                            onChange={(e) => handleUpdate(client.id, { url: e.target.value })}
+                            onChange={(e) => handleLocalUpdate(client.id, { url: e.target.value })}
                             placeholder="https://..."
                         />
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right align-top">
                     <button 
-                        onClick={() => handleDelete(client.id)}
+                        onClick={() => handleLocalDelete(client.id)}
                         className="text-neutral-400 hover:text-red-600 p-2"
                         title="Delete Client"
                     >

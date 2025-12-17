@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Trash2, Plus, X, Check, Search, Loader2, Upload, AlertCircle } from 'lucide-react';
+import { Trash2, Plus, X, Check, Search, Loader2, Upload, AlertCircle, Save, RotateCcw } from 'lucide-react';
 import { ICON_KEYS, SkillIcon } from '../SkillIcons';
+import { SkillCategory } from '../../types';
 
 // Use the provided Brandfetch API Key
 const BRANDFETCH_API_KEY = "xcgD6C-HsoohCTMkqg3DR0i9wYmaqUB2nVktAG16TWiSgYr32T7dDkfOVBVc-DXgPyODc3hx2IgCr0Y3urqLrA";
@@ -39,6 +40,18 @@ const generateUUID = () => {
 const SkillsTable: React.FC = () => {
   const { skills, updateSkill, deleteSkill, addSkill } = useData();
   
+  // Local State
+  const [localSkills, setLocalSkills] = useState<SkillCategory[]>([]);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Initialize
+  useEffect(() => {
+      if (skills.length > 0 && localSkills.length === 0 && !hasChanges) {
+          setLocalSkills(JSON.parse(JSON.stringify(skills)));
+      }
+  }, [skills]);
+
   // State for the "Add Item" form
   const [addingToId, setAddingToId] = useState<string | null>(null);
   const [newItemName, setNewItemName] = useState('');
@@ -64,42 +77,58 @@ const SkillsTable: React.FC = () => {
     }
   };
 
-  const handleAddNewCategory = async () => {
-    try {
-        showStatus('loading', 'Creating category...');
-        const newId = generateUUID();
-        await addSkill({
-            id: newId,
-            title: "New Category",
-            items: []
-        });
-        showStatus('success', 'Category created');
-    } catch (e) {
-        showStatus('error', 'Failed to create category');
-    }
+  // --- Local Operations ---
+
+  const updateLocalCategory = (id: string, title: string) => {
+      setLocalSkills(prev => prev.map(s => s.id === id ? { ...s, title } : s));
+      setHasChanges(true);
   };
 
-  const handleAddItem = async (categoryId: string) => {
-    if (!newItemName.trim()) return;
-    const category = skills.find(s => s.id === categoryId);
-    if (!category) return;
+  const handleLocalAddCategory = () => {
+      const newId = generateUUID();
+      const newCategory: SkillCategory = { id: newId, title: "New Category", items: [] };
+      setLocalSkills(prev => [...prev, newCategory]);
+      setHasChanges(true);
+  };
 
-    try {
-        showStatus('loading', 'Adding skill item...');
-        // Use newItemImage if present, otherwise fall back to icon
-        const updatedItems = [...category.items, { 
-            name: newItemName, 
-            icon: newItemImage ? undefined : newItemIcon, 
-            image: newItemImage 
-        }];
-        await updateSkill(categoryId, { items: updatedItems });
-        showStatus('success', 'Skill item added');
-        
-        // Reset form
-        resetForm();
-    } catch (e) {
-        showStatus('error', 'Failed to add item');
-    }
+  const handleLocalDeleteCategory = (id: string) => {
+      if (!confirm("Delete this entire category locally?")) return;
+      setLocalSkills(prev => prev.filter(s => s.id !== id));
+      setHasChanges(true);
+  };
+
+  const handleLocalAddItem = (categoryId: string) => {
+    if (!newItemName.trim()) return;
+    
+    setLocalSkills(prev => prev.map(s => {
+        if (s.id === categoryId) {
+            return {
+                ...s,
+                items: [...s.items, { 
+                    name: newItemName, 
+                    icon: newItemImage ? undefined : newItemIcon, 
+                    image: newItemImage 
+                }]
+            };
+        }
+        return s;
+    }));
+    
+    setHasChanges(true);
+    resetForm();
+  };
+
+  const handleLocalDeleteItem = (categoryId: string, itemIndex: number) => {
+     setLocalSkills(prev => prev.map(s => {
+         if (s.id === categoryId) {
+             return {
+                 ...s,
+                 items: s.items.filter((_, idx) => idx !== itemIndex)
+             };
+         }
+         return s;
+     }));
+     setHasChanges(true);
   };
 
   const resetForm = () => {
@@ -111,30 +140,51 @@ const SkillsTable: React.FC = () => {
     setShowResults(false);
   };
 
-  const handleDeleteItem = async (categoryId: string, itemIndex: number) => {
-     const category = skills.find(s => s.id === categoryId);
-     if (!category) return;
-     
-     try {
-         showStatus('loading', 'Removing item...');
-         const updatedItems = category.items.filter((_, idx) => idx !== itemIndex);
-         await updateSkill(categoryId, { items: updatedItems });
-         showStatus('success', 'Item removed');
-     } catch(e) {
-         showStatus('error', 'Failed to remove item');
-     }
+  const handleReset = () => {
+      if (hasChanges && !confirm("Discard unsaved changes?")) return;
+      setLocalSkills(JSON.parse(JSON.stringify(skills)));
+      setHasChanges(false);
+      showStatus('success', 'Changes discarded');
   };
 
-  const handleDeleteCategory = async (id: string) => {
-      if (!confirm("Delete this entire category?")) return;
-      try {
-          showStatus('loading', 'Deleting category...');
-          await deleteSkill(id);
-          showStatus('success', 'Category deleted');
-      } catch(e) {
-          showStatus('error', 'Failed to delete category');
-      }
+  const handleSaveChanges = async () => {
+    setIsSaving(true);
+    showStatus('loading', 'Saving changes...');
+    
+    try {
+        const dbIds = skills.map(s => s.id);
+        const localIds = localSkills.map(s => s.id);
+        
+        // 1. Deletions
+        const toDelete = dbIds.filter(id => !localIds.includes(id));
+        for (const id of toDelete) {
+            await deleteSkill(id);
+        }
+
+        // 2. Updates / Additions
+        for (let i = 0; i < localSkills.length; i++) {
+            const item = localSkills[i];
+            const original = skills.find(s => s.id === item.id);
+            const itemWithOrder = { ...item, order: i };
+
+            if (!original) {
+                await addSkill(itemWithOrder);
+            } else if (JSON.stringify(original) !== JSON.stringify(itemWithOrder) || i !== skills.findIndex(s => s.id === item.id)) {
+                await updateSkill(item.id, itemWithOrder);
+            }
+        }
+
+        setHasChanges(false);
+        showStatus('success', 'All changes saved!');
+    } catch (e: any) {
+        console.error(e);
+        showStatus('error', 'Failed to save changes');
+    } finally {
+        setIsSaving(false);
+    }
   };
+
+  // --- External API Operations (Search/Upload) ---
 
   const searchBrandfetch = async (query: string) => {
     if (!query) return;
@@ -263,14 +313,34 @@ const SkillsTable: React.FC = () => {
         onChange={processUpload}
       />
 
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Skills & Tools ({skills.length} Categories)</h3>
-        <button 
-          onClick={handleAddNewCategory}
-          className="flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white text-sm font-medium rounded-lg hover:bg-neutral-800 whitespace-nowrap"
-        >
-          <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Category</span><span className="sm:hidden">Add</span>
-        </button>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h3 className="text-lg font-medium">Skills & Tools ({localSkills.length} Categories)</h3>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+             <button 
+                onClick={handleReset}
+                disabled={!hasChanges || isSaving}
+                className="px-3 py-2 text-neutral-500 hover:text-neutral-900 text-sm font-medium rounded-lg hover:bg-neutral-100 disabled:opacity-50 transition-colors"
+                title="Discard Changes"
+            >
+                <RotateCcw className="w-4 h-4" />
+            </button>
+            <button 
+                onClick={handleLocalAddCategory}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-neutral-200 text-neutral-700 text-sm font-bold rounded-lg hover:bg-neutral-50 transition-all"
+            >
+                <Plus className="w-4 h-4" /> Add Category
+            </button>
+             <button 
+                onClick={handleSaveChanges}
+                disabled={!hasChanges || isSaving}
+                className={`flex items-center gap-2 px-4 py-2 text-white text-sm font-bold rounded-lg transition-all shadow-sm ${
+                    hasChanges ? 'bg-neutral-900 hover:bg-black hover:shadow-lg' : 'bg-neutral-300 cursor-not-allowed'
+                }`}
+            >
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />}
+                {isSaving ? 'Saving...' : 'Save Changes'}
+            </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden shadow-sm">
@@ -284,13 +354,13 @@ const SkillsTable: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
-              {skills.map((skill) => (
+              {localSkills.map((skill) => (
                 <tr key={skill.id} className="hover:bg-neutral-50/50 transition-colors">
                   <td className="px-6 py-4 align-top">
                     <input 
                       className="bg-transparent border-none p-0 font-bold text-neutral-900 w-full focus:ring-0 placeholder:text-neutral-300 transition-colors focus:bg-neutral-50 px-1 rounded"
                       value={skill.title}
-                      onChange={(e) => updateSkill(skill.id, { title: e.target.value })}
+                      onChange={(e) => updateLocalCategory(skill.id, e.target.value)}
                       placeholder="e.g. Design"
                     />
                   </td>
@@ -311,7 +381,7 @@ const SkillsTable: React.FC = () => {
                                 </div>
                                 <span className="text-neutral-700 font-medium">{item.name}</span>
                                 <button 
-                                    onClick={() => handleDeleteItem(skill.id, idx)}
+                                    onClick={() => handleLocalDeleteItem(skill.id, idx)}
                                     className="ml-1 text-neutral-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                                 >
                                     <X className="w-3 h-3" />
@@ -332,7 +402,7 @@ const SkillsTable: React.FC = () => {
                                         onChange={(e) => setNewItemName(e.target.value)}
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
-                                                if (newItemImage) handleAddItem(skill.id);
+                                                if (newItemImage) handleLocalAddItem(skill.id);
                                                 else searchBrandfetch(newItemName);
                                             }
                                             if (e.key === 'Escape') resetForm();
@@ -393,7 +463,7 @@ const SkillsTable: React.FC = () => {
                                     
                                     <div className="h-6 w-px bg-neutral-200 mx-1 flex-shrink-0"></div>
 
-                                    <button onClick={() => handleAddItem(skill.id)} className="p-1.5 bg-green-50 hover:bg-green-100 rounded text-green-600 transition-colors flex-shrink-0">
+                                    <button onClick={() => handleLocalAddItem(skill.id)} className="p-1.5 bg-green-50 hover:bg-green-100 rounded text-green-600 transition-colors flex-shrink-0">
                                         <Check className="w-4 h-4"/>
                                     </button>
                                     <button onClick={resetForm} className="p-1.5 hover:bg-red-50 rounded text-red-500 transition-colors flex-shrink-0">
@@ -442,7 +512,7 @@ const SkillsTable: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 text-right align-top">
                     <button 
-                        onClick={() => handleDeleteCategory(skill.id)}
+                        onClick={() => handleLocalDeleteCategory(skill.id)}
                         className="text-neutral-400 hover:text-red-600 p-2"
                         title="Delete Category"
                     >
