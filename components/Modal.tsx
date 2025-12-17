@@ -58,7 +58,7 @@ const Modal: React.FC<ModalProps> = ({ project, onClose }) => {
                     className="pointer-events-auto flex items-center gap-2 px-4 py-2 bg-background/50 backdrop-blur-md border border-border rounded-full hover:bg-foreground hover:text-background transition-colors group"
                 >
                     <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                    <span className="text-sm font-bold uppercase tracking-widest">Back to Work</span>
+                    <span className="text-sm font-bold uppercase tracking-widest">Back to Home</span>
                 </button>
 
                 <button 

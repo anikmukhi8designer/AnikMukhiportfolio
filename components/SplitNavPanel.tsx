@@ -124,17 +124,6 @@ const SplitNavPanel: React.FC<SplitNavPanelProps> = ({ isOpen, onClose, onProjec
               variants={columnVariants}
               className="flex-1 flex flex-col md:pl-12 pt-12 md:pt-0"
             >
-              <div className="mb-12">
-                  <h2 className="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-8">
-                    Navigation
-                  </h2>
-                  <div className="flex flex-col gap-4 text-xl font-medium">
-                      <a href="#work" onClick={(e) => handleScroll(e, 'work')} className="hover:text-neutral-400 transition-colors">Work</a>
-                      <a href="#experience" onClick={(e) => handleScroll(e, 'experience')} className="hover:text-neutral-400 transition-colors">Experience</a>
-                      <a href="#contact" onClick={(e) => handleScroll(e, 'contact')} className="hover:text-neutral-400 transition-colors">Contact</a>
-                  </div>
-              </div>
-
               <div>
                 <h2 className="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-6">
                   Latest Roles

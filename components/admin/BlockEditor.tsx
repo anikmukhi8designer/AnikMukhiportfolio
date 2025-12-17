@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Project, ContentBlock, BlockType } from '../../types';
 import { 
-  ArrowLeft, Save, Trash2, GripVertical, Image as ImageIcon, 
+  ArrowLeft, Save, Trash2, Image as ImageIcon, 
   Type, Heading1, Heading2, Code, Quote, ArrowUp, ArrowDown, Minus,
-  Link as LinkIcon, Calendar, Tag, Copy, X, Upload, Loader2, Settings, Github
+  Settings, Upload, Loader2, FileText, Layout,
+  MoreHorizontal, Check, X, ChevronRight, Sidebar
 } from 'lucide-react';
 
 interface BlockEditorProps {
@@ -12,7 +13,7 @@ interface BlockEditorProps {
   onBack: () => void;
 }
 
-// Helper to access env safely
+// Helper: Get Environment Variables
 const getEnv = (key: string) => {
     try {
         // @ts-ignore
@@ -24,7 +25,7 @@ const getEnv = (key: string) => {
     return '';
 };
 
-// Helper to get token from Env OR LocalStorage
+// Helper: GitHub Token
 const getGitHubToken = () => {
     const env = getEnv('VITE_GITHUB_TOKEN');
     if (env) return env;
@@ -37,11 +38,16 @@ const getGitHubConfig = () => ({
 });
 
 const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) => {
+  // --- State Management ---
   const [formData, setFormData] = useState<Project>(project);
   const [blocks, setBlocks] = useState<ContentBlock[]>(project.content || []);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [showMobileSettings, setShowMobileSettings] = useState(false);
   
+  // UI State
+  const [activeTab, setActiveTab] = useState<'home' | 'insert' | 'layout'>('home');
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [showMetadata, setShowMetadata] = useState(window.innerWidth > 1200);
+
   // Focus Management
   const blockInputRefs = useRef<{ [key: string]: HTMLInputElement | HTMLTextAreaElement | null }>({});
   const [shouldFocusId, setShouldFocusId] = useState<string | null>(null);
@@ -51,7 +57,9 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
   const [isUploading, setIsUploading] = useState(false);
   const [pendingUploadHandler, setPendingUploadHandler] = useState<((url: string) => void) | null>(null);
 
-  // Focus effect when shouldFocusId changes
+  // --- Effects ---
+
+  // Handle focus requests
   useEffect(() => {
     if (shouldFocusId && blockInputRefs.current[shouldFocusId]) {
         blockInputRefs.current[shouldFocusId]?.focus();
@@ -59,6 +67,7 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
     }
   }, [shouldFocusId, blocks]);
 
+  // Ensure at least one block exists
   useEffect(() => {
     if (!project.content || project.content.length === 0) {
       setBlocks([
@@ -67,59 +76,52 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
     }
   }, [project]);
 
+  // Responsive Sidebar
+  useEffect(() => {
+      const handleResize = () => {
+          if (window.innerWidth < 1200) setShowMetadata(false);
+          else setShowMetadata(true);
+      };
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // --- Logic / Handlers ---
+
   const handleMetaChange = (field: keyof Project, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setHasUnsavedChanges(true);
   };
 
-  const handleAddGalleryImage = (url: string) => {
-    const currentImages = formData.images || [];
-    handleMetaChange('images', [...currentImages, url]);
-  };
-
-  const handleRemoveGalleryImage = (index: number) => {
-    const currentImages = formData.images || [];
-    handleMetaChange('images', currentImages.filter((_, i) => i !== index));
-  };
-
   const generateId = () => `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-  const addBlock = (type: BlockType) => {
+  // Core Block Operations
+  const insertBlock = (type: BlockType) => {
     const newBlock: ContentBlock = {
       id: generateId(),
       type,
       content: '',
       caption: type === 'code' ? 'javascript' : ''
     };
-    setBlocks([...blocks, newBlock]);
-    setHasUnsavedChanges(true);
-  };
 
-  const insertBlockAfter = (index: number, type: BlockType = 'paragraph') => {
-    const newBlock: ContentBlock = {
-        id: generateId(),
-        type,
-        content: '',
-        caption: ''
-    };
-    const newBlocks = [...blocks];
-    newBlocks.splice(index + 1, 0, newBlock);
+    let newBlocks = [...blocks];
+    
+    // If a block is selected, insert after it
+    if (selectedBlockId) {
+        const index = blocks.findIndex(b => b.id === selectedBlockId);
+        if (index !== -1) {
+            newBlocks.splice(index + 1, 0, newBlock);
+        } else {
+            newBlocks.push(newBlock);
+        }
+    } else {
+        newBlocks.push(newBlock);
+    }
+
     setBlocks(newBlocks);
     setHasUnsavedChanges(true);
     setShouldFocusId(newBlock.id);
-  };
-
-  const duplicateBlock = (index: number) => {
-    const blockToDuplicate = blocks[index];
-    const newBlock: ContentBlock = {
-        ...blockToDuplicate,
-        id: generateId()
-    };
-    const newBlocks = [...blocks];
-    newBlocks.splice(index + 1, 0, newBlock);
-    setBlocks(newBlocks);
-    setHasUnsavedChanges(true);
-    setShouldFocusId(newBlock.id);
+    setSelectedBlockId(newBlock.id);
   };
 
   const updateBlock = (id: string, content: string, caption?: string) => {
@@ -127,67 +129,54 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
     setHasUnsavedChanges(true);
   };
 
-  const deleteBlock = (id: string) => {
-    setBlocks(blocks.filter(b => b.id !== id));
+  const deleteBlock = () => {
+    if (!selectedBlockId) return;
+    const index = blocks.findIndex(b => b.id === selectedBlockId);
+    if (index === -1) return;
+
+    // Safety check for last block
+    if (blocks.length <= 1) {
+        alert("Document must have at least one block.");
+        return;
+    }
+
+    const newBlocks = blocks.filter(b => b.id !== selectedBlockId);
+    setBlocks(newBlocks);
     setHasUnsavedChanges(true);
+    
+    // Focus neighbor
+    const prev = newBlocks[index - 1];
+    const next = newBlocks[index];
+    if (prev) {
+        setSelectedBlockId(prev.id);
+        setShouldFocusId(prev.id);
+    } else if (next) {
+        setSelectedBlockId(next.id);
+        setShouldFocusId(next.id);
+    } else {
+        setSelectedBlockId(null);
+    }
   };
 
-  const moveBlock = (index: number, direction: 'up' | 'down') => {
-    if (
-      (direction === 'up' && index === 0) || 
-      (direction === 'down' && index === blocks.length - 1)
-    ) return;
+  const moveBlock = (direction: 'up' | 'down') => {
+    if (!selectedBlockId) return;
+    const index = blocks.findIndex(b => b.id === selectedBlockId);
+    if (index === -1) return;
+    
+    if ((direction === 'up' && index === 0) || (direction === 'down' && index === blocks.length - 1)) return;
 
     const newBlocks = [...blocks];
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    
     [newBlocks[index], newBlocks[targetIndex]] = [newBlocks[targetIndex], newBlocks[index]];
+    
     setBlocks(newBlocks);
     setHasUnsavedChanges(true);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent, index: number, block: ContentBlock) => {
-      if (e.shiftKey && e.key === 'Delete') {
-          e.preventDefault();
-          const prev = blocks[index - 1];
-          const next = blocks[index + 1];
-          setBlocks(blocks.filter(b => b.id !== block.id));
-          setHasUnsavedChanges(true);
-          if (prev) setShouldFocusId(prev.id);
-          else if (next) setShouldFocusId(next.id);
-          return;
-      }
-
-      if (e.key === 'Enter' && !e.shiftKey) {
-          if (['paragraph', 'h1', 'h2', 'quote'].includes(block.type)) {
-             e.preventDefault();
-             insertBlockAfter(index, 'paragraph');
-          }
-      }
-
-      if (e.key === 'Backspace' && block.content === '' && blocks.length > 1) {
-          e.preventDefault();
-          const prev = blocks[index - 1];
-          const next = blocks[index + 1];
-          setBlocks(blocks.filter(b => b.id !== block.id));
-          setHasUnsavedChanges(true);
-          if (prev) setShouldFocusId(prev.id);
-          else if (next) setShouldFocusId(next.id);
-      }
-      
-      if (e.key === 'ArrowUp' && index > 0) {
-          const target = e.currentTarget as HTMLInputElement | HTMLTextAreaElement;
-          if (target.selectionStart === 0 && target.selectionEnd === 0) {
-              e.preventDefault();
-              setShouldFocusId(blocks[index - 1].id);
-          }
-      }
-      if (e.key === 'ArrowDown' && index < blocks.length - 1) {
-           const target = e.currentTarget as HTMLInputElement | HTMLTextAreaElement;
-           if (target.selectionStart === target.value.length && target.selectionEnd === target.value.length) {
-              e.preventDefault();
-              setShouldFocusId(blocks[index + 1].id);
-           }
-      }
+    // Keep focus logic handled by react re-render, but usually focus stays if key matches
+    // We might need to forcefully re-focus if DOM shifts
+    setTimeout(() => {
+         blockInputRefs.current[selectedBlockId]?.focus();
+    }, 0);
   };
 
   const handleSave = () => {
@@ -198,7 +187,59 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
     setHasUnsavedChanges(false);
   };
 
-  // Upload Logic (GitHub API)
+  const handleKeyDown = (e: React.KeyboardEvent, index: number, block: ContentBlock) => {
+      // Enter to create new paragraph
+      if (e.key === 'Enter' && !e.shiftKey) {
+          if (['paragraph', 'h1', 'h2', 'quote'].includes(block.type)) {
+             e.preventDefault();
+             // Manually insert paragraph after current index
+             const newBlock: ContentBlock = { id: generateId(), type: 'paragraph', content: '' };
+             const newBlocks = [...blocks];
+             newBlocks.splice(index + 1, 0, newBlock);
+             setBlocks(newBlocks);
+             setHasUnsavedChanges(true);
+             setShouldFocusId(newBlock.id);
+             setSelectedBlockId(newBlock.id);
+          }
+      }
+      
+      // Backspace to delete empty block
+      if (e.key === 'Backspace' && block.content === '' && blocks.length > 1) {
+          e.preventDefault();
+          const prev = blocks[index - 1];
+          const next = blocks[index + 1];
+          setBlocks(blocks.filter(b => b.id !== block.id));
+          setHasUnsavedChanges(true);
+          if (prev) {
+              setShouldFocusId(prev.id);
+              setSelectedBlockId(prev.id);
+          }
+          else if (next) {
+              setShouldFocusId(next.id);
+              setSelectedBlockId(next.id);
+          }
+      }
+
+      // Arrows for navigation
+      if (e.key === 'ArrowUp' && index > 0) {
+          const target = e.currentTarget as HTMLInputElement | HTMLTextAreaElement;
+          if (target.selectionStart === 0) {
+              e.preventDefault();
+              setShouldFocusId(blocks[index - 1].id);
+              setSelectedBlockId(blocks[index - 1].id);
+          }
+      }
+      if (e.key === 'ArrowDown' && index < blocks.length - 1) {
+           const target = e.currentTarget as HTMLInputElement | HTMLTextAreaElement;
+           if (target.selectionStart === target.value.length) {
+              e.preventDefault();
+              setShouldFocusId(blocks[index + 1].id);
+              setSelectedBlockId(blocks[index + 1].id);
+           }
+      }
+  };
+
+  // --- Upload Logic ---
   const triggerUpload = (handler: (url: string) => void) => {
     setPendingUploadHandler(() => handler);
     fileInputRef.current?.click();
@@ -211,504 +252,471 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
     let token = getGitHubToken();
     let { owner, repo } = getGitHubConfig();
 
-    if (!owner || !repo) {
-         const userOwner = prompt("GitHub Repository Owner (e.g. 'username'):");
-         if (!userOwner) return;
-         const userRepo = prompt("GitHub Repository Name (e.g. 'portfolio'):");
-         if (!userRepo) return;
-         
-         localStorage.setItem('github_owner', userOwner);
-         localStorage.setItem('github_repo', userRepo);
-         owner = userOwner;
-         repo = userRepo;
-    }
-    
-    if (!token) {
-        const userInput = prompt("GitHub Token is required for uploads. Please enter your GitHub Personal Access Token:");
-        if (userInput) {
-            localStorage.setItem('github_token', userInput.trim());
-            token = userInput.trim();
-        } else {
-            alert("Upload cancelled. Token is required.");
-            return;
-        }
+    if (!owner || !repo || !token) {
+         // Fallback for demo mode or missing config
+         const demoUrl = URL.createObjectURL(file);
+         pendingUploadHandler(demoUrl);
+         setPendingUploadHandler(null);
+         return;
     }
 
     setIsUploading(true);
-    
     try {
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${fileExt}`;
         const filePath = `public/uploads/${fileName}`;
 
-        // Convert file to Base64
         const reader = new FileReader();
         reader.readAsDataURL(file);
         
         reader.onload = async () => {
             const base64Content = (reader.result as string).split(',')[1];
-
             try {
                 const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`, {
                     method: 'PUT',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        message: `Upload image: ${fileName}`,
-                        content: base64Content
-                    })
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: `Upload image: ${fileName}`, content: base64Content })
                 });
 
                 if (!response.ok) throw new Error("GitHub Upload Failed");
-
-                // Construct public URL
-                // Use Raw URL for immediate feedback in preview
                 const publicUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${filePath}`;
-                
                 pendingUploadHandler(publicUrl);
             } catch (err) {
                 console.error(err);
-                alert("Upload failed. Check console or verify your token permissions.");
+                alert("Upload failed. Check console.");
             } finally {
                 setIsUploading(false);
                 setPendingUploadHandler(null);
                 if (fileInputRef.current) fileInputRef.current.value = '';
             }
         };
-
     } catch (error) {
-        console.error("Upload failed", error);
         setIsUploading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-neutral-100 flex flex-col">
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        className="hidden" 
-        accept="image/*"
-        onChange={processUpload}
-      />
+  // --- Renderers ---
 
-      <header className="bg-white border-b border-neutral-200 sticky top-0 z-40 px-4 md:px-6 h-16 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-2 md:gap-4">
-          <button onClick={onBack} className="p-2 hover:bg-neutral-100 rounded-full transition-colors text-neutral-500 hover:text-neutral-900">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="h-6 w-px bg-neutral-200 hidden md:block"></div>
-          <div>
-            <h1 className="text-sm font-bold text-neutral-900 truncate max-w-[150px] md:max-w-none">Editing: {formData.title}</h1>
-            <p className="text-xs text-neutral-500 hidden md:block">{hasUnsavedChanges ? 'Unsaved changes' : 'All changes saved to cloud'}</p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-3">
-            <button 
-                onClick={() => setShowMobileSettings(!showMobileSettings)}
-                className="lg:hidden p-2 text-neutral-500 hover:text-neutral-900 bg-neutral-100 rounded-lg"
-                title="Project Settings"
-            >
-                <Settings className="w-4 h-4" />
-            </button>
-            <button 
-            onClick={handleSave}
-            className={`flex items-center gap-2 px-3 md:px-6 py-2 rounded-lg text-sm font-bold text-white transition-all ${
-                hasUnsavedChanges ? 'bg-neutral-900 hover:bg-neutral-800' : 'bg-green-600 hover:bg-green-700'
-            }`}
-            >
-            <Save className="w-4 h-4" /> <span className="hidden md:inline">{hasUnsavedChanges ? 'Save Changes' : 'Saved'}</span>
-            </button>
-        </div>
-      </header>
-
-      <div className="flex-grow flex overflow-hidden relative">
-        
-        {/* Sidebar: Metadata - Sliding Panel on Mobile, Fixed on Desktop */}
-        <aside className={`
-            fixed inset-0 z-50 bg-white p-6 overflow-y-auto transition-transform duration-300 ease-in-out lg:translate-x-0
-            lg:static lg:w-96 lg:border-r lg:block lg:z-auto
-            ${showMobileSettings ? 'translate-x-0' : '-translate-x-full'}
-        `}>
-          <div className="flex justify-between items-center lg:hidden mb-6">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-900">Project Details</h2>
-            <button onClick={() => setShowMobileSettings(false)} className="p-2 hover:bg-neutral-100 rounded-full">
-                <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          <h2 className="text-xs font-bold uppercase tracking-widest text-neutral-400 mb-6 hidden lg:block">Project Details</h2>
-          
-          <div className="space-y-6">
-            <div>
-              <label className="block text-xs font-bold text-neutral-900 mb-2">Project Title</label>
-              <input 
-                type="text" 
-                value={formData.title}
-                onChange={(e) => handleMetaChange('title', e.target.value)}
-                className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-neutral-900 mb-2">Client</label>
-              <input 
-                type="text" 
-                value={formData.client}
-                onChange={(e) => handleMetaChange('client', e.target.value)}
-                className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-xs font-bold text-neutral-900 mb-2 flex items-center gap-1">
-                        <Calendar className="w-3 h-3"/> Year
-                    </label>
-                    <input 
-                        type="number" 
-                        value={formData.year}
-                        onChange={(e) => handleMetaChange('year', parseInt(e.target.value))}
-                        className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-                    />
-                </div>
-                <div>
-                    <label className="block text-xs font-bold text-neutral-900 mb-2 flex items-center gap-1">
-                        <Tag className="w-3 h-3"/> Services
-                    </label>
-                    <input 
-                        type="text" 
-                        value={formData.tags.join(', ')}
-                        onChange={(e) => handleMetaChange('tags', e.target.value.split(',').map(s => s.trim()))}
-                        className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-                        placeholder="Web, Mobile"
-                    />
-                </div>
-            </div>
-
-            <div>
-                <label className="block text-xs font-bold text-neutral-900 mb-2 flex items-center gap-1">
-                    <LinkIcon className="w-3 h-3"/> Live Site URL
-                </label>
-                <input 
-                    type="text" 
-                    value={formData.link || ''}
-                    onChange={(e) => handleMetaChange('link', e.target.value)}
-                    className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-                    placeholder="https://..."
-                />
-            </div>
-
-            <div>
-                <label className="block text-xs font-bold text-neutral-900 mb-2 flex items-center gap-1">
-                    <Github className="w-3 h-3"/> GitHub Repo URL
-                </label>
-                <input 
-                    type="text" 
-                    value={formData.githubRepoUrl || ''}
-                    onChange={(e) => handleMetaChange('githubRepoUrl', e.target.value)}
-                    className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-                    placeholder="https://github.com/..."
-                />
-            </div>
-
-            {/* Thumbnail Image Section */}
-            <div>
-              <label className="block text-xs font-bold text-neutral-900 mb-2">Thumbnail URL</label>
-              <div className="flex gap-2">
-                <input 
-                    type="text" 
-                    value={formData.thumb}
-                    onChange={(e) => handleMetaChange('thumb', e.target.value)}
-                    className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-                    placeholder="https://..."
-                />
-                <button 
-                    onClick={() => triggerUpload((url) => handleMetaChange('thumb', url))}
-                    disabled={isUploading}
-                    className="p-2 bg-neutral-100 hover:bg-neutral-200 rounded-lg border border-neutral-200 transition-colors"
-                >
-                    {isUploading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Upload className="w-4 h-4" />}
-                </button>
+  const renderRibbon = () => (
+      <div className="bg-white border-b border-neutral-300 shadow-sm z-30 relative">
+          {/* File/Title Bar */}
+          <div className="bg-[#2b579a] text-white px-4 py-2 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                  <button onClick={onBack} className="p-1 hover:bg-white/10 rounded">
+                      <ArrowLeft className="w-5 h-5" />
+                  </button>
+                  <div className="flex flex-col leading-none">
+                       <span className="text-sm font-semibold tracking-wide">{formData.title || "Untitled Document"}</span>
+                       <span className="text-[10px] opacity-80">{hasUnsavedChanges ? "Unsaved changes" : "Saved to cloud"}</span>
+                  </div>
               </div>
-              <img src={formData.thumb} alt="Preview" className="mt-2 w-full h-24 object-cover rounded-md bg-neutral-100" />
-            </div>
-
-            {/* Hero Image Section */}
-            <div>
-              <label className="block text-xs font-bold text-neutral-900 mb-2 flex items-center justify-between">
-                <span>Hero Image URL</span>
-                <button 
-                    onClick={() => handleMetaChange('heroImage', formData.thumb)}
-                    className="text-[10px] text-blue-600 hover:underline font-normal flex items-center gap-1"
-                >
-                    <Copy className="w-3 h-3"/> Use Thumb
-                </button>
-              </label>
-              <div className="flex gap-2">
-                <input 
-                    type="text" 
-                    value={formData.heroImage}
-                    onChange={(e) => handleMetaChange('heroImage', e.target.value)}
-                    className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-                    placeholder="https://..."
-                />
-                 <button 
-                    onClick={() => triggerUpload((url) => handleMetaChange('heroImage', url))}
-                    disabled={isUploading}
-                    className="p-2 bg-neutral-100 hover:bg-neutral-200 rounded-lg border border-neutral-200 transition-colors"
-                >
-                    {isUploading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Upload className="w-4 h-4" />}
-                </button>
+              <div className="flex items-center gap-2">
+                   <button 
+                        onClick={handleSave} 
+                        className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded transition-colors flex items-center gap-2 ${
+                            hasUnsavedChanges ? 'bg-white text-[#2b579a] hover:bg-neutral-100' : 'bg-white/20 text-white cursor-default'
+                        }`}
+                   >
+                       <Save className="w-3 h-3" />
+                       {hasUnsavedChanges ? 'Save' : 'Saved'}
+                   </button>
               </div>
-              <img src={formData.heroImage} alt="Preview" className="mt-2 w-full h-24 object-cover rounded-md bg-neutral-100" />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-neutral-900 mb-2">Summary (Card Description)</label>
-              <textarea 
-                value={formData.description}
-                onChange={(e) => handleMetaChange('description', e.target.value)}
-                rows={4}
-                className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-              />
-            </div>
-
-            {/* Gallery Images Management */}
-            <div>
-                <label className="block text-xs font-bold text-neutral-900 mb-2">Gallery Images</label>
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                    {formData.images?.map((img, idx) => (
-                        <div key={idx} className="relative group rounded-md overflow-hidden aspect-video bg-neutral-100">
-                            <img src={img} className="w-full h-full object-cover" alt="" />
-                            <button 
-                                onClick={() => handleRemoveGalleryImage(idx)}
-                                className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white"
-                            >
-                                <X className="w-6 h-6" />
-                            </button>
-                        </div>
-                    ))}
-                </div>
-                <button 
-                    onClick={() => triggerUpload(handleAddGalleryImage)}
-                    disabled={isUploading}
-                    className="w-full py-2 bg-neutral-100 hover:bg-neutral-200 border border-neutral-200 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-2"
-                >
-                     {isUploading ? <Loader2 className="w-3 h-3 animate-spin"/> : <Upload className="w-3 h-3" />}
-                    Upload Image
-                </button>
-            </div>
-
-            <div className="pt-6 border-t border-neutral-100">
-                <label className="flex items-center gap-2 cursor-pointer">
-                    <input 
-                        type="checkbox" 
-                        checked={formData.published}
-                        onChange={(e) => handleMetaChange('published', e.target.checked)}
-                        className="w-4 h-4 text-neutral-900 focus:ring-neutral-900 border-gray-300 rounded"
-                    />
-                    <span className="text-sm font-medium text-neutral-900">Published Live</span>
-                </label>
-            </div>
           </div>
-        </aside>
 
-        {/* Main Content: Blocks */}
-        <main className="flex-1 overflow-y-auto bg-neutral-100 p-4 md:p-8 pb-32">
-          <div className="max-w-3xl mx-auto space-y-4">
-            
-            {/* Project Header Preview */}
-            <div className="mb-12 text-center opacity-50 hover:opacity-100 transition-opacity">
-               <h1 className="text-4xl font-bold mb-2">{formData.title}</h1>
-               <p>{formData.client} • {formData.year}</p>
-            </div>
+          {/* Tab Headers */}
+          <div className="flex px-2 border-b border-neutral-200 bg-[#f3f2f1]">
+              {[
+                  { id: 'home', label: 'Home' },
+                  { id: 'insert', label: 'Insert' },
+                  { id: 'layout', label: 'Page Layout' },
+              ].map(tab => (
+                  <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id as any)}
+                      className={`px-5 py-2 text-sm font-medium border-t-2 border-x border-transparent mb-[-1px] transition-colors ${
+                          activeTab === tab.id 
+                          ? 'bg-white border-neutral-200 border-t-2 border-t-[#2b579a] text-[#2b579a]' 
+                          : 'text-neutral-600 hover:bg-neutral-200'
+                      }`}
+                  >
+                      {tab.label}
+                  </button>
+              ))}
+          </div>
 
-            {/* Blocks List */}
-            {blocks.map((block, index) => (
-              <div key={block.id} className="group relative flex gap-2 md:gap-4 items-start">
-                
-                {/* Block Controls - Hidden on mobile usually, accessible via focus or tap */}
-                <div className="hidden md:flex w-8 pt-2 flex-col items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => moveBlock(index, 'up')} className="p-1 hover:bg-white rounded text-neutral-400 hover:text-neutral-900">
-                        <ArrowUp className="w-3 h-3" />
-                    </button>
-                    <GripVertical className="w-4 h-4 text-neutral-300 cursor-grab active:cursor-grabbing" />
-                    <button onClick={() => moveBlock(index, 'down')} className="p-1 hover:bg-white rounded text-neutral-400 hover:text-neutral-900">
-                        <ArrowDown className="w-3 h-3" />
-                    </button>
-                    <button onClick={() => duplicateBlock(index)} className="p-1 hover:bg-white rounded text-neutral-400 hover:text-neutral-900 mt-1" title="Duplicate Block">
-                        <Copy className="w-3 h-3" />
-                    </button>
-                </div>
+          {/* Toolbar Area */}
+          <div className="h-24 bg-[#f3f2f1] flex items-center px-4 gap-6 overflow-x-auto">
+              
+              {/* HOME TAB TOOLS */}
+              {activeTab === 'home' && (
+                  <>
+                      {/* Clipboard Group (Mock) */}
+                      <div className="flex flex-col items-center gap-1 pr-6 border-r border-neutral-300">
+                           <div className="flex gap-1">
+                                <button className="p-1.5 text-neutral-500 hover:bg-white hover:shadow-sm rounded disabled:opacity-30" title="Paste (Ctrl+V)"><FileText className="w-5 h-5" /></button>
+                           </div>
+                           <span className="text-[10px] text-neutral-500">Clipboard</span>
+                      </div>
 
-                {/* Block Content */}
-                <div className="flex-1 bg-white rounded-lg shadow-sm border border-transparent hover:border-neutral-300 transition-colors p-4 relative group-focus-within:ring-2 group-focus-within:ring-neutral-900 ring-offset-2">
-                    
-                    {/* Delete Button (absolute) */}
-                    <button 
-                        onClick={() => deleteBlock(block.id)}
-                        className="absolute -right-2 -top-2 md:-right-3 md:-top-3 bg-white shadow-md p-1.5 rounded-full text-red-500 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 z-10"
-                        title="Delete (Shift+Delete)"
-                    >
-                        <Trash2 className="w-3 h-3" />
-                    </button>
+                      {/* Styles Group */}
+                      <div className="flex flex-col gap-1 pr-6 border-r border-neutral-300">
+                          <div className="flex gap-1">
+                              <button onClick={() => insertBlock('h1')} className="p-2 hover:bg-white hover:shadow-sm rounded group flex flex-col items-center min-w-[3rem]" title="Heading 1">
+                                  <Heading1 className="w-5 h-5 text-neutral-700 group-hover:text-[#2b579a]" />
+                                  <span className="text-[10px] mt-1 text-neutral-500">Title</span>
+                              </button>
+                              <button onClick={() => insertBlock('h2')} className="p-2 hover:bg-white hover:shadow-sm rounded group flex flex-col items-center min-w-[3rem]" title="Heading 2">
+                                  <Heading2 className="w-5 h-5 text-neutral-700 group-hover:text-[#2b579a]" />
+                                  <span className="text-[10px] mt-1 text-neutral-500">Header</span>
+                              </button>
+                              <button onClick={() => insertBlock('paragraph')} className="p-2 hover:bg-white hover:shadow-sm rounded group flex flex-col items-center min-w-[3rem]" title="Paragraph">
+                                  <Type className="w-5 h-5 text-neutral-700 group-hover:text-[#2b579a]" />
+                                  <span className="text-[10px] mt-1 text-neutral-500">Normal</span>
+                              </button>
+                              <button onClick={() => insertBlock('quote')} className="p-2 hover:bg-white hover:shadow-sm rounded group flex flex-col items-center min-w-[3rem]" title="Quote">
+                                  <Quote className="w-5 h-5 text-neutral-700 group-hover:text-[#2b579a]" />
+                                  <span className="text-[10px] mt-1 text-neutral-500">Quote</span>
+                              </button>
+                              <button onClick={() => insertBlock('code')} className="p-2 hover:bg-white hover:shadow-sm rounded group flex flex-col items-center min-w-[3rem]" title="Code Block">
+                                  <Code className="w-5 h-5 text-neutral-700 group-hover:text-[#2b579a]" />
+                                  <span className="text-[10px] mt-1 text-neutral-500">Code</span>
+                              </button>
+                          </div>
+                          <div className="text-center w-full">
+                               <span className="text-[10px] text-neutral-500">Styles</span>
+                          </div>
+                      </div>
 
-                    {/* Render Input based on Type */}
-                    {block.type === 'paragraph' && (
-                        <textarea
-                            ref={(el) => { blockInputRefs.current[block.id] = el; }}
-                            onKeyDown={(e) => handleKeyDown(e, index, block)}
-                            value={block.content}
-                            onChange={(e) => updateBlock(block.id, e.target.value)}
-                            placeholder="Type your paragraph here..."
-                            rows={Math.max(2, block.content.length / 80)}
-                            className="w-full resize-none border-none focus:ring-0 p-0 text-base text-neutral-700 leading-relaxed bg-transparent"
-                        />
-                    )}
-
-                    {block.type === 'h1' && (
-                         <input
-                            ref={(el) => { blockInputRefs.current[block.id] = el; }}
-                            onKeyDown={(e) => handleKeyDown(e, index, block)}
-                            value={block.content}
-                            onChange={(e) => updateBlock(block.id, e.target.value)}
-                            placeholder="Heading 1"
-                            className="w-full border-none focus:ring-0 p-0 text-2xl font-bold text-neutral-900 bg-transparent placeholder:text-neutral-300"
-                        />
-                    )}
-
-                    {block.type === 'h2' && (
-                         <input
-                            ref={(el) => { blockInputRefs.current[block.id] = el; }}
-                            onKeyDown={(e) => handleKeyDown(e, index, block)}
-                            value={block.content}
-                            onChange={(e) => updateBlock(block.id, e.target.value)}
-                            placeholder="Heading 2"
-                            className="w-full border-none focus:ring-0 p-0 text-xl font-bold text-neutral-800 bg-transparent placeholder:text-neutral-300"
-                        />
-                    )}
-
-                    {block.type === 'quote' && (
-                        <div className="flex gap-4">
-                            <div className="w-1 bg-neutral-300 rounded-full shrink-0"></div>
-                            <textarea
-                                ref={(el) => { blockInputRefs.current[block.id] = el; }}
-                                onKeyDown={(e) => handleKeyDown(e, index, block)}
-                                value={block.content}
-                                onChange={(e) => updateBlock(block.id, e.target.value)}
-                                placeholder="Enter quote..."
-                                rows={2}
-                                className="w-full resize-none border-none focus:ring-0 p-0 text-xl italic text-neutral-700 bg-transparent"
-                            />
-                        </div>
-                    )}
-
-                    {block.type === 'code' && (
-                        <div className="font-mono text-sm bg-neutral-50 p-2 rounded">
-                            <input 
-                                value={block.caption || ''}
-                                onChange={(e) => updateBlock(block.id, block.content, e.target.value)}
-                                placeholder="Language (e.g. javascript)"
-                                className="w-full bg-transparent border-b border-neutral-200 mb-2 pb-1 text-xs text-neutral-500 focus:outline-none"
-                            />
-                            <textarea
-                                ref={(el) => { blockInputRefs.current[block.id] = el; }}
-                                onKeyDown={(e) => handleKeyDown(e, index, block)}
-                                value={block.content}
-                                onChange={(e) => updateBlock(block.id, e.target.value)}
-                                placeholder="// Type your code here"
-                                rows={4}
-                                className="w-full resize-none border-none focus:ring-0 p-0 bg-transparent text-neutral-800"
-                            />
-                        </div>
-                    )}
-
-                    {block.type === 'image' && (
-                        <div className="space-y-3">
-                            {block.content ? (
-                                <img src={block.content} alt="" className="w-full rounded bg-neutral-100 max-h-64 object-cover" />
-                            ) : (
-                                <button 
-                                    onClick={() => triggerUpload((url) => updateBlock(block.id, url, block.caption))}
-                                    className="w-full h-32 bg-neutral-50 rounded border-2 border-dashed border-neutral-200 flex flex-col items-center justify-center text-neutral-400 hover:border-neutral-400 hover:text-neutral-600 transition-colors gap-2"
-                                >
-                                    {isUploading ? <Loader2 className="w-6 h-6 animate-spin"/> : <Upload className="w-6 h-6" />}
-                                    <span className="text-xs font-medium">Click to Upload Image</span>
-                                </button>
-                            )}
-                            <div className="flex gap-2">
-                                <input
-                                    ref={(el) => { blockInputRefs.current[block.id] = el; }}
-                                    onKeyDown={(e) => handleKeyDown(e, index, block)}
-                                    type="text"
-                                    value={block.content}
-                                    onChange={(e) => updateBlock(block.id, e.target.value, block.caption)}
-                                    placeholder="Paste image URL..."
-                                    className="flex-1 text-xs px-2 py-1 bg-neutral-50 border border-neutral-200 rounded"
-                                />
-                                {block.content && (
+                      {/* Editing Group */}
+                      <div className="flex flex-col items-center gap-1 pr-6 border-r border-neutral-300">
+                           <div className="flex gap-1">
+                                <div className="flex flex-col">
                                     <button 
-                                        onClick={() => triggerUpload((url) => updateBlock(block.id, url, block.caption))}
-                                        className="p-1 bg-white border border-neutral-200 rounded hover:bg-neutral-50 text-neutral-500"
-                                        title="Replace Image"
+                                        onClick={() => moveBlock('up')} 
+                                        disabled={!selectedBlockId}
+                                        className="p-1 hover:bg-white hover:shadow-sm rounded text-neutral-700 disabled:opacity-30"
                                     >
-                                        <Upload className="w-4 h-4" />
+                                        <ArrowUp className="w-4 h-4" />
                                     </button>
-                                )}
-                            </div>
-                            <input
-                                type="text"
-                                value={block.caption || ''}
-                                onChange={(e) => updateBlock(block.id, block.content, e.target.value)}
-                                placeholder="Image caption (optional)"
-                                className="w-full text-xs px-2 py-1 bg-transparent border-b border-neutral-100 focus:border-neutral-300 focus:outline-none text-neutral-500"
-                            />
-                        </div>
-                    )}
-                    
-                    {block.type === 'divider' && (
-                        <div className="flex items-center justify-center h-8">
-                            <div className="h-px w-full bg-neutral-200"></div>
-                        </div>
-                    )}
-                </div>
-              </div>
-            ))}
+                                    <button 
+                                        onClick={() => moveBlock('down')} 
+                                        disabled={!selectedBlockId}
+                                        className="p-1 hover:bg-white hover:shadow-sm rounded text-neutral-700 disabled:opacity-30"
+                                    >
+                                        <ArrowDown className="w-4 h-4" />
+                                    </button>
+                                </div>
+                                <button 
+                                    onClick={deleteBlock} 
+                                    disabled={!selectedBlockId}
+                                    className="p-2 hover:bg-red-50 hover:text-red-600 hover:shadow-sm rounded text-neutral-700 disabled:opacity-30 flex flex-col items-center justify-center"
+                                >
+                                    <Trash2 className="w-5 h-5" />
+                                </button>
+                           </div>
+                           <span className="text-[10px] text-neutral-500">Editing</span>
+                      </div>
+                  </>
+              )}
 
-            {/* Add Block Menu (Floating/Bottom) */}
-            <div className="mt-8 p-4 border-2 border-dashed border-neutral-200 rounded-lg flex flex-col items-center justify-center gap-4 hover:border-neutral-400 transition-colors bg-white/50">
-                <span className="text-sm font-medium text-neutral-400">Add content block</span>
-                <div className="flex flex-wrap justify-center gap-2">
-                    <button onClick={() => addBlock('paragraph')} className="flex items-center gap-2 px-3 py-2 bg-white border border-neutral-200 shadow-sm rounded-md hover:bg-neutral-50 text-sm font-medium text-neutral-700">
-                        <Type className="w-4 h-4" /> Text
-                    </button>
-                    <button onClick={() => addBlock('h1')} className="flex items-center gap-2 px-3 py-2 bg-white border border-neutral-200 shadow-sm rounded-md hover:bg-neutral-50 text-sm font-medium text-neutral-700">
-                        <Heading1 className="w-4 h-4" /> Heading 1
-                    </button>
-                    <button onClick={() => addBlock('h2')} className="flex items-center gap-2 px-3 py-2 bg-white border border-neutral-200 shadow-sm rounded-md hover:bg-neutral-50 text-sm font-medium text-neutral-700">
-                        <Heading2 className="w-4 h-4" /> Heading 2
-                    </button>
-                    <button onClick={() => addBlock('image')} className="flex items-center gap-2 px-3 py-2 bg-white border border-neutral-200 shadow-sm rounded-md hover:bg-neutral-50 text-sm font-medium text-neutral-700">
-                        <ImageIcon className="w-4 h-4" /> Image
-                    </button>
-                    <button onClick={() => addBlock('code')} className="flex items-center gap-2 px-3 py-2 bg-white border border-neutral-200 shadow-sm rounded-md hover:bg-neutral-50 text-sm font-medium text-neutral-700">
-                        <Code className="w-4 h-4" /> Code
-                    </button>
-                    <button onClick={() => addBlock('quote')} className="flex items-center gap-2 px-3 py-2 bg-white border border-neutral-200 shadow-sm rounded-md hover:bg-neutral-50 text-sm font-medium text-neutral-700">
-                        <Quote className="w-4 h-4" /> Quote
-                    </button>
-                    <button onClick={() => addBlock('divider')} className="flex items-center gap-2 px-3 py-2 bg-white border border-neutral-200 shadow-sm rounded-md hover:bg-neutral-50 text-sm font-medium text-neutral-700">
-                        <Minus className="w-4 h-4" /> Divider
-                    </button>
-                </div>
-            </div>
+              {/* INSERT TAB TOOLS */}
+              {activeTab === 'insert' && (
+                  <>
+                      <div className="flex flex-col items-center gap-1 pr-6 border-r border-neutral-300">
+                           <button onClick={() => insertBlock('image')} className="p-2 hover:bg-white hover:shadow-sm rounded group flex flex-col items-center min-w-[3rem]">
+                                <ImageIcon className="w-6 h-6 text-neutral-700 group-hover:text-[#2b579a]" />
+                           </button>
+                           <span className="text-[10px] text-neutral-500">Picture</span>
+                      </div>
+                      <div className="flex flex-col items-center gap-1 pr-6 border-r border-neutral-300">
+                           <button onClick={() => insertBlock('divider')} className="p-2 hover:bg-white hover:shadow-sm rounded group flex flex-col items-center min-w-[3rem]">
+                                <Minus className="w-6 h-6 text-neutral-700 group-hover:text-[#2b579a]" />
+                           </button>
+                           <span className="text-[10px] text-neutral-500">Divider</span>
+                      </div>
+                  </>
+              )}
 
+              {/* LAYOUT TAB TOOLS */}
+              {activeTab === 'layout' && (
+                  <>
+                     <div className="flex flex-col items-center gap-1 pr-6 border-r border-neutral-300">
+                           <button 
+                                onClick={() => setShowMetadata(!showMetadata)} 
+                                className={`p-2 hover:bg-white hover:shadow-sm rounded group flex flex-col items-center min-w-[3rem] ${showMetadata ? 'bg-white shadow-sm text-[#2b579a]' : ''}`}
+                            >
+                                <Sidebar className="w-6 h-6 text-neutral-700 group-hover:text-[#2b579a]" />
+                           </button>
+                           <span className="text-[10px] text-neutral-500">Properties</span>
+                      </div>
+                      <div className="flex flex-col items-center gap-1 pr-6 border-r border-neutral-300">
+                           <div className="flex items-center gap-2 px-3 py-1">
+                                <span className="text-xs font-bold text-neutral-600">Status:</span>
+                                <button 
+                                    onClick={() => handleMetaChange('published', !formData.published)}
+                                    className={`px-3 py-1 rounded text-xs font-bold ${formData.published ? 'bg-green-100 text-green-700' : 'bg-neutral-200 text-neutral-500'}`}
+                                >
+                                    {formData.published ? 'Published' : 'Draft'}
+                                </button>
+                           </div>
+                           <span className="text-[10px] text-neutral-500">State</span>
+                      </div>
+                  </>
+              )}
           </div>
-        </main>
+      </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-[#f3f2f1] flex flex-col font-sans text-neutral-900">
+      
+      {/* Hidden Upload Input */}
+      <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={processUpload} />
+
+      {/* 1. Ribbon UI */}
+      {renderRibbon()}
+
+      <div className="flex flex-1 overflow-hidden relative">
+          
+          {/* 2. Main Canvas (The "Paper") */}
+          <main className="flex-1 overflow-y-auto relative p-8 md:p-12 flex justify-center" onClick={() => setSelectedBlockId(null)}>
+              
+              <div 
+                  className="bg-white shadow-sm border border-neutral-300 w-full max-w-[850px] min-h-[1100px] p-8 md:p-16 flex flex-col gap-4 transition-all"
+                  onClick={(e) => e.stopPropagation()} 
+              >
+                  {/* Document Title (Visual only in Canvas, actual editing in Properties) */}
+                  <div className="mb-8 border-b border-transparent hover:border-neutral-200 pb-4 group">
+                      <h1 className="text-4xl md:text-5xl font-bold text-black leading-tight tracking-tight mb-2 outline-none">
+                          {formData.title}
+                      </h1>
+                      <div className="text-neutral-500 text-lg">{formData.client} • {formData.year}</div>
+                  </div>
+
+                  {/* Blocks Rendering */}
+                  {blocks.map((block, index) => {
+                      const isSelected = selectedBlockId === block.id;
+
+                      return (
+                          <div 
+                              key={block.id} 
+                              className={`relative group transition-all duration-200 ${isSelected ? 'ring-2 ring-blue-500/50 rounded-sm' : 'hover:bg-neutral-50 rounded-sm'}`}
+                              onClick={() => setSelectedBlockId(block.id)}
+                          >
+                              {/* Element Renderer */}
+                              {block.type === 'paragraph' && (
+                                  <textarea
+                                      ref={(el) => { blockInputRefs.current[block.id] = el; }}
+                                      onKeyDown={(e) => handleKeyDown(e, index, block)}
+                                      value={block.content}
+                                      onChange={(e) => updateBlock(block.id, e.target.value)}
+                                      placeholder="Type something..."
+                                      className="w-full resize-none bg-transparent border-none p-2 text-lg text-neutral-800 leading-relaxed focus:ring-0 placeholder:text-neutral-300"
+                                      rows={Math.max(1, block.content.split('\n').length)}
+                                      style={{ minHeight: '1.5em' }}
+                                  />
+                              )}
+
+                              {block.type === 'h1' && (
+                                  <input
+                                      ref={(el) => { blockInputRefs.current[block.id] = el; }}
+                                      onKeyDown={(e) => handleKeyDown(e, index, block)}
+                                      value={block.content}
+                                      onChange={(e) => updateBlock(block.id, e.target.value)}
+                                      placeholder="Heading 1"
+                                      className="w-full bg-transparent border-none p-2 text-3xl font-bold text-neutral-900 focus:ring-0 placeholder:text-neutral-300"
+                                  />
+                              )}
+
+                              {block.type === 'h2' && (
+                                  <input
+                                      ref={(el) => { blockInputRefs.current[block.id] = el; }}
+                                      onKeyDown={(e) => handleKeyDown(e, index, block)}
+                                      value={block.content}
+                                      onChange={(e) => updateBlock(block.id, e.target.value)}
+                                      placeholder="Heading 2"
+                                      className="w-full bg-transparent border-none p-2 text-2xl font-bold text-neutral-800 focus:ring-0 placeholder:text-neutral-300 mt-4"
+                                  />
+                              )}
+
+                              {block.type === 'quote' && (
+                                  <div className="flex gap-4 px-2 py-4">
+                                      <div className="w-1 bg-[#2b579a] rounded-full shrink-0"></div>
+                                      <textarea
+                                          ref={(el) => { blockInputRefs.current[block.id] = el; }}
+                                          onKeyDown={(e) => handleKeyDown(e, index, block)}
+                                          value={block.content}
+                                          onChange={(e) => updateBlock(block.id, e.target.value)}
+                                          placeholder="Pull quote..."
+                                          className="w-full resize-none bg-transparent border-none p-0 text-xl italic text-neutral-600 focus:ring-0 placeholder:text-neutral-300"
+                                          rows={Math.max(2, block.content.length / 50)}
+                                      />
+                                  </div>
+                              )}
+
+                              {block.type === 'code' && (
+                                  <div className="bg-neutral-50 border border-neutral-200 rounded p-4 font-mono text-sm my-2">
+                                      <div className="flex justify-between border-b border-neutral-200 pb-2 mb-2">
+                                          <input 
+                                              value={block.caption || ''}
+                                              onChange={(e) => updateBlock(block.id, block.content, e.target.value)}
+                                              placeholder="Language"
+                                              className="bg-transparent border-none text-xs text-neutral-500 focus:ring-0 w-32 p-0"
+                                          />
+                                      </div>
+                                      <textarea
+                                          ref={(el) => { blockInputRefs.current[block.id] = el; }}
+                                          onKeyDown={(e) => handleKeyDown(e, index, block)}
+                                          value={block.content}
+                                          onChange={(e) => updateBlock(block.id, e.target.value)}
+                                          placeholder="// Type code here..."
+                                          className="w-full resize-none bg-transparent border-none p-0 text-neutral-800 focus:ring-0 font-mono"
+                                          rows={Math.max(3, block.content.split('\n').length)}
+                                      />
+                                  </div>
+                              )}
+
+                              {block.type === 'image' && (
+                                  <div className="my-4">
+                                      {block.content ? (
+                                          <div className="relative group/img">
+                                              <img src={block.content} alt="" className="w-full h-auto rounded shadow-sm" />
+                                              <div className="absolute top-2 right-2 opacity-0 group-hover/img:opacity-100 transition-opacity flex gap-2">
+                                                  <button onClick={() => triggerUpload((url) => updateBlock(block.id, url, block.caption))} className="bg-white/90 p-1.5 rounded text-neutral-700 shadow hover:text-[#2b579a]">
+                                                      <Layout className="w-4 h-4" />
+                                                  </button>
+                                              </div>
+                                          </div>
+                                      ) : (
+                                          <button 
+                                              onClick={() => triggerUpload((url) => updateBlock(block.id, url, block.caption))}
+                                              className="w-full h-48 bg-neutral-50 border-2 border-dashed border-neutral-300 rounded flex flex-col items-center justify-center text-neutral-400 gap-2 hover:bg-neutral-100 hover:border-neutral-400 transition-colors"
+                                          >
+                                              {isUploading ? <Loader2 className="w-6 h-6 animate-spin"/> : <ImageIcon className="w-8 h-8 opacity-50"/>}
+                                              <span className="text-sm">Click to Upload Image</span>
+                                          </button>
+                                      )}
+                                      <input 
+                                          value={block.caption || ''}
+                                          onChange={(e) => updateBlock(block.id, block.content, e.target.value)}
+                                          placeholder="Add a caption..."
+                                          className="w-full text-center text-xs text-neutral-500 bg-transparent border-none focus:ring-0 mt-2 italic"
+                                      />
+                                  </div>
+                              )}
+
+                              {block.type === 'divider' && (
+                                  <div className="py-8 flex items-center justify-center">
+                                      <div className="h-px w-24 bg-neutral-300"></div>
+                                      <div className="mx-4 text-neutral-300 text-xs">***</div>
+                                      <div className="h-px w-24 bg-neutral-300"></div>
+                                  </div>
+                              )}
+                          </div>
+                      );
+                  })}
+
+                  {/* Empty State / Bottom Area */}
+                  <div className="h-32 flex items-center justify-center text-neutral-300 text-sm italic select-none pointer-events-none">
+                      End of Document
+                  </div>
+              </div>
+          </main>
+
+          {/* 3. Right Sidebar (Document Properties) */}
+          <aside className={`
+              w-80 bg-white border-l border-neutral-300 flex-shrink-0 flex flex-col transition-all duration-300
+              ${showMetadata ? 'mr-0' : '-mr-80'}
+          `}>
+              <div className="p-4 border-b border-neutral-200 bg-neutral-50 font-bold text-xs text-neutral-500 uppercase tracking-widest flex items-center justify-between">
+                  <span>Properties</span>
+                  <button onClick={() => setShowMetadata(false)} className="hover:bg-neutral-200 p-1 rounded"><ChevronRight className="w-4 h-4"/></button>
+              </div>
+              
+              <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                  {/* General Info */}
+                  <div className="space-y-4">
+                      <div className="space-y-1">
+                          <label className="text-xs font-bold text-neutral-700">Document Title</label>
+                          <input 
+                              type="text" 
+                              value={formData.title}
+                              onChange={(e) => handleMetaChange('title', e.target.value)}
+                              className="w-full px-3 py-2 bg-white border border-neutral-300 rounded text-sm focus:border-[#2b579a] focus:ring-1 focus:ring-[#2b579a] outline-none"
+                          />
+                      </div>
+                      <div className="space-y-1">
+                          <label className="text-xs font-bold text-neutral-700">Client</label>
+                          <input 
+                              type="text" 
+                              value={formData.client}
+                              onChange={(e) => handleMetaChange('client', e.target.value)}
+                              className="w-full px-3 py-2 bg-white border border-neutral-300 rounded text-sm focus:border-[#2b579a] focus:ring-1 focus:ring-[#2b579a] outline-none"
+                          />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                              <label className="text-xs font-bold text-neutral-700">Year</label>
+                              <input 
+                                  type="number" 
+                                  value={formData.year}
+                                  onChange={(e) => handleMetaChange('year', parseInt(e.target.value))}
+                                  className="w-full px-3 py-2 bg-white border border-neutral-300 rounded text-sm focus:border-[#2b579a] focus:ring-1 focus:ring-[#2b579a] outline-none"
+                              />
+                          </div>
+                      </div>
+                  </div>
+
+                  <hr className="border-neutral-200"/>
+
+                  {/* Media */}
+                  <div className="space-y-4">
+                      <label className="text-xs font-bold text-neutral-700">Cover Image</label>
+                      <div className="border border-neutral-200 rounded p-2 bg-neutral-50">
+                          {formData.thumb && <img src={formData.thumb} className="w-full h-32 object-cover rounded mb-2 bg-white" alt="cover" />}
+                          <div className="flex gap-2">
+                               <input 
+                                  type="text" 
+                                  value={formData.thumb}
+                                  onChange={(e) => handleMetaChange('thumb', e.target.value)}
+                                  className="flex-1 px-2 py-1 text-xs border border-neutral-300 rounded"
+                                  placeholder="https://..."
+                               />
+                               <button 
+                                  onClick={() => triggerUpload((url) => handleMetaChange('thumb', url))}
+                                  className="p-1.5 bg-white border border-neutral-300 rounded hover:bg-neutral-100"
+                               >
+                                  {isUploading ? <Loader2 className="w-3 h-3 animate-spin"/> : <Upload className="w-3 h-3"/>}
+                               </button>
+                          </div>
+                      </div>
+                  </div>
+                  
+                  <hr className="border-neutral-200"/>
+
+                  {/* SEO / Meta */}
+                  <div className="space-y-4">
+                      <div className="space-y-1">
+                          <label className="text-xs font-bold text-neutral-700">Summary</label>
+                          <textarea 
+                              value={formData.description}
+                              onChange={(e) => handleMetaChange('description', e.target.value)}
+                              rows={4}
+                              className="w-full px-3 py-2 bg-white border border-neutral-300 rounded text-sm focus:border-[#2b579a] focus:ring-1 focus:ring-[#2b579a] outline-none resize-none"
+                          />
+                      </div>
+                       <div className="space-y-1">
+                          <label className="text-xs font-bold text-neutral-700">Tags (Comma separated)</label>
+                          <input 
+                              type="text" 
+                              value={formData.tags.join(', ')}
+                              onChange={(e) => handleMetaChange('tags', e.target.value.split(',').map(s => s.trim()))}
+                              className="w-full px-3 py-2 bg-white border border-neutral-300 rounded text-sm focus:border-[#2b579a] focus:ring-1 focus:ring-[#2b579a] outline-none"
+                          />
+                      </div>
+                  </div>
+              </div>
+          </aside>
       </div>
     </div>
   );
