@@ -13,14 +13,72 @@ import ScrollToTop from './components/ScrollToTop';
 import { ArrowDown } from 'lucide-react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 
+// Admin Imports
+import AdminLogin from './components/admin/AdminLogin';
+import Dashboard from './components/admin/Dashboard';
+import BlockEditor from './components/admin/BlockEditor';
+import { supabase } from './src/supabaseClient';
+
 // Context
 import { DataProvider, useData } from './contexts/DataContext';
+
+const AdminRoot = () => {
+  const [session, setSession] = useState<any>(null);
+  const [view, setView] = useState<'dashboard' | 'editor'>('dashboard');
+  const [editorProjectId, setEditorProjectId] = useState<string | null>(null);
+  const { projects, updateProject, isLoading } = useData();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (!session) {
+    return <AdminLogin onLogin={() => {}} />;
+  }
+
+  if (view === 'editor' && editorProjectId) {
+      // Find project from context (which is now populated from DB)
+      const project = projects.find(p => p.id === editorProjectId);
+      
+      // If project not found (loading or invalid ID), show dashboard or loader
+      if (!project) return <div>Loading Project...</div>;
+
+      return (
+        <BlockEditor 
+            project={project} 
+            onSave={async (updated) => {
+                await updateProject(updated.id, updated);
+                setView('dashboard');
+                setEditorProjectId(null);
+            }} 
+            onBack={() => {
+                setView('dashboard');
+                setEditorProjectId(null);
+            }} 
+        />
+      );
+  }
+
+  return (
+    <Dashboard 
+        onLogout={() => supabase.auth.signOut()} 
+        onEditProject={(id) => {
+            setEditorProjectId(id);
+            setView('editor');
+        }} 
+    />
+  );
+};
 
 const AppContent: React.FC = () => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
-  // Theme State - Default to 'dark' for the intended aesthetic
+  // Theme State - Default to 'dark'
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
         return localStorage.getItem('theme') as 'light' | 'dark' || 'dark';
@@ -175,9 +233,22 @@ const AppContent: React.FC = () => {
 };
 
 const App: React.FC = () => {
+    const [isAdmin, setIsAdmin] = useState(false);
+
+    useEffect(() => {
+        const handleHashChange = () => {
+            setIsAdmin(window.location.hash === '#admin');
+        };
+        // Check initial hash
+        handleHashChange();
+        // Listen for changes
+        window.addEventListener('hashchange', handleHashChange);
+        return () => window.removeEventListener('hashchange', handleHashChange);
+    }, []);
+
     return (
         <DataProvider>
-            <AppContent />
+            {isAdmin ? <AdminRoot /> : <AppContent />}
         </DataProvider>
     );
 };
