@@ -16,7 +16,7 @@ const NavBar: React.FC<NavBarProps> = ({ isMenuOpen, setIsMenuOpen, theme, toggl
     >
       <div className="max-w-screen-2xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
         <a href="#" className="text-sm font-bold tracking-widest uppercase text-foreground z-50">
-          Mukhi Anik <span className="text-primary">// Dev</span>
+          Mukhi Anik <span className="text-primary"></span>
         </a>
         
         <div className="flex items-center gap-4 z-50">
