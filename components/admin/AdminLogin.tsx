@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Database, Key, Loader2, AlertCircle, UserPlus, LogIn, Settings, X, Save, ArrowLeft, Mail, Wifi, CheckCircle, ShieldAlert } from 'lucide-react';
+import { Database, Key, Loader2, AlertCircle, UserPlus, LogIn, Settings, X, Save, ArrowLeft, Mail, Wifi, CheckCircle, ShieldAlert, Lock } from 'lucide-react';
 import { supabase, isDemo } from '../../src/supabaseClient';
 
 interface AdminLoginProps {
@@ -11,6 +11,7 @@ type AuthMode = 'login' | 'signup' | 'forgot';
 const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [mode, setMode] = useState<AuthMode>('login');
@@ -35,11 +36,8 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
       const match = currentUrl.match(/https:\/\/([^.]+)\./);
       setProjectUrl(match ? match[1] : 'Unknown Project');
       
-      // If we are in demo mode, auto-open settings to encourage connection
-      if (isDemo && !storedUrl) {
-          // Optional: You could auto-open settings here, but might be annoying.
-          // setShowSettings(true); 
-      }
+      // Check if we have a hash indicating a specific mode
+      if (window.location.hash === '#signup') setMode('signup');
   }, []);
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -53,6 +51,13 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
             if (isDemo) {
                 throw new Error("Cannot create account on Demo Database. Please connect your own Supabase project first (Settings icon below).");
             }
+            if (password !== confirmPassword) {
+                throw new Error("Passwords do not match.");
+            }
+            if (password.length < 6) {
+                throw new Error("Password must be at least 6 characters.");
+            }
+
             const { data, error } = await supabase.auth.signUp({
                 email,
                 password,
@@ -74,7 +79,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
             });
             if (error) {
                 if (error.message.includes("Invalid login credentials")) {
-                    throw new Error("User not found or wrong password. If you are new, please switch to 'Create Account'.");
+                    throw new Error("User not found or wrong password. If this is your first time, please Create an Account.");
                 }
                 throw error;
             }
@@ -188,10 +193,10 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                 <Database className="w-6 h-6" />
             </div>
             <h1 className="text-2xl font-bold text-neutral-900 mb-1">
-                {mode === 'signup' ? 'Create Account' : mode === 'forgot' ? 'Reset Password' : 'CMS Login'}
+                {mode === 'signup' ? 'Setup Admin Account' : mode === 'forgot' ? 'Reset Password' : 'CMS Login'}
             </h1>
             <p className="text-sm text-neutral-500">
-                {mode === 'signup' ? 'Set up your admin access.' : mode === 'forgot' ? 'Enter email to receive reset link.' : 'Sign in to manage your portfolio.'}
+                {mode === 'signup' ? 'Create your admin credentials.' : mode === 'forgot' ? 'Enter email to receive reset link.' : 'Sign in to manage your portfolio.'}
             </p>
         </div>
 
@@ -212,7 +217,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
         {isDemo && mode !== 'login' && (
              <div className="mb-6 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700 flex gap-2 items-start">
                  <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-                 <p>You are connected to the <strong>Demo Database</strong>. To create an account and save data, please click the <strong>Read-Only Demo Mode</strong> badge above to connect your own Supabase project.</p>
+                 <p>You are connected to the <strong>Demo Database</strong>. To create an account and save data, please click the badge above to connect your own Supabase project.</p>
              </div>
         )}
 
@@ -232,7 +237,9 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
             )}
 
             <div className="space-y-1.5">
-                <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500">Email</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500">
+                    {mode === 'signup' ? 'Set Admin Email' : 'Email'}
+                </label>
                 <input 
                     type="email" 
                     required
@@ -245,7 +252,9 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
 
             {mode !== 'forgot' && (
                 <div className="space-y-1.5">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500">Password</label>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500">
+                        {mode === 'signup' ? 'Set Admin Password' : 'Password'}
+                    </label>
                     <div className="relative">
                         <input 
                             type="password" 
@@ -257,6 +266,26 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                             minLength={6}
                         />
                         <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                    </div>
+                </div>
+            )}
+
+            {mode === 'signup' && (
+                <div className="space-y-1.5 animate-in slide-in-from-top-1 fade-in">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500">
+                        Confirm Password
+                    </label>
+                    <div className="relative">
+                        <input 
+                            type="password" 
+                            required
+                            className="w-full pl-10 pr-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-neutral-900 focus:border-transparent outline-none transition-all placeholder:text-neutral-400"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="••••••••"
+                            minLength={6}
+                        />
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                     </div>
                 </div>
             )}
@@ -293,11 +322,16 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                  </button>
             ) : (
                 <button 
-                    onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(''); setMessage(''); }}
+                    onClick={() => { 
+                        setMode(mode === 'login' ? 'signup' : 'login'); 
+                        setError(''); 
+                        setMessage(''); 
+                        setConfirmPassword('');
+                    }}
                     className="text-xs text-neutral-500 hover:text-neutral-900 font-medium"
                 >
                     {mode === 'login' ? (
-                        <span>Don't have an account? <span className="underline font-bold text-neutral-800">Create an account</span></span>
+                        <span>New here? <span className="underline font-bold text-neutral-800">Create Admin Account</span></span>
                     ) : (
                         <span>Already have an account? <span className="underline font-bold text-neutral-800">Sign in</span></span>
                     )}
