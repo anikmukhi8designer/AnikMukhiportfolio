@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Database, Key, Loader2, AlertCircle, UserPlus, LogIn, Settings, X, Save, ArrowLeft, Mail, Wifi, CheckCircle } from 'lucide-react';
-import { supabase } from '../../src/supabaseClient';
-import DbStatus from '../DbStatus';
+import { Database, Key, Loader2, AlertCircle, UserPlus, LogIn, Settings, X, Save, ArrowLeft, Mail, Wifi, CheckCircle, ShieldAlert } from 'lucide-react';
+import { supabase, isDemo } from '../../src/supabaseClient';
 
 interface AdminLoginProps {
   onLogin: () => void;
@@ -35,6 +34,12 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
       const currentUrl = supabase.supabaseUrl || '';
       const match = currentUrl.match(/https:\/\/([^.]+)\./);
       setProjectUrl(match ? match[1] : 'Unknown Project');
+      
+      // If we are in demo mode, auto-open settings to encourage connection
+      if (isDemo && !storedUrl) {
+          // Optional: You could auto-open settings here, but might be annoying.
+          // setShowSettings(true); 
+      }
   }, []);
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -45,6 +50,9 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
 
     try {
         if (mode === 'signup') {
+            if (isDemo) {
+                throw new Error("Cannot create account on Demo Database. Please connect your own Supabase project first (Settings icon below).");
+            }
             const { data, error } = await supabase.auth.signUp({
                 email,
                 password,
@@ -52,8 +60,6 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
             if (error) throw error;
             if (data.user) {
                 setMessage("Account created successfully! Logging you in...");
-                // Some Supabase configs auto-login, some require email confirm.
-                // We attempt login immediately if session exists, else ask to check email.
                 if (data.session) {
                     setTimeout(onLogin, 1000);
                 } else {
@@ -68,7 +74,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
             });
             if (error) {
                 if (error.message.includes("Invalid login credentials")) {
-                    throw new Error("Invalid credentials. If this is your first time, please Create an Account.");
+                    throw new Error("User not found or wrong password. If you are new, please switch to 'Create Account'.");
                 }
                 throw error;
             }
@@ -76,6 +82,9 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                 onLogin();
             }
         } else if (mode === 'forgot') {
+             if (isDemo) {
+                throw new Error("Cannot reset password on Demo Database.");
+            }
             const { error } = await supabase.auth.resetPasswordForEmail(email, {
                 redirectTo: window.location.origin + '/#admin',
             });
@@ -96,7 +105,6 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
       }
       localStorage.setItem('sb_url', customUrl.trim());
       localStorage.setItem('sb_key', customKey.trim());
-      // Reload to re-initialize supabase client with new keys
       window.location.reload();
   };
 
@@ -109,7 +117,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-neutral-100 p-4 font-sans relative">
+    <div className="min-h-screen flex items-center justify-center bg-neutral-100 p-4 font-sans relative overflow-hidden">
       <div className="absolute inset-0 z-0 opacity-50 pointer-events-none bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]"></div>
       
       <div className="w-full max-w-[420px] bg-white p-8 rounded-2xl border border-neutral-200 shadow-xl shadow-neutral-200/50 relative z-10">
@@ -126,10 +134,15 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                     </button>
                 </div>
                 
-                <div className="space-y-4 flex-grow">
-                    <div className="text-xs text-blue-700 bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4 flex items-start gap-2">
-                        <Wifi className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                        <p>Connect to your own Supabase project. Get these from <strong>Project Settings &rarr; API</strong>.</p>
+                <div className="space-y-4 flex-grow overflow-y-auto">
+                    <div className="text-xs text-blue-700 bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
+                        <p className="font-bold mb-1">How to connect:</p>
+                        <ol className="list-decimal pl-4 space-y-1">
+                            <li>Go to <a href="https://supabase.com/dashboard" target="_blank" className="underline">Supabase Dashboard</a></li>
+                            <li>Create a new project</li>
+                            <li>Go to <strong>Project Settings</strong> &rarr; <strong>API</strong></li>
+                            <li>Copy <strong>URL</strong> and <strong>anon / public</strong> key</li>
+                        </ol>
                     </div>
                     
                     <div className="space-y-1.5">
@@ -153,28 +166,28 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                     </div>
                 </div>
 
-                <div className="flex gap-2 mt-6">
+                <div className="flex gap-2 mt-6 pt-4 border-t border-neutral-100">
                     <button 
                         onClick={clearConnectionSettings}
                         className="flex-1 py-2 text-red-600 text-sm font-bold hover:bg-red-50 rounded"
                     >
-                        Reset Default
+                        Reset
                     </button>
                     <button 
                         onClick={saveConnectionSettings}
                         className="flex-1 py-2 bg-neutral-900 text-white text-sm font-bold rounded hover:bg-black flex items-center justify-center gap-2"
                     >
-                        <Save className="w-4 h-4" /> Save & Connect
+                        <Save className="w-4 h-4" /> Connect
                     </button>
                 </div>
             </div>
         )}
 
-        <div className="mb-8 text-center">
+        <div className="mb-6 text-center">
             <div className="w-12 h-12 bg-neutral-900 text-white rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-neutral-900/20">
                 <Database className="w-6 h-6" />
             </div>
-            <h1 className="text-2xl font-bold text-neutral-900 mb-2">
+            <h1 className="text-2xl font-bold text-neutral-900 mb-1">
                 {mode === 'signup' ? 'Create Account' : mode === 'forgot' ? 'Reset Password' : 'CMS Login'}
             </h1>
             <p className="text-sm text-neutral-500">
@@ -182,15 +195,26 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
             </p>
         </div>
 
-        {/* Connection Badge */}
+        {/* Connection Status Badge */}
         <div 
             onClick={() => setShowSettings(true)}
-            className="mb-6 mx-auto w-fit flex items-center gap-2 px-3 py-1 bg-neutral-50 border border-neutral-200 rounded-full text-[10px] font-mono text-neutral-500 cursor-pointer hover:bg-neutral-100 hover:border-neutral-300 transition-colors"
-            title="Click to configure connection"
+            className={`mb-6 mx-auto w-fit flex items-center gap-2 px-3 py-1.5 border rounded-full text-[10px] font-mono cursor-pointer transition-all ${
+                isDemo 
+                ? 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100' 
+                : 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
+            }`}
         >
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-            Connected: {projectUrl}
+            <div className={`w-2 h-2 rounded-full ${isDemo ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`}></div>
+            {isDemo ? 'READ-ONLY DEMO MODE' : `Connected: ${projectUrl}`}
+            <Settings className="w-3 h-3 ml-1 opacity-50" />
         </div>
+
+        {isDemo && mode !== 'login' && (
+             <div className="mb-6 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700 flex gap-2 items-start">
+                 <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+                 <p>You are connected to the <strong>Demo Database</strong>. To create an account and save data, please click the <strong>Read-Only Demo Mode</strong> badge above to connect your own Supabase project.</p>
+             </div>
+        )}
 
         <form onSubmit={handleAuth} className="space-y-4">
             {error && (
@@ -279,13 +303,6 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                     )}
                 </button>
             )}
-
-            <button 
-                onClick={() => setShowSettings(true)}
-                className="text-[10px] text-neutral-400 hover:text-neutral-600 flex items-center gap-1 uppercase tracking-widest font-bold"
-            >
-                <Settings className="w-3 h-3" /> Connection Settings
-            </button>
         </div>
       </div>
     </div>

@@ -7,6 +7,7 @@ import ClientsTable from './ClientsTable';
 import ProfileSettings from './ProfileSettings';
 import { useData } from '../../contexts/DataContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '../../src/supabaseClient';
 
 interface DashboardProps {
   onLogout: () => void;
@@ -24,6 +25,23 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   
   const [errorMessage, setErrorMessage] = useState('');
   const [connectionError, setConnectionError] = useState<string | null>(null);
+
+  // Check if tables exist on mount to guide user setup
+  useEffect(() => {
+    const checkTables = async () => {
+        // Quick check if 'projects' table exists by selecting 1 row.
+        // If error code is '42P01' (undefined_table), we show the setup modal.
+        try {
+            const { error } = await supabase.from('projects').select('id').limit(1);
+            if (error && error.code === '42P01') {
+                setShowSqlModal(true);
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    };
+    checkTables();
+  }, []);
 
   useEffect(() => {
       reloadContent();
@@ -201,74 +219,7 @@ create policy "Enable insert for authenticated users only" on projects for inser
 insert into config (id, email, "heroHeadline", "heroSubheadline", "heroDescription") 
 values (1, 'hello@mukhianik.com', 'Product Designer', '& Creative Dev.', 'Building digital products that blend aesthetics with function. Currently crafting experiences in San Francisco.') 
 on conflict (id) do nothing;
-
--- Projects (Ravens PDF Content + Others)
-delete from projects where id in ('ravens-tablet-2024', 'fintech-dashboard-2024', 'apex-logistics-2023');
-
-insert into projects (id, title, client, roles, description, year, "heroImage", thumb, tags, published, content)
-values 
-('ravens-tablet-2024', 'Stadium Suite Tablet', 'Baltimore Ravens', ARRAY['UX Architecture', 'UI Design', 'Wireframing'], 'A premium in-suite digital experience allowing guests to control the TV, order food, and request assistance.', 2024, 'https://images.unsplash.com/photo-1516280440614-6697288d5d38?q=80&w=2070&auto=format&fit=crop', 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070&auto=format&fit=crop', ARRAY['Tablet App', 'Hospitality', 'Sports Tech'], true, 
-'[
-  {"id": "1", "type": "h2", "content": "Introduction"},
-  {"id": "2", "type": "paragraph", "content": "The Baltimore Ravens Stadium Suite Tablet Experience was designed to enhance the luxury suite environment by offering guests an intuitive digital platform. This tablet enables users to control suite amenities including TV, food and beverage ordering, valet services, merchandise shopping, and service assistance—all from a single interface."},
-  {"id": "3", "type": "h2", "content": "Project Overview"},
-  {"id": "4", "type": "paragraph", "content": "The goal was to upgrade traditional, manual suite services with a premium digital solution. The platform had to provide real-time control, seamless navigation, and a visually polished appearance aligned with the Baltimore Ravens brand identity."},
-  {"id": "5", "type": "h2", "content": "Problem Statement"},
-  {"id": "6", "type": "paragraph", "content": "Guests often encountered delays ordering food, controlling the TV, or requesting support. These interruptions affected the premium experience expected in a luxury stadium suite."},
-  {"id": "7", "type": "h2", "content": "Objective"},
-  {"id": "8", "type": "paragraph", "content": "Create a unified, easy-to-use tablet interface enabling users to manage entertainment, suite services, and amenities conveniently without needing staff assistance for basic tasks."},
-  {"id": "9", "type": "h2", "content": "Target Users"},
-  {"id": "10", "type": "paragraph", "content": "The system primarily serves VIP guests, corporate clients, and season ticket holders who value convenience and expect a high-end digital environment."},
-  {"id": "11", "type": "h2", "content": "Role & Responsibilities"},
-  {"id": "12", "type": "paragraph", "content": "As the UI/UX designer, I was responsible for the complete design process—research, interaction design, user flows, wireframes, and final high-fidelity UI development."},
-  {"id": "13", "type": "h2", "content": "Research Insights"},
-  {"id": "14", "type": "paragraph", "content": "Based on interviews and competitive analysis, users needed: Fast navigation, Minimal steps, High-contrast UI, Modern interface."},
-  {"id": "15", "type": "h2", "content": "UI Design"},
-  {"id": "20", "type": "paragraph", "content": "The final UI employs a dark, modern theme with the Baltimore Ravens signature purple accents. Visual elements are large and bold, optimized for visibility from various seating angles."}
-]'::jsonb
-),
-('fintech-dashboard-2024', 'Nova Financial', 'Nova Inc.', ARRAY['Product Design', 'Design System'], 'A comprehensive dashboard for modern financial tracking.', 2024, 'https://picsum.photos/id/1/1200/800', 'https://picsum.photos/id/1/800/600', ARRAY['Fintech', 'SaaS', 'Dashboard'], true, '[]'::jsonb),
-('apex-logistics-2023', 'Apex Logistics', 'Apex Global', ARRAY['Product Design', 'UX Research'], 'Real-time logistics tracking platform for global supply chains.', 2023, 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?q=80&w=2070&auto=format&fit=crop', 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=2070&auto=format&fit=crop', ARRAY['SaaS', 'B2B', 'Logistics'], true, 
-'[
-  {"id": "1", "type": "h2", "content": "Overview"},
-  {"id": "2", "type": "paragraph", "content": "Apex Global manages thousands of shipments daily. Their existing tools were fragmented, leading to operational inefficiencies. We built a unified dashboard to centralize tracking."},
-  {"id": "3", "type": "h2", "content": "Key Features"},
-  {"id": "4", "type": "paragraph", "content": "• Real-time map visualization of assets • Automated delay risk alerts • One-click document generation"},
-  {"id": "5", "type": "image", "content": "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070&auto=format&fit=crop", "caption": "Shipment Detail View"}
-]'::jsonb);
-
--- Experience
-delete from experience;
-insert into experience (id, role, company, period, description, published, "order")
-values
-('senior-pd-2023', 'Senior Product Designer', 'TechFlow Systems', '2023 — Present', 'Leading the design system team and overseeing core product UX.', true, 0),
-('pd-2021', 'Product Designer', 'Creative Studio X', '2021 — 2023', 'Worked on various client projects ranging from fintech to healthcare.', true, 1);
-
--- Clients
-delete from clients;
-insert into clients (id, name, "order")
-values
-('ravens', 'Baltimore Ravens', 0),
-('c1', 'Nova Inc.', 1),
-('c2', 'Lumina Fashion', 2),
-('c3', 'Syntax Labs', 3),
-('c4', 'Pulse Health', 4),
-('c6', 'TechFlow', 5),
-('c8', 'Google', 6),
-('c9', 'Airbnb', 7);
-
--- Skills
-delete from skills;
-insert into skills (id, title, items, "order")
-values
-('s1', 'Design', '[{"name": "Figma", "image": "https://cdn.brandfetch.io/figma.com/w/200/h/200"}, {"name": "Adobe", "image": "https://cdn.brandfetch.io/adobe.com/w/200/h/200"}, {"name": "Framer", "image": "https://cdn.brandfetch.io/framer.com/w/200/h/200"}]'::jsonb, 0);
-
--- Socials
-delete from socials;
-insert into socials (id, platform, url, label, "order")
-values
-('twitter-link', 'Twitter', 'https://twitter.com', '@mukhi_anik', 0),
-('linkedin-link', 'LinkedIn', 'https://linkedin.com', 'Mukhi Anik', 1);`;
+`;
 
   const copySQL = () => {
     navigator.clipboard.writeText(setupSQL);
@@ -357,18 +308,28 @@ values
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden"
+                    className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
                   >
-                      <div className="p-6 border-b border-neutral-200 flex justify-between items-center">
+                      <div className="p-6 border-b border-neutral-200 flex justify-between items-center bg-white flex-shrink-0">
                           <div>
-                            <h3 className="text-lg font-bold text-neutral-900">Database Setup (Fix RLS Errors)</h3>
-                            <p className="text-xs text-neutral-500">Run this SQL in your Supabase Dashboard to enable saving.</p>
+                            <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2">
+                                <Database className="w-5 h-5 text-blue-600" /> Database Setup Required
+                            </h3>
+                            <p className="text-xs text-neutral-500 mt-1">To update data, you must create the database tables first.</p>
                           </div>
                           <button onClick={() => setShowSqlModal(false)} className="p-2 hover:bg-neutral-100 rounded-full">
                               <X className="w-5 h-5 text-neutral-500" />
                           </button>
                       </div>
-                      <div className="p-6 bg-neutral-50">
+                      <div className="p-6 bg-neutral-50 flex-grow overflow-auto">
+                           <div className="mb-4 text-sm text-neutral-600 space-y-2">
+                                <p><strong>Instructions:</strong></p>
+                                <ol className="list-decimal pl-4 space-y-1">
+                                    <li>Click <strong>Copy SQL</strong> below.</li>
+                                    <li>Open your <a href="https://supabase.com/dashboard/project/_/sql" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-bold">Supabase SQL Editor</a>.</li>
+                                    <li>Paste the code and click <strong>Run</strong>.</li>
+                                </ol>
+                           </div>
                           <div className="relative">
                               <pre className="bg-neutral-900 text-neutral-300 p-4 rounded-lg text-xs font-mono overflow-auto max-h-[300px] whitespace-pre-wrap">
                                   {setupSQL}
@@ -382,7 +343,7 @@ values
                               </button>
                           </div>
                       </div>
-                      <div className="p-6 bg-white flex justify-end gap-3">
+                      <div className="p-6 bg-white flex justify-end gap-3 flex-shrink-0">
                           <a 
                             href="https://supabase.com/dashboard/project/_/sql" 
                             target="_blank" 

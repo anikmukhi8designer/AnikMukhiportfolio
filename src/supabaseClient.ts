@@ -31,3 +31,6 @@ const supabaseUrl = localUrl || envUrl || fallbackUrl;
 const supabaseKey = localKey || envKey || fallbackKey;
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Flag to check if we are using the read-only demo database
+export const isDemo = supabaseUrl === fallbackUrl;
