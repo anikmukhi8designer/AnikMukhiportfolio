@@ -57,7 +57,6 @@ const ClientLogo: React.FC<{ client: Client }> = ({ client }) => {
                 Logo Filters:
                 Light Mode: Grayscale & Faded -> Color & Opaque
                 Dark Mode: Brightness 0 & Invert (White Silhouette) -> Brightness 0 & Invert (White Silhouette) but full Opacity
-                (We avoid restoring original color in dark mode because black text logos would disappear)
             */}
             <img 
                 src={logoUrl} 
@@ -75,8 +74,8 @@ const ClientLogo: React.FC<{ client: Client }> = ({ client }) => {
 
   // 4. Render Text Fallback
   return (
-    <div className="w-full h-full flex items-center justify-center px-8 whitespace-nowrap">
-        <span className={`text-3xl md:text-4xl text-neutral-400 dark:text-neutral-600 group-hover:text-neutral-900 dark:group-hover:text-neutral-200 transition-colors duration-300 ${fontStyles[styleIndex]}`}>
+    <div className="w-full h-full flex items-center justify-center px-10 whitespace-nowrap">
+        <span className={`text-3xl md:text-4xl text-muted-foreground group-hover:text-foreground transition-colors duration-300 ${fontStyles[styleIndex]}`}>
             {client.name}
         </span>
     </div>
@@ -89,13 +88,22 @@ const ClientsSection: React.FC = () => {
   // Fallback to empty array if clients is undefined
   const safeClients = clients || [];
   
-  // Clone list for seamless loop
-  const marqueeClients = [...safeClients, ...safeClients, ...safeClients];
+  // Ensure we have enough items to loop smoothly even if only 1 or 2 clients exist
+  // We want at least 10 items in the marquee list if the count is low
+  let marqueeClients = [...safeClients];
+  if (safeClients.length > 0) {
+      while (marqueeClients.length < 10) {
+          marqueeClients = [...marqueeClients, ...safeClients];
+      }
+  }
+
+  // Add one more set for the loop buffer
+  marqueeClients = [...marqueeClients, ...safeClients];
 
   if (safeClients.length === 0) return null;
 
   return (
-    <section className="py-24 bg-transparent border-t border-neutral-200 dark:border-white/5 overflow-hidden relative z-10 transition-colors duration-500">
+    <section className="py-24 bg-background border-t border-border overflow-hidden relative z-10">
       <motion.div 
         className="w-full"
         initial={{ opacity: 0 }}
@@ -103,12 +111,12 @@ const ClientsSection: React.FC = () => {
         viewport={{ once: true }}
         transition={{ duration: 1 }}
       >
-        {/* Minimal Section Header */}
-        <div className="max-w-screen-xl mx-auto px-4 md:px-8 mb-16 flex flex-col md:flex-row md:items-baseline justify-between gap-4">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-400 dark:text-neutral-500 transition-colors">
+        {/* Consistent Layout Container */}
+        <div className="max-w-screen-2xl mx-auto px-4 md:px-6 mb-16 flex flex-col md:flex-row md:items-baseline justify-between gap-4">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground transition-colors">
             Clients & Collaborations
           </h2>
-          <span className="text-sm text-neutral-400 dark:text-neutral-500 font-medium hidden md:block transition-colors">
+          <span className="text-sm text-muted-foreground font-medium hidden md:block transition-colors">
             {safeClients.length} Companies
           </span>
         </div>
@@ -124,10 +132,10 @@ const ClientsSection: React.FC = () => {
             {/* Moving Track */}
             <motion.div 
                 className="flex items-center gap-4 md:gap-8 w-max"
-                animate={{ x: ["0%", "-33.33%"] }}
+                animate={{ x: ["0%", "-50%"] }}
                 transition={{ 
                     ease: "linear", 
-                    duration: 40, 
+                    duration: Math.max(20, marqueeClients.length * 2), // Adjust speed based on content length
                     repeat: Infinity 
                 }}
             >

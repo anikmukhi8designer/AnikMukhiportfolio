@@ -43,17 +43,14 @@ interface SkillCardProps {
 
 const SkillCard: React.FC<SkillCardProps> = ({ item, index }) => {
     // 1. Resolve effective image URL
-    // Priority: Manual Upload/URL > Domain Map Auto-fetch
     let imageUrl = item.image;
 
     if (!imageUrl) {
-         // Fallback to domain map if no image provided in CMS
          const domain = DOMAIN_MAP[item.name];
          if (domain) {
               imageUrl = `https://cdn.brandfetch.io/${domain}/w/128/h/128?c=${BRANDFETCH_KEY}`;
          }
     } else {
-         // If image is a raw Brandfetch URL without key (from CMS search), append key
          if (imageUrl.includes('brandfetch.io') && !imageUrl.includes('c=')) {
               const separator = imageUrl.includes('?') ? '&' : '?';
               imageUrl = `${imageUrl}${separator}c=${BRANDFETCH_KEY}`;
@@ -67,19 +64,14 @@ const SkillCard: React.FC<SkillCardProps> = ({ item, index }) => {
             viewport={{ once: true }}
             transition={{ delay: index * 0.05, duration: 0.4, ease: "easeOut" }}
             className="group relative flex flex-col items-center justify-center p-6 
-                       bg-white/60 dark:bg-white/[0.03] 
-                       backdrop-blur-xl border border-neutral-200 dark:border-white/5
+                       bg-card/50
+                       backdrop-blur-xl border border-border
                        rounded-3xl
-                       hover:bg-white dark:hover:bg-neutral-800/40 
-                       hover:border-neutral-300 dark:hover:border-white/10
-                       hover:shadow-2xl dark:hover:shadow-black/20
+                       hover:bg-card 
+                       hover:border-primary/20
+                       hover:shadow-2xl
                        transition-all duration-500 ease-out aspect-square cursor-default overflow-hidden"
         >
-            {/* 
-                Icon Container 
-                - Starts at w-10 (40px)
-                - Scales 1.5x on hover (~60px)
-            */}
             <div className="w-10 h-10 mb-4 flex items-center justify-center relative z-10 transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-150 group-hover:-translate-y-2">
                  {imageUrl ? (
                     <img 
@@ -93,33 +85,28 @@ const SkillCard: React.FC<SkillCardProps> = ({ item, index }) => {
                                    dark:group-hover:brightness-100 dark:group-hover:invert-0 dark:group-hover:opacity-100
                                    transition-all duration-500"
                         onError={(e) => {
-                            // Hide broken image
                             e.currentTarget.style.display = 'none';
-                            // Show fallback icon
                             const fallback = e.currentTarget.parentElement?.querySelector('.fallback-icon');
                             if (fallback) (fallback as HTMLElement).classList.remove('hidden');
                             (fallback as HTMLElement).style.display = 'flex';
                         }}
                     />
                 ) : (
-                    <div className="w-full h-full text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-white transition-colors duration-500">
+                    <div className="w-full h-full text-muted-foreground group-hover:text-foreground transition-colors duration-500">
                         <SkillIcon icon={item.icon || item.name || 'Default'} className="w-full h-full" />
                     </div>
                 )}
                  
-                 {/* Fallback Icon (Hidden by default, shown on Error or if no image) */}
-                 <div className="fallback-icon hidden absolute inset-0 items-center justify-center text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-white transition-colors">
+                 <div className="fallback-icon hidden absolute inset-0 items-center justify-center text-muted-foreground group-hover:text-foreground transition-colors">
                     <SkillIcon icon={item.icon || item.name || 'Default'} className="w-full h-full" />
                 </div>
             </div>
 
-            {/* Label */}
-            <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-neutral-500 dark:text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-white transition-all duration-300 text-center relative z-10 group-hover:translate-y-1">
+            <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-all duration-300 text-center relative z-10 group-hover:translate-y-1">
                 {item.name}
             </span>
 
-            {/* Shine/Glare Effect on Hover */}
-            <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/40 to-transparent opacity-0 group-hover:opacity-100 dark:group-hover:opacity-10 transition-opacity duration-700 pointer-events-none mix-blend-overlay" />
+            <div className="absolute inset-0 bg-gradient-to-tr from-primary/0 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none mix-blend-overlay" />
         </motion.div>
     );
 }
@@ -128,15 +115,15 @@ const SkillsSection: React.FC = () => {
   const { skills } = useData();
 
   return (
-    <section className="py-32 border-t border-neutral-200/50 dark:border-white/5 bg-transparent relative z-10 transition-colors duration-500">
-      <div className="max-w-screen-xl mx-auto px-4 md:px-8">
+    <section className="py-24 border-t border-border bg-background relative z-10 transition-colors duration-500">
+      <div className="max-w-screen-2xl mx-auto px-4 md:px-6">
         
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-baseline justify-between mb-20 gap-4">
-            <h2 className="text-3xl md:text-5xl font-medium tracking-tight text-neutral-900 dark:text-white transition-colors">
+            <h2 className="text-3xl md:text-5xl font-medium tracking-tight text-foreground transition-colors">
                 Design & Tech
             </h2>
-            <span className="text-sm text-neutral-400 dark:text-neutral-500 font-medium hidden md:block uppercase tracking-widest transition-colors">
+            <span className="text-sm text-muted-foreground font-medium hidden md:block uppercase tracking-widest transition-colors">
                 Tools we use
             </span>
         </div>
@@ -144,9 +131,9 @@ const SkillsSection: React.FC = () => {
         <div className="space-y-24">
             {skills.map((category) => (
                 <div key={category.id}>
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-400 dark:text-neutral-600 mb-8 pl-1 transition-colors flex items-center gap-4">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-8 pl-1 transition-colors flex items-center gap-4">
                         {category.title}
-                        <div className="h-px bg-neutral-200 dark:bg-white/5 flex-grow"></div>
+                        <div className="h-px bg-border flex-grow"></div>
                     </h3>
                     
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
