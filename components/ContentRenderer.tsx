@@ -10,46 +10,58 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ blocks }) => {
   if (!blocks || blocks.length === 0) return null;
 
   return (
-    <div className="space-y-6 max-w-none">
+    <div className="w-full">
       {blocks.map((block) => {
         switch (block.type) {
           case 'h1':
             return (
-              <h3 key={block.id} className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mt-8 mb-4">
-                {block.content}
-              </h3>
+              <div key={block.id} className="px-8 md:px-24 pt-16 pb-8 max-w-5xl">
+                <h3 className="text-3xl md:text-4xl font-bold text-foreground">
+                    {block.content}
+                </h3>
+              </div>
             );
           case 'h2':
             return (
-              <h4 key={block.id} className="text-xl font-bold text-neutral-800 dark:text-neutral-200 mt-6 mb-3">
-                {block.content}
-              </h4>
+              <div key={block.id} className="px-8 md:px-24 pt-12 pb-6 max-w-4xl">
+                <h4 className="text-2xl font-bold text-foreground flex items-center gap-4">
+                    <span className="w-8 h-px bg-primary"></span>
+                    {block.content}
+                </h4>
+              </div>
             );
           case 'paragraph':
             return (
-              <p key={block.id} className="text-lg text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                {block.content}
-              </p>
+              <div key={block.id} className="px-8 md:px-24 pb-8 max-w-4xl">
+                <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
+                    {block.content}
+                </p>
+              </div>
             );
           case 'quote':
             return (
-              <blockquote key={block.id} className="border-l-4 border-neutral-300 dark:border-neutral-700 pl-6 py-2 my-8 italic text-xl text-neutral-700 dark:text-neutral-300">
-                "{block.content}"
-              </blockquote>
+              <div key={block.id} className="px-8 md:px-24 py-16 bg-secondary/30 my-12 border-y border-border">
+                <blockquote className="text-3xl md:text-5xl font-bold text-foreground text-center tracking-tight leading-tight max-w-5xl mx-auto">
+                    "{block.content}"
+                </blockquote>
+              </div>
             );
           case 'image':
             return (
-              <figure key={block.id} className="my-8">
-                <img 
-                  src={getOptimizedSrc(block.content, 1000)}
-                  srcSet={getOptimizedSrcSet(block.content)}
-                  sizes="(max-width: 768px) 100vw, 800px"
-                  loading="lazy"
-                  alt={block.caption || 'Project image'} 
-                  className="w-full rounded-lg bg-neutral-100 dark:bg-neutral-800"
-                />
+              <figure key={block.id} className="w-full my-12 group">
+                <div className="overflow-hidden">
+                    <img 
+                    src={getOptimizedSrc(block.content, 1400)}
+                    srcSet={getOptimizedSrcSet(block.content)}
+                    sizes="100vw"
+                    loading="lazy"
+                    alt={block.caption || 'Project image'} 
+                    className="w-full h-auto object-cover grayscale-[20%] group-hover:grayscale-0 transition-all duration-700 hover:scale-[1.01]"
+                    />
+                </div>
                 {block.caption && (
-                  <figcaption className="text-center text-sm text-neutral-400 mt-2">
+                  <figcaption className="px-8 md:px-24 mt-4 text-xs font-mono text-muted-foreground uppercase tracking-widest flex items-center gap-4">
+                    <span className="h-px w-8 bg-border"></span>
                     {block.caption}
                   </figcaption>
                 )}
@@ -57,19 +69,26 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ blocks }) => {
             );
           case 'code':
             return (
-              <div key={block.id} className="bg-neutral-900 rounded-lg p-6 my-6 overflow-x-auto">
-                {block.caption && (
-                  <div className="text-xs font-mono text-neutral-400 mb-2 pb-2 border-b border-neutral-800">
-                    {block.caption}
-                  </div>
-                )}
-                <pre className="text-sm font-mono text-neutral-200">
-                  <code>{block.content}</code>
-                </pre>
+              <div key={block.id} className="px-8 md:px-24 my-12">
+                <div className="bg-[#111] rounded-xl p-6 md:p-8 overflow-x-auto border border-neutral-800 shadow-2xl">
+                    {block.caption && (
+                    <div className="text-[10px] font-mono text-neutral-500 mb-4 pb-2 border-b border-neutral-800 flex justify-between">
+                        <span>{block.caption}</span>
+                        <div className="flex gap-1.5">
+                            <div className="w-2 h-2 rounded-full bg-red-500/50"></div>
+                            <div className="w-2 h-2 rounded-full bg-yellow-500/50"></div>
+                            <div className="w-2 h-2 rounded-full bg-green-500/50"></div>
+                        </div>
+                    </div>
+                    )}
+                    <pre className="text-sm font-mono text-neutral-300 leading-relaxed">
+                    <code>{block.content}</code>
+                    </pre>
+                </div>
               </div>
             );
           case 'divider':
-            return <hr key={block.id} className="border-t border-neutral-200 dark:border-neutral-800 my-12" />;
+            return <div key={block.id} className="px-8 md:px-24 my-16"><hr className="border-t border-border" /></div>;
           default:
             return null;
         }
