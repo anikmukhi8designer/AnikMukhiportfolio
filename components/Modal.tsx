@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowUpRight, Github } from 'lucide-react';
 import { Project } from '../types';
 import ContentRenderer from './ContentRenderer';
+import { getOptimizedSrc, getOptimizedSrcSet } from '../utils/imageOptimizer';
 
 interface ModalProps {
   project: Project | null;
@@ -30,6 +31,8 @@ const Modal: React.FC<ModalProps> = ({ project, onClose }) => {
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
   }, [onClose]);
+
+  const heroImgSrc = project ? (project.heroImage || project.thumb) : '';
 
   return (
     <AnimatePresence>
@@ -66,7 +69,9 @@ const Modal: React.FC<ModalProps> = ({ project, onClose }) => {
                     <div className="w-full h-[40vh] md:h-[60vh] relative overflow-hidden">
                          <motion.img
                             layoutId={`project-image-${project.id}`}
-                            src={project.heroImage || project.thumb}
+                            src={getOptimizedSrc(heroImgSrc, 1200)}
+                            srcSet={getOptimizedSrcSet(heroImgSrc)}
+                            sizes="100vw"
                             alt={project.title}
                             className="w-full h-full object-cover"
                         />
@@ -103,7 +108,15 @@ const Modal: React.FC<ModalProps> = ({ project, onClose }) => {
                                     {project.images && (
                                         <div className="grid grid-cols-1 gap-8">
                                             {project.images.map((img, idx) => (
-                                                <img key={idx} src={img} alt="" className="w-full h-auto rounded-2xl bg-neutral-100 dark:bg-neutral-800" />
+                                                <img 
+                                                  key={idx} 
+                                                  src={getOptimizedSrc(img, 1000)}
+                                                  srcSet={getOptimizedSrcSet(img)}
+                                                  sizes="(max-width: 768px) 100vw, 800px"
+                                                  loading="lazy"
+                                                  alt="" 
+                                                  className="w-full h-auto rounded-2xl bg-neutral-100 dark:bg-neutral-800" 
+                                                />
                                             ))}
                                         </div>
                                     )}

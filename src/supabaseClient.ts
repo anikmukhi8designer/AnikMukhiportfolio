@@ -34,3 +34,11 @@ export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Flag to check if we are using the read-only demo database
 export const isDemo = supabaseUrl === fallbackUrl;
+
+// Helper to clear local overrides if things get stuck
+export const clearLocalSupabaseKeys = () => {
+    if (typeof window !== 'undefined') {
+        localStorage.removeItem('sb_url');
+        localStorage.removeItem('sb_key');
+    }
+};

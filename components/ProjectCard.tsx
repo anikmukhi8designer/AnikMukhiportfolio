@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Project } from '../types';
 import { ArrowUpRight } from 'lucide-react';
+import { getOptimizedSrc, getOptimizedSrcSet } from '../utils/imageOptimizer';
 
 interface ProjectCardProps {
   project: Project;
@@ -26,7 +27,10 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
       <div className="relative w-full aspect-[16/10] overflow-hidden bg-muted border-b border-border">
         <motion.img
           layoutId={`project-image-${project.id}`}
-          src={project.thumb}
+          src={getOptimizedSrc(project.thumb, 800)}
+          srcSet={getOptimizedSrcSet(project.thumb)}
+          sizes="(max-width: 768px) 100vw, 50vw"
+          loading="lazy"
           alt={project.title}
           className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 ease-out"
         />

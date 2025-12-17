@@ -100,9 +100,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   };
 
   // Robust SQL that can be re-run safely
-  const setupSQL = `-- 1. CREATE TABLES
+  // Updated for Multi-User (Team) Support: Adds user_id but RLS allows shared team access
+  const setupSQL = `-- 1. CREATE TABLES (Multi-User Ready)
 create table if not exists projects (
   id text primary key, 
+  user_id uuid default auth.uid(), -- Multi-user support
   title text, 
   client text, 
   roles text[], 
@@ -121,6 +123,7 @@ create table if not exists projects (
 
 create table if not exists experience (
   id text primary key, 
+  user_id uuid default auth.uid(),
   role text, 
   company text, 
   period text, 
@@ -132,6 +135,7 @@ create table if not exists experience (
 
 create table if not exists clients (
   id text primary key, 
+  user_id uuid default auth.uid(),
   name text, 
   logo text, 
   url text, 
@@ -141,6 +145,7 @@ create table if not exists clients (
 
 create table if not exists skills (
   id text primary key, 
+  user_id uuid default auth.uid(),
   title text, 
   items jsonb, 
   "order" int default 0, 
@@ -149,6 +154,7 @@ create table if not exists skills (
 
 create table if not exists config (
   id int primary key default 1, 
+  user_id uuid default auth.uid(),
   "resumeUrl" text, 
   email text, 
   "heroHeadline" text, 
@@ -159,6 +165,7 @@ create table if not exists config (
 
 create table if not exists socials (
   id text primary key, 
+  user_id uuid default auth.uid(),
   platform text, 
   url text, 
   label text, 
@@ -174,10 +181,11 @@ alter table skills enable row level security;
 alter table config enable row level security;
 alter table socials enable row level security;
 
--- 3. DROP EXISTING POLICIES (To prevent conflict errors on re-run)
+-- 3. DROP EXISTING POLICIES (Reset to clean state)
 drop policy if exists "Public read projects" on projects;
 drop policy if exists "Auth all projects" on projects;
 drop policy if exists "Enable insert for authenticated users only" on projects;
+drop policy if exists "Individuals can create" on projects;
 
 drop policy if exists "Public read experience" on experience;
 drop policy if exists "Auth all experience" on experience;
@@ -194,7 +202,7 @@ drop policy if exists "Auth all config" on config;
 drop policy if exists "Public read socials" on socials;
 drop policy if exists "Auth all socials" on socials;
 
--- 4. CREATE POLICIES (Public Read, Admin Write)
+-- 4. CREATE POLICIES (Team Mode: Public Read, Auth Write)
 -- Allow anyone to read data
 create policy "Public read projects" on projects for select using (true);
 create policy "Public read experience" on experience for select using (true);
@@ -203,19 +211,16 @@ create policy "Public read skills" on skills for select using (true);
 create policy "Public read config" on config for select using (true);
 create policy "Public read socials" on socials for select using (true);
 
--- Allow authenticated users (Admin) to do everything (Insert, Update, Delete)
-create policy "Auth all projects" on projects for all to authenticated using (true) with check (true);
-create policy "Auth all experience" on experience for all to authenticated using (true) with check (true);
-create policy "Auth all clients" on clients for all to authenticated using (true) with check (true);
-create policy "Auth all skills" on skills for all to authenticated using (true) with check (true);
-create policy "Auth all config" on config for all to authenticated using (true) with check (true);
-create policy "Auth all socials" on socials for all to authenticated using (true) with check (true);
+-- Allow ANY authenticated user to Insert/Update/Delete (Team Collaboration)
+-- Note: To strictly isolate user data, change 'using (true)' to 'using (auth.uid() = user_id)'
+create policy "Auth team write projects" on projects for all to authenticated using (true) with check (true);
+create policy "Auth team write experience" on experience for all to authenticated using (true) with check (true);
+create policy "Auth team write clients" on clients for all to authenticated using (true) with check (true);
+create policy "Auth team write skills" on skills for all to authenticated using (true) with check (true);
+create policy "Auth team write config" on config for all to authenticated using (true) with check (true);
+create policy "Auth team write socials" on socials for all to authenticated using (true) with check (true);
 
--- Explicit Insert Policy for clarity
-create policy "Enable insert for authenticated users only" on projects for insert to authenticated with check (true);
-
--- 5. SEED INITIAL CONFIG DATA (To prevent empty config errors)
--- Config
+-- 5. SEED INITIAL CONFIG DATA
 insert into config (id, email, "heroHeadline", "heroSubheadline", "heroDescription") 
 values (1, 'hello@mukhianik.com', 'Product Designer', '& Creative Dev.', 'Building digital products that blend aesthetics with function. Currently crafting experiences in San Francisco.') 
 on conflict (id) do nothing;

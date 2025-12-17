@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Database, Key, Loader2, AlertCircle, UserPlus, LogIn, Settings, X, Save, ArrowLeft, Mail, Wifi, CheckCircle, ShieldAlert, Lock } from 'lucide-react';
+import { Database, Key, Loader2, AlertCircle, UserPlus, LogIn, Settings, X, Save, ArrowLeft, Mail, CheckCircle, ShieldAlert, Lock, Globe } from 'lucide-react';
 import { supabase, isDemo } from '../../src/supabaseClient';
 
 interface AdminLoginProps {
@@ -22,6 +22,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
   const [customUrl, setCustomUrl] = useState('');
   const [customKey, setCustomKey] = useState('');
   const [projectUrl, setProjectUrl] = useState('');
+  const [envDetected, setEnvDetected] = useState(false);
 
   useEffect(() => {
       // Load existing custom settings
@@ -29,6 +30,11 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
       const storedKey = localStorage.getItem('sb_key');
       if (storedUrl) setCustomUrl(storedUrl);
       if (storedKey) setCustomKey(storedKey);
+
+      // Check if Env vars are active
+      // @ts-ignore
+      const envUrl = import.meta.env.VITE_SUPABASE_URL;
+      setEnvDetected(!!envUrl);
 
       // Identify current connection
       // @ts-ignore
@@ -48,9 +54,9 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
 
     try {
         if (mode === 'signup') {
-            if (isDemo) {
-                throw new Error("Cannot create account on Demo Database. Please connect your own Supabase project first (Settings icon below).");
-            }
+            // We allow signup attempts even in Demo mode (user might be mistaken or using a permissive demo instance)
+            // But we warn them if it fails.
+            
             if (password !== confirmPassword) {
                 throw new Error("Passwords do not match.");
             }
@@ -62,7 +68,14 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                 email,
                 password,
             });
-            if (error) throw error;
+            
+            if (error) {
+                 if (isDemo) {
+                     throw new Error(`${error.message} (Note: You are currently connected to the Read-Only Demo Database. Please click the Settings icon to connect your own Supabase project.)`);
+                 }
+                 throw error;
+            }
+
             if (data.user) {
                 setMessage("Account created successfully! Logging you in...");
                 if (data.session) {
@@ -79,7 +92,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
             });
             if (error) {
                 if (error.message.includes("Invalid login credentials")) {
-                    throw new Error("User not found or wrong password. If this is your first time, please Create an Account.");
+                    throw new Error("User not found or wrong password. If this is your first time, please switch to 'Create Admin Account'.");
                 }
                 throw error;
             }
@@ -87,13 +100,13 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                 onLogin();
             }
         } else if (mode === 'forgot') {
-             if (isDemo) {
-                throw new Error("Cannot reset password on Demo Database.");
-            }
             const { error } = await supabase.auth.resetPasswordForEmail(email, {
                 redirectTo: window.location.origin + '/#admin',
             });
-            if (error) throw error;
+            if (error) {
+                if (isDemo) throw new Error("Cannot reset password on Demo Database.");
+                throw error;
+            }
             setMessage("Password reset link sent! Check your email.");
         }
     } catch (err: any) {
@@ -114,7 +127,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
   };
 
   const clearConnectionSettings = () => {
-      if(confirm("Reset to default connection?")) {
+      if(confirm("Reset to default/environment connection?")) {
           localStorage.removeItem('sb_url');
           localStorage.removeItem('sb_key');
           window.location.reload();
@@ -141,13 +154,12 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                 
                 <div className="space-y-4 flex-grow overflow-y-auto">
                     <div className="text-xs text-blue-700 bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
-                        <p className="font-bold mb-1">How to connect:</p>
-                        <ol className="list-decimal pl-4 space-y-1">
-                            <li>Go to <a href="https://supabase.com/dashboard" target="_blank" className="underline">Supabase Dashboard</a></li>
-                            <li>Create a new project</li>
-                            <li>Go to <strong>Project Settings</strong> &rarr; <strong>API</strong></li>
-                            <li>Copy <strong>URL</strong> and <strong>anon / public</strong> key</li>
-                        </ol>
+                        <p className="font-bold mb-1">Status:</p>
+                        <ul className="list-disc pl-4 space-y-1">
+                            <li>Env Variables: <strong>{envDetected ? 'Detected' : 'Not Detected'}</strong></li>
+                            <li>Current Project: <strong>{projectUrl}</strong></li>
+                            <li>Mode: <strong>{isDemo ? 'Demo (Read-Only)' : 'Live (Read/Write)'}</strong></li>
+                        </ul>
                     </div>
                     
                     <div className="space-y-1.5">
@@ -168,6 +180,10 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                             value={customKey}
                             onChange={(e) => setCustomKey(e.target.value)}
                         />
+                    </div>
+
+                    <div className="text-xs text-neutral-400 mt-2">
+                        Tip: You can also set <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> in your <code>.env</code> file.
                     </div>
                 </div>
 
@@ -210,14 +226,17 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
             }`}
         >
             <div className={`w-2 h-2 rounded-full ${isDemo ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`}></div>
-            {isDemo ? 'READ-ONLY DEMO MODE' : `Connected: ${projectUrl}`}
+            {isDemo ? 'DEMO MODE (READ ONLY)' : `Connected: ${projectUrl}`}
             <Settings className="w-3 h-3 ml-1 opacity-50" />
         </div>
 
         {isDemo && mode !== 'login' && (
              <div className="mb-6 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700 flex gap-2 items-start">
                  <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-                 <p>You are connected to the <strong>Demo Database</strong>. To create an account and save data, please click the badge above to connect your own Supabase project.</p>
+                 <p>
+                    <strong>Note:</strong> You are connected to the Demo Database. 
+                    If you have your own Supabase project, click the badge above to enter your keys.
+                 </p>
              </div>
         )}
 
