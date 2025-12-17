@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowUpRight } from 'lucide-react';
 import { Project } from '../types';
+import { ArrowUpRight } from 'lucide-react';
 
 interface ProjectCardProps {
   project: Project;
@@ -13,56 +13,56 @@ interface ProjectCardProps {
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnter, onMouseLeave }) => {
   return (
     <motion.div
-      layoutId={`project-card-${project.id}`}
-      className="group relative flex-shrink-0 w-[45vw] sm:w-[220px] md:w-[260px] cursor-pointer"
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.5 }}
+      className="group cursor-pointer flex flex-col border border-border bg-card hover:border-primary/50 transition-colors"
       onClick={() => onClick(project)}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      initial={{ opacity: 0, scale: 0.9 }}
-      whileInView={{ opacity: 1, scale: 1 }}
-      whileHover={{ scale: 1.02 }}
-      viewport={{ once: true, margin: "-10%" }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
     >
-      {/* Image Container */}
-      <div className="relative aspect-[4/5] w-full overflow-hidden rounded-xl bg-neutral-100 dark:bg-neutral-900 shadow-sm">
-        <img
-          src={project.thumb || project.heroImage}
+      {/* Image Container - Aspect Ratio preserved but sharp corners */}
+      <div className="relative w-full aspect-[16/10] overflow-hidden bg-muted border-b border-border">
+        <motion.img
+          layoutId={`project-image-${project.id}`}
+          src={project.thumb}
           alt={project.title}
-          className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+          className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 ease-out"
         />
         
-        {/* Overlay / Dimmer */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-500" />
-
-        {/* Hover Action Icon */}
-        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform translate-y-2 group-hover:translate-y-0">
-             <div className="bg-white/20 backdrop-blur-md p-1.5 rounded-full text-white border border-white/20">
-                <ArrowUpRight className="w-4 h-4" />
-             </div>
+        {/* Overlay Icon */}
+        <div className="absolute top-4 right-4 bg-background/90 text-foreground p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <ArrowUpRight className="w-5 h-5" />
         </div>
       </div>
 
-      {/* Info Below Card */}
-      <div className="mt-3 flex flex-col px-1 opacity-80 group-hover:opacity-100 transition-opacity duration-300">
-         <div className="flex justify-between items-baseline mb-0.5">
-            <span className="text-base font-medium text-neutral-900 dark:text-white tracking-tight truncate pr-2">
-                {project.client}
-            </span>
-            <span className="text-[10px] font-mono text-neutral-400 dark:text-neutral-600 flex-shrink-0">
+      {/* Content - Technical Layout */}
+      <div className="p-5 flex flex-col gap-4">
+        <div className="flex justify-between items-start">
+            <div className="space-y-1">
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground block">
+                    {project.client}
+                </span>
+                <motion.h3 
+                  layoutId={`project-title-${project.id}`}
+                  className="text-xl font-bold text-foreground leading-tight group-hover:text-primary transition-colors"
+                >
+                  {project.title}
+                </motion.h3>
+            </div>
+            <span className="text-xs font-mono text-muted-foreground border border-border px-2 py-1">
                 {project.year}
             </span>
-         </div>
-         <span className="text-xs text-neutral-500 dark:text-neutral-400 line-clamp-2 leading-relaxed">
-            {project.description}
-         </span>
-         <div className="mt-2.5 flex flex-wrap gap-1.5">
-            {project.tags.slice(0, 2).map(tag => (
-                <span key={tag} className="text-[9px] font-bold uppercase tracking-widest text-neutral-400 border border-neutral-200 dark:border-neutral-800 px-1.5 py-0.5 rounded-md">
+        </div>
+        
+        <div className="flex flex-wrap gap-2 mt-auto">
+            {project.tags?.slice(0, 3).map((tag, i) => (
+                <span key={i} className="text-[10px] uppercase bg-secondary text-secondary-foreground px-2 py-1">
                     {tag}
                 </span>
             ))}
-         </div>
+        </div>
       </div>
     </motion.div>
   );

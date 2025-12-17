@@ -1,75 +1,114 @@
-import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect } from 'react';
+import { motion } from 'framer-motion';
 
 interface LoadingScreenProps {
   onComplete: () => void;
 }
 
 const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
-  const [count, setCount] = useState(0);
-
   useEffect(() => {
-    // Simulate loading time based on "resources"
-    const duration = 2000; // 2 seconds total load time
-    const intervalTime = 20;
-    const steps = duration / intervalTime;
-    const increment = 100 / steps;
+    // Duration matches the animation time + small buffer
+    const timer = setTimeout(() => {
+      onComplete();
+    }, 2800);
 
-    const timer = setInterval(() => {
-      setCount((prev) => {
-        const next = prev + increment;
-        if (next >= 100) {
-          clearInterval(timer);
-          return 100;
-        }
-        return next;
-      });
-    }, intervalTime);
-
-    // Cleanup and trigger complete
-    const timeout = setTimeout(() => {
-       clearInterval(timer);
-       setCount(100);
-       setTimeout(onComplete, 800); 
-    }, duration);
-
-    return () => {
-      clearInterval(timer);
-      clearTimeout(timeout);
-    };
+    return () => clearTimeout(timer);
   }, [onComplete]);
 
   return (
     <motion.div
-      className="fixed inset-0 z-[10000] bg-[#1a1a1a] flex flex-col items-center justify-center text-white overflow-hidden"
-      initial={{ y: 0 }}
+      className="fixed inset-0 z-[10000] bg-black flex items-center justify-center overflow-hidden"
       exit={{ 
-        y: "-100%", 
-        transition: { duration: 0.8, ease: [0.76, 0, 0.24, 1] } 
+        opacity: 0,
+        transition: { duration: 0.8, ease: "easeInOut" } 
       }}
     >
-        <div className="w-full max-w-md px-8">
-            <div className="flex justify-between items-end mb-4">
-                <span className="text-sm font-bold uppercase tracking-widest text-neutral-500">
-                    Mukhi Anik
-                </span>
-                <span className="text-6xl md:text-8xl font-bold tabular-nums leading-none">
-                    {Math.round(count)}%
-                </span>
-            </div>
-            
-            {/* Colorful Progress Bar */}
-            <div className="w-full h-1 bg-neutral-800 rounded-full relative overflow-hidden">
-                <motion.div 
-                    className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"
-                    style={{ width: `${count}%` }}
+        <div className="w-full max-w-7xl px-8 relative">
+            <svg viewBox="0 0 1200 300" className="w-full h-auto text-white overflow-visible">
+                
+                {/* Start Node: White Square */}
+                <motion.rect
+                    x="0" y="145" width="10" height="10" fill="currentColor"
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.4, ease: "easeOut" }}
                 />
-            </div>
-            
-            <div className="mt-4 flex justify-between text-xs text-neutral-500 font-mono">
-                <span>LOADING EXPERIENCE</span>
-                <span className="animate-pulse">PLEASE WAIT</span>
-            </div>
+
+                {/* Path 1: Main Flow (Straight -> Curve Down -> Up -> Straight) */}
+                <motion.path
+                    d="M 15 150 L 300 150 C 450 150 500 250 650 250 C 800 250 850 150 1000 150 L 1150 150"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    initial={{ pathLength: 0, opacity: 0 }}
+                    animate={{ pathLength: 1, opacity: 1 }}
+                    transition={{ 
+                        duration: 2.2, 
+                        ease: [0.16, 1, 0.3, 1], // Expo ease for sleek feel
+                        delay: 0.2 
+                    }}
+                />
+
+                {/* Path 2: Diverging Flow (Splits and Re-joins/Crosses) */}
+                <motion.path
+                    d="M 300 150 C 450 150 500 50 650 50 C 800 50 850 150 1000 150"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    initial={{ pathLength: 0, opacity: 0 }}
+                    animate={{ pathLength: 1, opacity: 0.5 }} // Lower opacity for secondary path
+                    transition={{ 
+                        duration: 2.2, 
+                        ease: [0.16, 1, 0.3, 1], 
+                        delay: 0.2 
+                    }}
+                />
+
+                {/* Path 3: Branching Off (Upwards at the end) */}
+                <motion.path
+                    d="M 900 150 C 950 150 1000 100 1050 50"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    initial={{ pathLength: 0, opacity: 0 }}
+                    animate={{ pathLength: 1, opacity: 1 }}
+                    transition={{ 
+                        duration: 1.5, 
+                        ease: "easeOut", 
+                        delay: 1 
+                    }}
+                />
+
+                {/* Arrow Head: Main Path */}
+                <motion.path
+                    d="M 1140 140 L 1150 150 L 1140 160"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 2.2, duration: 0.4 }}
+                />
+
+                {/* Arrow Head: Branching Path */}
+                <motion.path
+                    d="M 1040 55 L 1050 50 L 1045 65"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    initial={{ opacity: 0, x: -5, y: 5 }}
+                    animate={{ opacity: 1, x: 0, y: 0 }}
+                    transition={{ delay: 2.3, duration: 0.4 }}
+                />
+
+            </svg>
         </div>
     </motion.div>
   );

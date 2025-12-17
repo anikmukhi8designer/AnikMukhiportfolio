@@ -24,18 +24,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   
   const [errorMessage, setErrorMessage] = useState('');
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [connectionStatusMsg, setConnectionStatusMsg] = useState('');
 
   useEffect(() => {
       reloadContent();
       verifyConnection().then(result => {
           if (!result.success) {
               setConnectionError(result.message);
-              setConnectionStatusMsg('');
           } else {
               setConnectionError(null);
-              // Store the detailed success message (e.g. "Connected. Projects found: 3")
-              setConnectionStatusMsg(result.message);
           }
       });
   }, []);
@@ -423,10 +419,10 @@ values
                 <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
                     Database Status
                 </span>
-                <div className="flex items-center gap-1.5" title={connectionStatusMsg}>
+                <div className="flex items-center gap-1.5">
                     <div className={`w-2 h-2 rounded-full ${!connectionError ? 'bg-green-500' : 'bg-red-500'}`}></div>
                     <span className={`text-xs font-bold ${!connectionError ? 'text-neutral-900' : 'text-neutral-500'}`}>
-                        {!connectionError ? (connectionStatusMsg || 'Connected') : 'Error'}
+                        {!connectionError ? 'Connected' : 'Error'}
                     </span>
                 </div>
             </div>

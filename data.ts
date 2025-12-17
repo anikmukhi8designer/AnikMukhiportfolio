@@ -1,4 +1,3 @@
-
 import { Project, Experience, SocialLink, Client, SkillCategory, GlobalConfig } from './types';
 import { PROJECT_APEX } from './project_apex';
 
@@ -16,47 +15,6 @@ export const INITIAL_CONFIG: GlobalConfig = {
 };
 
 export const PROJECTS: Project[] = [
-  {
-    id: "crypto-trade-wallet",
-    title: "CryptoTrade Wallet",
-    client: "CryptoTrade Inc.",
-    roles: ["Lead UI/UX", "User Research", "Prototyping"],
-    description: "A simplified, trust-first crypto trading experience designed to onboard novice investors with confidence.",
-    year: 2024,
-    heroImage: "https://images.unsplash.com/photo-1621416894569-0f39ed31d247?q=80&w=2555&auto=format&fit=crop",
-    thumb: "https://images.unsplash.com/photo-1639322537228-ad7117a394bc?q=80&w=2555&auto=format&fit=crop",
-    tags: ["Fintech", "Mobile App", "Blockchain"],
-    link: "#",
-    published: true,
-    images: [
-        "https://images.unsplash.com/photo-1616077168712-fc6c738ae82e?q=80&w=2600&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1640340434855-6084b1f4901c?q=80&w=2564&auto=format&fit=crop"
-    ],
-    content: [
-      { id: '1', type: 'h2', content: 'Context & Challenge' },
-      { id: '2', type: 'paragraph', content: 'CryptoTrade’s existing mobile app suffered from high drop-off rates during the trading flow. Users reported that the interface felt confusing and risky—riddled with technical jargon, hidden fees, and unclear steps. This complexity caused anxiety, preventing new users from completing their first trade.' },
-      
-      { id: '3', type: 'h2', content: 'The Goal' },
-      { id: '4', type: 'paragraph', content: 'The primary objectives were to:\n• Simplify the complex trading and wallet flow for non-technical users.\n• Increase trust signals throughout the onboarding and transaction process.\n• Improve conversion rates for first-time deposits and trades.' },
-
-      { id: '5', type: 'image', content: 'https://images.unsplash.com/photo-1620321023374-d1a68fddadb3?q=80&w=2600&auto=format&fit=crop', caption: 'Audit of the original fragmented user flow' },
-
-      { id: '6', type: 'h2', content: 'Research Insights' },
-      { id: '7', type: 'paragraph', content: 'We conducted 10 one-on-one interviews and analyzed 50 survey responses. Key findings included:\n• **Onboarding Fatigue:** The KYC process was too lengthy and asked for sensitive data before establishing value.\n• **Fee Anxiety:** Users couldn\'t find a clear breakdown of gas fees vs. platform fees.\n• **Jargon Overload:** Terms like "Slippage" and "Gwei" intimidated beginner investors.' },
-
-      { id: '8', type: 'h2', content: 'Design Strategy' },
-      { id: '9', type: 'paragraph', content: 'We adopted a "Trust-First" design philosophy. Every interaction needed to be transparent and reassuring.\n• **Progressive Disclosure:** We moved complex charts to secondary views, keeping the main dashboard focused on "Total Balance" and "Action".\n• **Plain Language:** We replaced "Slippage" with "Price Variance" and added tooltips for every technical term.\n• **Explicit Confirmations:** A redesigned "Review Order" screen that clearly lists every fee line-item before execution.' },
-
-      { id: '10', type: 'image', content: 'https://images.unsplash.com/photo-1642104704074-907c0698cbd9?q=80&w=2532&auto=format&fit=crop', caption: 'New Design System: Calm Blue Palette & Clean Typography' },
-
-      { id: '11', type: 'h2', content: 'The Solution' },
-      { id: '12', type: 'paragraph', content: 'The redesign introduced a calm, blue-green color palette to reduce anxiety associated with volatile red/green crypto markers. We streamlined onboarding into 3 clear steps and added a "Guided Tour" for the first trade.' },
-      { id: '13', type: 'paragraph', content: 'For the trading interface, we prioritized clarity. Large input fields, real-time fiat conversion display, and a swipe-to-confirm interaction pattern helped users feel in control of their money.' },
-
-      { id: '14', type: 'h2', content: 'Outcome & Impact' },
-      { id: '15', type: 'paragraph', content: '• **30% Increase** in onboarding completion rate within the first month.\n• **25% Reduction** in support tickets related to "Hidden Fees".\n• **Positive Sentiment:** Users described the new app as "Clean", "Honest", and "Easy to understand" in follow-up surveys.' }
-    ]
-  },
   {
     id: "ravens-tablet-2024",
     title: "Stadium Suite Tablet",

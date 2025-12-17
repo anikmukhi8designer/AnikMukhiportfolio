@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { Database, Key, Loader2, AlertCircle, UserPlus, LogIn, Settings, X, Save, ArrowLeft, Mail, AlertTriangle } from 'lucide-react';
+import { Database, Key, Loader2, AlertCircle, UserPlus, LogIn, Settings, X, Save, ArrowLeft, Mail } from 'lucide-react';
 import { supabase } from '../../src/supabaseClient';
 import DbStatus from '../DbStatus';
 
@@ -17,7 +16,6 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
   const [error, setError] = useState('');
   const [mode, setMode] = useState<AuthMode>('login');
   const [message, setMessage] = useState('');
-  const [isDemoConnection, setIsDemoConnection] = useState(false);
   
   // Connection Settings State
   const [showSettings, setShowSettings] = useState(false);
@@ -30,23 +28,10 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
       const storedKey = localStorage.getItem('sb_key');
       if (storedUrl) setCustomUrl(storedUrl);
       if (storedKey) setCustomKey(storedKey);
-
-      // Check if connected to the placeholder demo database
-      // @ts-ignore - Accessing internal property for validation
-      const currentUrl = supabase.supabaseUrl || '';
-      if (currentUrl.includes('ppaaanrjvptohtuduebu')) {
-          setIsDemoConnection(true);
-      }
   }, []);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (isDemoConnection && mode !== 'login') {
-        setError("You are connected to the Demo Database. You cannot create accounts or reset passwords here. Please connect to your own Supabase project via 'Connection Settings' below.");
-        return;
-    }
-
     setLoading(true);
     setError('');
     setMessage('');
@@ -61,9 +46,6 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
             if (data.user) {
                 setMessage("Account created! You can now log in.");
                 setMode('login');
-            } else if (data.session) {
-                // Auto login if session returned immediately (email confirm off)
-                onLogin();
             }
         } else if (mode === 'login') {
             const { data, error } = await supabase.auth.signInWithPassword({
@@ -82,14 +64,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
             setMessage("Password reset link sent! Check your email.");
         }
     } catch (err: any) {
-        let msg = err.message || "Authentication failed";
-        // Specific help for common Supabase errors
-        if (msg.toLowerCase().includes('captcha')) {
-            msg = "Signup failed: Captcha is enabled. Please go to your Supabase Dashboard > Authentication > Security and disable 'Enable CAPTCHA protection'.";
-        } else if (msg.includes('rate limit')) {
-            msg = "Too many attempts. Please wait a moment.";
-        }
-        setError(msg);
+        setError(err.message || "Authentication failed");
     } finally {
         setLoading(false);
     }
@@ -122,7 +97,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
         
         {/* Settings Modal Overlay */}
         {showSettings && (
-            <div className="absolute inset-0 bg-white z-20 rounded-2xl p-8 flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            <div className="absolute inset-0 bg-white z-20 rounded-2xl p-8 flex flex-col">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="text-lg font-bold flex items-center gap-2">
                         <Settings className="w-5 h-5" /> Connection Settings
@@ -132,7 +107,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                     </button>
                 </div>
                 
-                <div className="space-y-4 flex-grow overflow-y-auto">
+                <div className="space-y-4 flex-grow">
                     <p className="text-xs text-neutral-500 bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
                         Connect to your own Supabase project to enable editing. Find these in Project Settings &rarr; API.
                     </p>
@@ -188,13 +163,6 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
         </div>
 
         <form onSubmit={handleAuth} className="space-y-5">
-            {isDemoConnection && (
-                <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg flex items-start gap-2 text-xs text-blue-700">
-                    <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                    <span>You are using the Demo Database. Signups are disabled. Click "Connection Settings" to connect your own DB.</span>
-                </div>
-            )}
-
             {error && (
                 <div className="p-3 bg-red-50 border border-red-100 rounded-lg flex items-start gap-2 text-sm text-red-600">
                     <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />

@@ -1,150 +1,100 @@
-/* 
-   DESIGN SYSTEM - NEW GENRE STUDIO AESTHETIC 
-   ------------------------------------------
-*/
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  /* --- COLORS (Light Mode Default) --- */
-  --c-bg: #ffffff;
-  --c-text-primary: #111111;
-  --c-text-secondary: #666666;
-  --c-text-tertiary: #999999;
-  
-  /* Accents */
-  --c-accent-1: #eef2ff;
-  --c-accent-2: #fdf4ff;
-  --c-accent-3: #f9fafb;
-  
-  /* --- TYPOGRAPHY --- */
-  --font-sans: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
-  --tracking-tight: -0.03em;
-  --tracking-normal: -0.01em;
+@layer base {
+  :root {
+    /* Light Mode - Clean Swiss Style */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 10%;
+    
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+    
+    --primary: 0 0% 0%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 10%;
+    
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 10%;
+    
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
 
-  /* --- MOTION --- */
-  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --duration-base: 0.6s;
-  
-  /* --- GRADIENTS --- */
-  --g-mesh: radial-gradient(at 0% 0%, var(--c-accent-1) 0px, transparent 40%),
-            radial-gradient(at 100% 0%, var(--c-accent-2) 0px, transparent 40%),
-            radial-gradient(at 100% 100%, var(--c-accent-1) 0px, transparent 40%),
-            radial-gradient(at 0% 100%, var(--c-accent-3) 0px, transparent 40%);
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 0 0% 10%;
+    
+    --radius: 0rem;
+  }
+
+  .dark {
+    /* Dark Mode - High Contrast Neutral (No tint) */
+    --background: 0 0% 5%; /* Near Black */
+    --foreground: 0 0% 95%; /* Off White */
+    
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 95%;
+    
+    --popover: 0 0% 5%;
+    --popover-foreground: 0 0% 95%;
+    
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 0%;
+    
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 95%;
+    
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 60%;
+    
+    --accent: 0 0% 12%;
+    --accent-foreground: 0 0% 95%;
+    
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 95%;
+    
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 0 0% 95%;
+  }
 }
 
-/* Dark Mode Overrides */
-.dark {
-  /* Using a very deep charcoal/navy tint instead of pure black for depth */
-  --c-bg: #050505; 
-  --c-text-primary: #f5f5f5;
-  --c-text-secondary: #a3a3a3;
-  --c-text-tertiary: #525252;
-
-  --c-accent-1: #0f0f11;
-  --c-accent-2: #131316;
-  --c-accent-3: #0a0a0a;
-  
-  --g-mesh: radial-gradient(at 0% 0%, #111116 0px, transparent 50%),
-            radial-gradient(at 100% 0%, #1a1a20 0px, transparent 50%),
-            radial-gradient(at 100% 100%, #111116 0px, transparent 50%),
-            radial-gradient(at 0% 100%, #000000 0px, transparent 50%);
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-mono;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-mono tracking-tight;
+  }
 }
 
-/* GLOBAL RESET & BASE */
-html {
-  scroll-behavior: smooth;
+/* Custom Utilities */
+.glass {
+    @apply bg-background/80 backdrop-blur-md border-b border-border;
 }
 
-body {
-  background-color: var(--c-bg);
-  color: var(--c-text-primary);
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
-  transition: background-color 0.5s ease, color 0.5s ease;
-}
-
-::selection {
-  background: var(--c-text-primary);
-  color: var(--c-bg);
-}
-
-/* SCROLLBAR (Minimal) */
+/* Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
+    width: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+    @apply bg-background;
 }
 ::-webkit-scrollbar-thumb {
-  background: #e5e5e5;
-  border-radius: 3px;
-}
-.dark ::-webkit-scrollbar-thumb {
-  background: #262626;
+    @apply bg-muted-foreground/20;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #d4d4d4;
-}
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #404040;
-}
-
-/* 
-   ANIMATED BACKGROUND 
-   Updated to use CSS variables for color adaptability
-*/
-.gradient-bg {
-  background-color: var(--c-bg);
-  background-image: var(--g-mesh);
-  background-size: 120% 120%;
-  background-attachment: fixed;
-  animation: gradient-drift 30s ease-in-out infinite alternate;
-  transition: background-color 0.5s ease;
-}
-
-@keyframes gradient-drift {
-  0% { background-position: 0% 0%; }
-  100% { background-position: 100% 100%; }
-}
-
-/* TYPOGRAPHY ENHANCEMENTS */
-h1, h2, h3, h4, h5, h6 {
-  letter-spacing: var(--tracking-tight);
-}
-
-p {
-  letter-spacing: var(--tracking-normal);
-}
-
-/* COMPONENT UTILITIES */
-
-/* Glass Effect */
-.glass {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(0,0,0,0.03);
-}
-.dark .glass {
-  background: rgba(10, 10, 10, 0.6);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-}
-
-/* Hover Reveals */
-.hover-reveal-image {
-  transform: scale(1);
-  transition: transform 0.8s var(--ease-expo), opacity 0.5s ease;
-}
-.group:hover .hover-reveal-image {
-  transform: scale(1.05);
-}
-
-/* Custom Cursor Reset for non-pointer devices */
-@media (pointer: coarse) {
-  body, a, button {
-    cursor: auto !important;
-  }
+    @apply bg-muted-foreground/40;
 }

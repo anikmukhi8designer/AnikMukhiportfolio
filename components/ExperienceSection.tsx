@@ -8,46 +8,48 @@ const ExperienceSection: React.FC = () => {
   const publishedExperience = experience.filter(e => e.published);
 
   return (
-    <section className="py-24 border-t border-neutral-200 dark:border-white/5 bg-transparent relative z-10 transition-colors duration-500">
-      <div className="max-w-screen-xl mx-auto px-4 md:px-8">
+    <section className="py-24 border-t border-border bg-background relative z-10">
+      <div className="max-w-screen-2xl mx-auto px-4 md:px-6">
         
         {/* Section Header */}
-        <div className="flex flex-col md:flex-row md:items-baseline justify-between mb-20 gap-4">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+        <div className="flex flex-col md:flex-row md:items-baseline justify-between mb-20 gap-4 border-b border-border pb-6">
+            <h2 className="text-3xl font-bold tracking-tight text-foreground">
                 Experience
             </h2>
-            <a href={config.resumeUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-neutral-900 dark:text-white hover:text-neutral-500 dark:hover:text-neutral-300 transition-colors">
-                Download Resume <ArrowUpRight className="w-4 h-4" />
+            <a href={config.resumeUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-primary hover:text-foreground transition-colors">
+                [ Download Resume <ArrowUpRight className="w-3 h-3" /> ]
             </a>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-24">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
           {/* Introduction */}
           <div className="lg:col-span-4">
-            <h3 className="text-2xl md:text-3xl font-medium text-neutral-900 dark:text-white leading-tight sticky top-32 transition-colors">
-              Over the past 5 years, I've worked with startups and agencies to build scalable design systems and products.
+            <h3 className="text-xl font-mono text-muted-foreground sticky top-32 leading-relaxed">
+              // Over the past 5 years, I've worked with startups and agencies to build scalable design systems and products.
             </h3>
           </div>
           
-          {/* Experience List */}
-          <div className="lg:col-span-8 flex flex-col gap-12">
+          {/* Experience List - Tabular Style */}
+          <div className="lg:col-span-8 flex flex-col border-t border-border">
             {publishedExperience.map((job, index) => (
               <motion.div 
                 key={job.id} 
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 10 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-50px" }}
-                transition={{ duration: 0.6, delay: index * 0.1, ease: "easeOut" }}
-                className="group flex flex-col md:flex-row gap-6 md:gap-12 pb-12 border-b border-neutral-200 dark:border-white/10 last:border-0"
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: index * 0.1 }}
+                className="group grid grid-cols-1 md:grid-cols-12 gap-6 py-8 border-b border-border hover:bg-secondary/20 transition-colors px-4 -mx-4"
               >
-                <div className="md:w-1/3 pt-1">
-                  <span className="text-xs font-bold uppercase tracking-widest text-neutral-400 dark:text-neutral-500 block mb-2">{job.period}</span>
-                  <h4 className="text-xl font-bold text-neutral-900 dark:text-white">{job.company}</h4>
+                <div className="md:col-span-3">
+                  <span className="text-xs font-mono text-muted-foreground block">{job.period}</span>
                 </div>
                 
-                <div className="md:w-2/3">
-                  <h5 className="text-lg font-medium text-neutral-800 dark:text-neutral-200 mb-4">{job.role}</h5>
-                  <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed text-base">
+                <div className="md:col-span-9">
+                  <div className="flex justify-between items-baseline mb-2">
+                    <h4 className="text-lg font-bold text-foreground group-hover:text-primary transition-colors">{job.company}</h4>
+                    <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{job.role}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
                     {job.description}
                   </p>
                 </div>
