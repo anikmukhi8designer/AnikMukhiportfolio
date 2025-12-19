@@ -3,18 +3,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Project, ContentBlock, BlockType } from '../../types';
 import { 
   ArrowLeft, Save, Trash2, Image as ImageIcon, 
-  Type, Grid, PlayCircle, Code, Aperture, MousePointer2, Box,
-  Settings, Upload, Loader2, Check, X, LayoutTemplate,
-  ChevronUp, ChevronDown, Plus, Heading1, Heading2, AlignLeft, Columns,
-  Maximize2, Type as TypeIcon, Eye
+  Type, Layout, Settings, Upload, Loader2, Check, X, 
+  LayoutTemplate, ChevronUp, ChevronDown, Plus, 
+  Heading1, Heading2, AlignLeft, Columns, Tag, Users, AlertCircle
 } from 'lucide-react';
-// Added missing motion and AnimatePresence imports from framer-motion
 import { motion, AnimatePresence } from 'framer-motion';
 import { useData } from '../../contexts/DataContext';
 
 interface BlockEditorProps {
   project: Project;
-  onSave: (updatedProject: Project) => void;
+  onSave: (updatedProject: Project) => Promise<void> | void;
   onBack: () => void;
 }
 
@@ -43,11 +41,12 @@ const getGitHubConfig = () => ({
 });
 
 const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) => {
-  const { isSaving } = useData();
+  const { isSaving, projects } = useData();
   const [formData, setFormData] = useState<Project>(project);
   const [blocks, setBlocks] = useState<ContentBlock[]>(project.content || []);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [pendingUploadHandler, setPendingUploadHandler] = useState<((url: string) => void) | null>(null);
@@ -58,7 +57,16 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
   const handleMetaChange = (field: keyof Project, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setHasUnsavedChanges(true);
+    setSaveError(null);
   };
+
+  const handleIdChange = (newId: string) => {
+    // Clean slug: lowercase, replace spaces/special with dashes
+    const slug = newId.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    handleMetaChange('id', slug);
+  };
+
+  const isIdUnique = !projects.some(p => p.id === formData.id && p.id !== project.id);
 
   const generateId = () => `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -81,6 +89,7 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
 
     setBlocks(newBlocks);
     setHasUnsavedChanges(true);
+    setSaveError(null);
     setTimeout(() => {
         blockInputRefs.current[newBlock.id]?.focus();
     }, 100);
@@ -89,12 +98,14 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
   const updateBlock = (id: string, content: string, caption?: string, secondaryContent?: string) => {
     setBlocks(blocks.map(b => b.id === id ? { ...b, content, caption, secondaryContent } : b));
     setHasUnsavedChanges(true);
+    setSaveError(null);
   };
 
   const deleteBlock = (id: string) => {
     if(!confirm("Remove this block?")) return;
     setBlocks(blocks.filter(b => b.id !== id));
     setHasUnsavedChanges(true);
+    setSaveError(null);
     setSelectedBlockId(null);
   };
 
@@ -109,13 +120,24 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
     
     setBlocks(newBlocks);
     setHasUnsavedChanges(true);
+    setSaveError(null);
   };
 
   const handleSave = async () => {
-    await onSave({ ...formData, content: blocks });
-    setHasUnsavedChanges(false);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
+    if (!isIdUnique) {
+      setSaveError("Project ID must be unique.");
+      return;
+    }
+    
+    setSaveError(null);
+    try {
+        await onSave({ ...formData, content: blocks });
+        setHasUnsavedChanges(false);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+    } catch (e: any) {
+        setSaveError(e.message || "Failed to save project. Check database connection.");
+    }
   };
 
   const triggerUpload = (handler: (url: string) => void) => {
@@ -197,16 +219,16 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
 
           <div className="flex items-center gap-4">
               {hasUnsavedChanges && (
-                <div className="flex items-center gap-2 text-[10px] text-orange-500 font-bold uppercase tracking-widest bg-orange-50 px-3 py-1.5 rounded-full border border-orange-100">
+                <div className="hidden md:flex items-center gap-2 text-[10px] text-orange-500 font-bold uppercase tracking-widest bg-orange-50 px-3 py-1.5 rounded-full border border-orange-100">
                   <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse"></div>
                   Unsaved Changes
                 </div>
               )}
               <button 
                 onClick={handleSave}
-                disabled={isSaving || !hasUnsavedChanges}
+                disabled={isSaving || (!hasUnsavedChanges && formData.id === project.id) || !isIdUnique}
                 className={`px-8 py-2.5 rounded-full text-sm font-bold shadow-md transition-all flex items-center gap-2 min-w-[120px] justify-center ${
-                    hasUnsavedChanges 
+                    hasUnsavedChanges || formData.id !== project.id
                     ? 'bg-neutral-900 text-white hover:bg-black hover:scale-105' 
                     : 'bg-neutral-200 text-neutral-400 cursor-not-allowed'
                 }`}
@@ -240,7 +262,7 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
                             )}
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
                                 <div className="bg-white text-black px-6 py-3 rounded-full text-xs font-bold shadow-2xl flex items-center gap-2 transform translate-y-4 group-hover:translate-y-0 transition-transform">
-                                  <Upload className="w-4 h-4" /> Change Background Image
+                                  <Upload className="w-4 h-4" /> Change Hero Image
                                 </div>
                             </div>
                         </>
@@ -291,6 +313,21 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
                         </button>
                     </div>
                 </div>
+
+                {/* Save Error Display */}
+                <AnimatePresence>
+                    {saveError && (
+                        <motion.div 
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="bg-red-50 border-b border-red-100 p-4 flex items-center gap-3 text-red-600 text-sm font-bold"
+                        >
+                            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                            <span>{saveError}</span>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 {/* Content Area */}
                 <div className="p-12 md:p-24 space-y-16">
@@ -406,31 +443,82 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
         </div>
 
         {/* Sidebar Settings */}
-        <aside className="w-[320px] bg-white border-l border-neutral-200 flex flex-col shadow-2xl z-[50]">
+        <aside className="w-[320px] bg-white border-l border-neutral-200 flex flex-col shadow-2xl z-[50] overflow-y-auto">
           <div className="p-8 border-b border-neutral-100">
               <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-neutral-400 mb-8 flex items-center gap-3">
-                  <Settings className="w-3.5 h-3.5" /> Project Metadata
+                  <Settings className="w-3.5 h-3.5" /> Project Identity
               </h2>
               <div className="space-y-8">
+                  {/* Project ID / Slug Editor */}
+                  <div className="space-y-3">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Project Slug (ID)</label>
+                      <div className="relative">
+                          <input 
+                            value={formData.id} 
+                            onChange={e => handleIdChange(e.target.value)} 
+                            className={`w-full p-4 bg-neutral-50 border rounded-xl text-xs font-mono focus:ring-2 focus:ring-neutral-900 focus:outline-none transition-colors ${
+                                !isIdUnique ? 'border-red-500 bg-red-50 text-red-700' : 'border-neutral-200'
+                            }`}
+                            placeholder="my-unique-slug"
+                          />
+                          {!isIdUnique && (
+                              <p className="mt-1 text-[9px] text-red-500 font-bold flex items-center gap-1">
+                                  <X className="w-2.5 h-2.5" /> This ID is already taken
+                              </p>
+                          )}
+                          {isIdUnique && formData.id !== project.id && (
+                              <p className="mt-1 text-[9px] text-blue-500 font-bold flex items-center gap-1">
+                                  <Check className="w-2.5 h-2.5" /> Will replace old ID on save
+                              </p>
+                          )}
+                      </div>
+                  </div>
+
                   <div className="space-y-3">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Grid Thumbnail</label>
                       <div 
                         onClick={() => triggerUpload(url => handleMetaChange('thumb', url))}
                         className="w-full aspect-[4/3] bg-neutral-50 border border-neutral-200 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-neutral-100 transition-colors overflow-hidden group shadow-sm"
                       >
-                          {formData.thumb ? <img src={formData.thumb} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"/> : <ImageIcon className="w-8 h-8 text-neutral-300"/>}
+                          {formData.thumb ? <img src={formData.thumb} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="thumb"/> : <ImageIcon className="w-8 h-8 text-neutral-300"/>}
                       </div>
                   </div>
+
+                  <div className="space-y-3">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 flex items-center gap-2">
+                        <Tag className="w-3 h-3" /> Tags (Comma separated)
+                      </label>
+                      <input 
+                        value={formData.tags?.join(', ') || ''} 
+                        onChange={e => handleMetaChange('tags', e.target.value.split(',').map(t => t.trim()))} 
+                        className="w-full p-4 bg-neutral-50 border border-neutral-200 rounded-xl text-xs focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+                        placeholder="Web, Mobile, UX"
+                      />
+                  </div>
+
+                  <div className="space-y-3">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 flex items-center gap-2">
+                        <Users className="w-3 h-3" /> Roles (Comma separated)
+                      </label>
+                      <input 
+                        value={formData.roles?.join(', ') || ''} 
+                        onChange={e => handleMetaChange('roles', e.target.value.split(',').map(r => r.trim()))} 
+                        className="w-full p-4 bg-neutral-50 border border-neutral-200 rounded-xl text-xs focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+                        placeholder="Product Designer, Developer"
+                      />
+                  </div>
+
                   <div className="space-y-3">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Brief Overview</label>
                       <textarea 
                         value={formData.description} 
                         onChange={e => handleMetaChange('description', e.target.value)} 
                         rows={4}
-                        className="w-full p-4 bg-neutral-50 border border-neutral-200 rounded-xl text-xs leading-relaxed focus:ring-2 focus:ring-neutral-900 focus:outline-none focus:bg-white transition-all"
+                        className="w-full p-4 bg-neutral-50 border border-neutral-200 rounded-xl text-xs leading-relaxed focus:ring-2 focus:ring-neutral-900 focus:outline-none focus:bg-white transition-all resize-none"
                         placeholder="Write a clear summary..."
                       />
                   </div>
+                  
                   <div className="space-y-3">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Live URL</label>
                       <input 
@@ -443,17 +531,20 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
               </div>
           </div>
           
-          <div className="p-8 flex-1">
+          <div className="p-8 pb-12">
             <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-neutral-400 mb-6">Actions</h2>
             <div className="space-y-3">
               <button 
                 onClick={handleSave}
-                disabled={isSaving || !hasUnsavedChanges}
+                disabled={isSaving || (!hasUnsavedChanges && formData.id === project.id) || !isIdUnique}
                 className="w-full py-4 bg-neutral-900 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-3 hover:bg-black transition-all disabled:opacity-50 shadow-lg"
               >
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Check className="w-4 h-4" />}
-                Save Draft
+                {formData.id !== project.id ? 'Save and Rename' : 'Save Changes'}
               </button>
+              {saveError && (
+                <p className="text-[10px] text-red-500 font-bold mt-2 text-center">{saveError}</p>
+              )}
             </div>
           </div>
         </aside>

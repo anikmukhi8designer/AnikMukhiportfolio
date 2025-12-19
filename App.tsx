@@ -27,7 +27,7 @@ const AdminRoot = () => {
   const [session, setSession] = useState<any>(null);
   const [view, setView] = useState<'dashboard' | 'editor'>('dashboard');
   const [editorProjectId, setEditorProjectId] = useState<string | null>(null);
-  const { projects, updateProject } = useData();
+  const { projects, updateProject, deleteProject } = useData();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
@@ -43,15 +43,24 @@ const AdminRoot = () => {
 
   if (view === 'editor' && editorProjectId) {
       const project = projects.find(p => p.id === editorProjectId);
-      if (!project) return <div>Loading Project...</div>;
+      if (!project) return <div className="p-20 text-center font-mono">Loading Project...</div>;
 
       return (
         <BlockEditor 
             project={project} 
             onSave={async (updated) => {
-                await updateProject(updated.id, updated);
-                setView('dashboard');
-                setEditorProjectId(null);
+                try {
+                    // Rename logic: if the ID changed, delete the old record and create the new one
+                    if (editorProjectId && updated.id !== editorProjectId) {
+                        await deleteProject(editorProjectId);
+                    }
+                    await updateProject(updated.id, updated);
+                    setView('dashboard');
+                    setEditorProjectId(null);
+                } catch (e: any) {
+                    console.error("Save failed:", e);
+                    throw e; // Rethrow so the editor can show the error
+                }
             }} 
             onBack={() => {
                 setView('dashboard');
@@ -195,7 +204,7 @@ const AppContent: React.FC = () => {
               <h2 className="text-4xl md:text-6xl font-bold text-foreground mb-8 tracking-tighter">
                 Let's build<br/>something great.
               </h2>
-              <a href={`mailto:${config.email}`} className="text-2xl md:text-3xl text-primary hover:text-foreground transition-colors underline decoration-2 underline-offset-8 decoration-border hover:decoration-primary">
+              <a href={`mailto:${config.email}`} className="text-2xl md:text-3xl font-bold text-primary hover:text-foreground transition-colors underline decoration-2 underline-offset-8 decoration-border hover:decoration-primary">
                 {config.email}
               </a>
             </div>
