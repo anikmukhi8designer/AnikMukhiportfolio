@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect } from 'react';
-// Added missing Database icon to the imports from lucide-react
 import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, RefreshCw, UserCircle, Check, AlertCircle, Loader2, Rocket, UploadCloud, Copy, X, Database } from 'lucide-react';
 import WorkTable from './WorkTable';
 import ExperienceTable from './ExperienceTable';
@@ -18,7 +17,7 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   const [activeTab, setActiveTab] = useState<'work' | 'experience' | 'skills' | 'clients' | 'settings'>('work');
-  const { resetData, syncData, triggerDeploy, projects, reloadContent, verifyConnection, isLoading, isSaving, isDbEmpty } = useData();
+  const { resetData, syncData, triggerDeploy, projects, reloadContent, verifyConnection, isLoading, isSaving, isDbEmpty, error: dataError } = useData();
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [deployStatus, setDeployStatus] = useState<'idle' | 'deploying' | 'success' | 'error'>('idle');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -29,22 +28,30 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   const [connectionError, setConnectionError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Check for schema issues or data errors passed from DataContext
+    if (dataError && (dataError.includes('titleSize') || dataError.includes('column'))) {
+        setShowSqlModal(true);
+    }
+
     const checkTables = async () => {
         try {
-            const { error } = await supabase.from('projects').select('id').limit(1);
-            if (error && error.code === '42P01') {
-                setShowSqlModal(true);
-            }
-            // Check for specific missing column error
-            if (error && error.message.includes("titleSize")) {
-                setShowSqlModal(true);
+            const { error } = await supabase.from('projects').select('id, titleSize').limit(1);
+            if (error) {
+                // Table doesn't exist
+                if (error.code === '42P01') {
+                    setShowSqlModal(true);
+                }
+                // Specific column missing
+                if (error.message.includes("titleSize") || error.message.includes("column")) {
+                    setShowSqlModal(true);
+                }
             }
         } catch (e) {
             console.error(e);
         }
     };
     checkTables();
-  }, []);
+  }, [dataError]);
 
   useEffect(() => {
       reloadContent();
@@ -126,6 +133,7 @@ create table if not exists projects (
 alter table projects add column if not exists "titleSize" int default 10;
 alter table projects add column if not exists "roles" text[];
 alter table projects add column if not exists "tags" text[];
+alter table projects add column if not exists "githubRepoUrl" text;
 
 create table if not exists experience (
   id text primary key, 
@@ -166,6 +174,9 @@ create table if not exists config (
   "heroHeadline" text, 
   "heroSubheadline" text, 
   "heroDescription" text, 
+  "experienceIntro" text,
+  "seoTitle" text,
+  "seoDescription" text,
   created_at timestamptz default now()
 );
 
@@ -187,11 +198,7 @@ alter table skills enable row level security;
 alter table config enable row level security;
 alter table socials enable row level security;
 
--- 3. DROP EXISTING POLICIES (Optional: Use only if resetting permissions)
--- drop policy if exists "Public read projects" on projects;
--- drop policy if exists "Auth team write projects" on projects;
-
--- 4. CREATE POLICIES (Safely)
+-- 3. CREATE POLICIES (Safely)
 do $$ 
 begin
     if not exists (select 1 from pg_policies where policyname = 'Public read projects') then
@@ -232,6 +239,10 @@ begin
         create policy "Auth team write socials" on socials for all to authenticated using (true) with check (true);
     end if;
 end $$;
+
+-- 4. RELOAD SCHEMA CACHE
+-- This is critical to fix the "Could not find column in schema cache" error
+NOTIFY pgrst, 'reload schema';
 
 -- 5. SEED INITIAL CONFIG DATA
 insert into config (id, email, "heroHeadline", "heroSubheadline", "heroDescription") 
@@ -329,7 +340,7 @@ on conflict (id) do nothing;
                       <div className="p-6 border-b border-neutral-200 flex justify-between items-center bg-white flex-shrink-0">
                           <div>
                             <h3 className="text-lg font-bold text-neutral-900">Database Update Required</h3>
-                            <p className="text-xs text-neutral-500 mt-1">Run this script in your Supabase SQL editor to add missing columns like "titleSize".</p>
+                            <p className="text-xs text-neutral-500 mt-1">Run this script in your Supabase SQL editor to add missing columns like "titleSize" and refresh the cache.</p>
                           </div>
                           <button onClick={() => setShowSqlModal(false)} className="p-2 hover:bg-neutral-100 rounded-full">
                               <X className="w-5 h-5 text-neutral-500" />
@@ -347,6 +358,10 @@ on conflict (id) do nothing;
                                   {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                                   {copied ? 'Copied!' : 'Copy SQL'}
                               </button>
+                          </div>
+                          <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700 flex gap-2">
+                             <AlertCircle className="w-4 h-4 shrink-0" />
+                             <p><strong>Important:</strong> After running this in Supabase, the <code>NOTIFY pgrst</code> command will force the app to recognize the new columns immediately.</p>
                           </div>
                       </div>
                       <div className="p-6 bg-white flex justify-end gap-3 flex-shrink-0">
@@ -424,6 +439,24 @@ on conflict (id) do nothing;
       </header>
 
       <main className="flex-grow p-4 md:p-8 max-w-7xl mx-auto w-full overflow-hidden flex flex-col">
+        {dataError && (
+             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-4 animate-in slide-in-from-top-4">
+                <AlertCircle className="w-6 h-6 text-red-600 shrink-0" />
+                <div>
+                    <h3 className="text-sm font-bold text-red-900">Database Synchronization Error</h3>
+                    <p className="text-xs text-red-700 mt-1 leading-relaxed">
+                        {dataError}
+                    </p>
+                    <button 
+                        onClick={() => setShowSqlModal(true)}
+                        className="mt-3 text-xs font-bold underline text-red-800 hover:text-red-900"
+                    >
+                        View Fix Instructions
+                    </button>
+                </div>
+             </div>
+        )}
+
         {!connectionError && isDbEmpty && (
             <div className="mb-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
                 <div className="flex gap-4">

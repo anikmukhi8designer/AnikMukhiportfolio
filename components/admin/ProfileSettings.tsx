@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Save, Plus, Trash2, Loader2, Check, Database, AlertTriangle, Wifi, ExternalLink, Globe, Search, Monitor, Info } from 'lucide-react';
+import { Save, Plus, Trash2, Loader2, Check, Database, AlertTriangle, Wifi, ExternalLink, Globe, Search, Monitor, Info, Share2 } from 'lucide-react';
 
 const ProfileSettings: React.FC = () => {
   const { config, socials, updateConfig, updateSocials, isSaving, verifyConnection } = useData();
@@ -85,10 +85,10 @@ const ProfileSettings: React.FC = () => {
   };
 
   return (
-    <div className="space-y-12 max-w-4xl pb-24 font-sans">
+    <div className="space-y-12 max-w-5xl pb-24 font-sans">
       
       {/* Header Actions */}
-      <div className="flex justify-between items-center sticky top-0 bg-neutral-100 py-4 z-10 border-b border-neutral-200/50">
+      <div className="flex justify-between items-center sticky top-0 bg-neutral-100/80 backdrop-blur-md py-4 z-50 border-b border-neutral-200/50 -mx-4 px-4 md:-mx-8 md:px-8">
           <h2 className="text-2xl font-bold text-neutral-900">Settings</h2>
           <button 
             onClick={saveChanges}
@@ -200,66 +200,109 @@ const ProfileSettings: React.FC = () => {
       </section>
 
       {/* SEO Section Configuration */}
-      <section className="space-y-6 bg-white p-6 rounded-xl border border-neutral-200 shadow-sm">
+      <section className="space-y-6 bg-white p-8 rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
         <div className="flex justify-between items-center border-b border-neutral-100 pb-4">
             <h3 className="text-lg font-bold flex items-center gap-2">
-                <Globe className="w-5 h-5 text-neutral-400" /> Search Engine Optimization (SEO)
+                <Globe className="w-5 h-5 text-neutral-400" /> Search & Social Optimization
             </h3>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="space-y-6">
-                <div className="space-y-2">
-                    <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Search Title (Meta Title)</label>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            {/* INPUTS */}
+            <div className="space-y-8">
+                <div className="space-y-3">
+                    <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest flex items-center gap-2">
+                      Meta Title
+                      <span className={`text-[10px] ml-auto ${localConfig.seoTitle?.length && localConfig.seoTitle.length > 60 ? 'text-red-500' : 'text-neutral-400'}`}>
+                        {localConfig.seoTitle?.length || 0} / 60
+                      </span>
+                    </label>
                     <input 
                         type="text" 
                         value={localConfig.seoTitle || ""}
                         onChange={(e) => handleConfigChange('seoTitle', e.target.value)}
-                        className="w-full px-4 py-2 bg-neutral-50 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-neutral-900 focus:outline-none focus:bg-white transition-all text-sm"
-                        placeholder="Mukhi Anik | Portfolio"
+                        className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl focus:ring-2 focus:ring-neutral-900 focus:outline-none focus:bg-white transition-all text-sm font-medium"
+                        placeholder="Mukhi Anik | Product Designer"
                     />
-                    <div className="flex justify-between">
-                         <span className="text-[10px] text-neutral-400 uppercase font-bold">Characters: {localConfig.seoTitle?.length || 0}</span>
-                         <span className={`text-[10px] uppercase font-bold ${localConfig.seoTitle?.length && localConfig.seoTitle.length > 60 ? 'text-red-500' : 'text-neutral-400'}`}>Recommended: &lt; 60</span>
-                    </div>
                 </div>
 
-                <div className="space-y-2">
-                    <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Search Description (Meta Description)</label>
+                <div className="space-y-3">
+                    <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest flex items-center gap-2">
+                      Meta Description
+                      <span className={`text-[10px] ml-auto ${localConfig.seoDescription?.length && localConfig.seoDescription.length > 160 ? 'text-red-500' : 'text-neutral-400'}`}>
+                        {localConfig.seoDescription?.length || 0} / 160
+                      </span>
+                    </label>
                     <textarea 
                         value={localConfig.seoDescription || ""}
                         onChange={(e) => handleConfigChange('seoDescription', e.target.value)}
-                        rows={4}
-                        className="w-full px-4 py-2 bg-neutral-50 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-neutral-900 focus:outline-none focus:bg-white transition-all text-sm resize-none"
-                        placeholder="Write a clear summary for search results..."
+                        rows={5}
+                        className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl focus:ring-2 focus:ring-neutral-900 focus:outline-none focus:bg-white transition-all text-sm resize-none leading-relaxed"
+                        placeholder="Brief summary for search engines..."
                     />
-                    <div className="flex justify-between">
-                         <span className="text-[10px] text-neutral-400 uppercase font-bold">Characters: {localConfig.seoDescription?.length || 0}</span>
-                         <span className={`text-[10px] uppercase font-bold ${localConfig.seoDescription?.length && localConfig.seoDescription.length > 160 ? 'text-red-500' : 'text-neutral-400'}`}>Recommended: &lt; 160</span>
+                </div>
+
+                <div className="bg-blue-50/80 p-5 rounded-2xl flex gap-4 items-start border border-blue-100">
+                    <div className="p-2 bg-white rounded-lg shadow-sm">
+                        <Search className="w-4 h-4 text-blue-600" />
                     </div>
+                    <p className="text-[11px] text-blue-800/80 leading-relaxed font-medium">
+                        Optimizing these tags directly influences your click-through rate (CTR) from Google results and the clarity of your brand when shared on social platforms.
+                    </p>
                 </div>
             </div>
 
-            {/* Google Search Preview */}
-            <div className="space-y-4">
-                <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider block">Google Search Preview</label>
-                <div className="p-6 bg-white border border-neutral-100 rounded-xl shadow-inner space-y-1.5 font-sans cursor-default">
-                    <div className="flex items-center gap-2 text-xs text-neutral-600 mb-1">
-                        <div className="w-5 h-5 bg-neutral-100 rounded-full flex items-center justify-center text-[10px] font-bold">M</div>
-                        <span>mukhianik.com › portfolio</span>
+            {/* PREVIEWS */}
+            <div className="space-y-10">
+                {/* Google Preview */}
+                <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-neutral-400 uppercase tracking-widest">
+                      <Search className="w-3 h-3" /> Google Search Preview
                     </div>
-                    <h4 className="text-xl text-[#1a0dab] hover:underline transition-all line-clamp-1">
-                        {localConfig.seoTitle || localConfig.heroHeadline || "Page Title Placeholder"}
-                    </h4>
-                    <p className="text-sm text-neutral-600 line-clamp-3 leading-relaxed">
-                        {localConfig.seoDescription || localConfig.heroDescription || "This is a preview of how your page description will appear in search results. Start typing to see it update live."}
-                    </p>
+                    <div className="p-6 bg-white border border-neutral-100 rounded-2xl shadow-xl shadow-neutral-100/50 space-y-2 font-sans cursor-default group transition-all hover:border-neutral-200">
+                        <div className="flex items-center gap-3 text-xs text-neutral-600 mb-2">
+                            <div className="w-7 h-7 bg-neutral-100 rounded-full flex items-center justify-center text-[11px] font-bold border border-neutral-200">
+                                M
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-[13px] font-medium text-neutral-900 leading-none">Mukhi Anik</span>
+                                <span className="text-[11px] text-neutral-500 mt-0.5">mukhianik.com › portfolio</span>
+                            </div>
+                        </div>
+                        <h4 className="text-[20px] text-[#1a0dab] group-hover:underline transition-all line-clamp-1 leading-tight mb-1">
+                            {localConfig.seoTitle || localConfig.heroHeadline || "Mukhi Anik | Product Designer"}
+                        </h4>
+                        <p className="text-[14px] text-neutral-600 line-clamp-3 leading-snug">
+                            {localConfig.seoDescription || localConfig.heroDescription || "Product designer building digital products that blend aesthetics with function. Specializing in SaaS, Fintech, and high-end web experiences."}
+                        </p>
+                    </div>
                 </div>
-                <div className="bg-blue-50 p-4 rounded-lg flex gap-3 items-start">
-                    <Search className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                    <p className="text-[11px] text-blue-700 leading-relaxed font-medium">
-                        Optimizing your SEO titles and descriptions helps improve your site's visibility on Google and Bing, and controls what people see when you share your link on social media.
-                    </p>
+
+                {/* Social Media Preview */}
+                <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-neutral-400 uppercase tracking-widest">
+                      <Share2 className="w-3 h-3" /> Social Share Card
+                    </div>
+                    <div className="bg-white border border-neutral-200 rounded-2xl overflow-hidden shadow-2xl shadow-neutral-100/50 group transition-all">
+                        <div className="aspect-[1.91/1] bg-neutral-100 relative overflow-hidden">
+                            {config.heroImage ? (
+                                <img src={config.heroImage} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt="OG Preview" />
+                            ) : (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <Globe className="w-12 h-12 text-neutral-300 opacity-20" />
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 border-t border-neutral-100 space-y-1">
+                            <div className="text-[10px] text-neutral-400 uppercase font-bold tracking-wider">MUKHIANIK.COM</div>
+                            <h5 className="text-sm font-bold text-neutral-900 line-clamp-1">
+                                {localConfig.seoTitle || localConfig.heroHeadline || "Mukhi Anik | Product Designer"}
+                            </h5>
+                            <p className="text-xs text-neutral-500 line-clamp-2 leading-relaxed">
+                                {localConfig.seoDescription || localConfig.heroDescription || "Portfolio of Mukhi Anik - Designer & Developer."}
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
