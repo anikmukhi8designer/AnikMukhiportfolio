@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, RefreshCw, UserCircle, Check, AlertCircle, Loader2, Rocket, Database, UploadCloud, Copy, X } from 'lucide-react';
+import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, RefreshCw, UserCircle, Check, AlertCircle, Loader2, Rocket, UploadCloud, Copy, X } from 'lucide-react';
 import WorkTable from './WorkTable';
 import ExperienceTable from './ExperienceTable';
 import SkillsTable from './SkillsTable';
@@ -26,11 +27,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   const [errorMessage, setErrorMessage] = useState('');
   const [connectionError, setConnectionError] = useState<string | null>(null);
 
-  // Check if tables exist on mount to guide user setup
   useEffect(() => {
     const checkTables = async () => {
-        // Quick check if 'projects' table exists by selecting 1 row.
-        // If error code is '42P01' (undefined_table), we show the setup modal.
         try {
             const { error } = await supabase.from('projects').select('id').limit(1);
             if (error && error.code === '42P01') {
@@ -69,7 +67,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
     try {
         await syncData("Manual Sync from Admin Dashboard");
         setSyncStatus('success');
-        // Reload content to ensure frontend is in sync with backend state if needed
         await reloadContent();
         setTimeout(() => setSyncStatus('idle'), 4000);
     } catch (e: any) {
@@ -99,12 +96,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
       }
   };
 
-  // Robust SQL that can be re-run safely
-  // Updated for Multi-User (Team) Support: Adds user_id but RLS allows shared team access
   const setupSQL = `-- 1. CREATE TABLES (Multi-User Ready)
 create table if not exists projects (
   id text primary key, 
-  user_id uuid default auth.uid(), -- Multi-user support
+  user_id uuid default auth.uid(), 
   title text, 
   client text, 
   roles text[], 
@@ -181,29 +176,11 @@ alter table skills enable row level security;
 alter table config enable row level security;
 alter table socials enable row level security;
 
--- 3. DROP EXISTING POLICIES (Reset to clean state)
+-- 3. DROP EXISTING POLICIES
 drop policy if exists "Public read projects" on projects;
-drop policy if exists "Auth all projects" on projects;
-drop policy if exists "Enable insert for authenticated users only" on projects;
-drop policy if exists "Individuals can create" on projects;
+drop policy if exists "Auth team write projects" on projects;
 
-drop policy if exists "Public read experience" on experience;
-drop policy if exists "Auth all experience" on experience;
-
-drop policy if exists "Public read clients" on clients;
-drop policy if exists "Auth all clients" on clients;
-
-drop policy if exists "Public read skills" on skills;
-drop policy if exists "Auth all skills" on skills;
-
-drop policy if exists "Public read config" on config;
-drop policy if exists "Auth all config" on config;
-
-drop policy if exists "Public read socials" on socials;
-drop policy if exists "Auth all socials" on socials;
-
--- 4. CREATE POLICIES (Team Mode: Public Read, Auth Write)
--- Allow anyone to read data
+-- 4. CREATE POLICIES
 create policy "Public read projects" on projects for select using (true);
 create policy "Public read experience" on experience for select using (true);
 create policy "Public read clients" on clients for select using (true);
@@ -211,8 +188,6 @@ create policy "Public read skills" on skills for select using (true);
 create policy "Public read config" on config for select using (true);
 create policy "Public read socials" on socials for select using (true);
 
--- Allow ANY authenticated user to Insert/Update/Delete (Team Collaboration)
--- Note: To strictly isolate user data, change 'using (true)' to 'using (auth.uid() = user_id)'
 create policy "Auth team write projects" on projects for all to authenticated using (true) with check (true);
 create policy "Auth team write experience" on experience for all to authenticated using (true) with check (true);
 create policy "Auth team write clients" on clients for all to authenticated using (true) with check (true);
@@ -276,7 +251,6 @@ on conflict (id) do nothing;
 
   return (
     <div className="min-h-screen bg-neutral-100 flex flex-col">
-      {/* Toast Notification */}
       <AnimatePresence>
           {(syncStatus === 'success' || syncStatus === 'error') && (
               <motion.div 
@@ -298,7 +272,6 @@ on conflict (id) do nothing;
           )}
       </AnimatePresence>
 
-      {/* SQL Setup Modal */}
       <AnimatePresence>
           {showSqlModal && (
               <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -317,24 +290,14 @@ on conflict (id) do nothing;
                   >
                       <div className="p-6 border-b border-neutral-200 flex justify-between items-center bg-white flex-shrink-0">
                           <div>
-                            <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2">
-                                <Database className="w-5 h-5 text-blue-600" /> Database Setup Required
-                            </h3>
-                            <p className="text-xs text-neutral-500 mt-1">To update data, you must create the database tables first.</p>
+                            <h3 className="text-lg font-bold text-neutral-900">Database Setup Required</h3>
+                            <p className="text-xs text-neutral-500 mt-1">Run this script in your Supabase SQL editor to create the necessary tables.</p>
                           </div>
                           <button onClick={() => setShowSqlModal(false)} className="p-2 hover:bg-neutral-100 rounded-full">
                               <X className="w-5 h-5 text-neutral-500" />
                           </button>
                       </div>
                       <div className="p-6 bg-neutral-50 flex-grow overflow-auto">
-                           <div className="mb-4 text-sm text-neutral-600 space-y-2">
-                                <p><strong>Instructions:</strong></p>
-                                <ol className="list-decimal pl-4 space-y-1">
-                                    <li>Click <strong>Copy SQL</strong> below.</li>
-                                    <li>Open your <a href="https://supabase.com/dashboard/project/_/sql" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-bold">Supabase SQL Editor</a>.</li>
-                                    <li>Paste the code and click <strong>Run</strong>.</li>
-                                </ol>
-                           </div>
                           <div className="relative">
                               <pre className="bg-neutral-900 text-neutral-300 p-4 rounded-lg text-xs font-mono overflow-auto max-h-[300px] whitespace-pre-wrap">
                                   {setupSQL}
@@ -349,19 +312,11 @@ on conflict (id) do nothing;
                           </div>
                       </div>
                       <div className="p-6 bg-white flex justify-end gap-3 flex-shrink-0">
-                          <a 
-                            href="https://supabase.com/dashboard/project/_/sql" 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="px-4 py-2 bg-white border border-neutral-200 hover:bg-neutral-50 rounded-lg text-sm font-medium text-neutral-700"
-                          >
-                              Open Supabase SQL Editor
-                          </a>
                           <button 
                             onClick={() => setShowSqlModal(false)}
                             className="px-4 py-2 bg-neutral-900 text-white rounded-lg text-sm font-bold hover:bg-neutral-800"
                           >
-                              Done
+                              Close
                           </button>
                       </div>
                   </motion.div>
@@ -369,7 +324,6 @@ on conflict (id) do nothing;
           )}
       </AnimatePresence>
 
-      {/* CMS Header */}
       <header className="bg-white border-b border-neutral-200 sticky top-0 z-[100]">
         <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -380,32 +334,10 @@ on conflict (id) do nothing;
           </div>
           
           <div className="flex items-center gap-3 md:gap-4">
-            {/* Status Indicators */}
-            <div className="hidden md:flex flex-col items-end mr-4">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                    Database Status
-                </span>
-                <div className="flex items-center gap-1.5">
-                    <div className={`w-2 h-2 rounded-full ${!connectionError ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                    <span className={`text-xs font-bold ${!connectionError ? 'text-neutral-900' : 'text-neutral-500'}`}>
-                        {!connectionError ? 'Connected' : 'Error'}
-                    </span>
-                </div>
-            </div>
-            
-            <button
-                onClick={() => setShowSqlModal(true)}
-                className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 border border-blue-100 rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-blue-100 transition-colors"
-                title="View Setup SQL Script"
-            >
-                <Database className="w-3 h-3" /> Setup DB
-            </button>
-
-            {/* Action Buttons */}
             <button 
                 onClick={handleRefresh}
                 className="p-2 text-neutral-500 hover:text-neutral-900 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors"
-                title="Refresh Data from Database"
+                title="Refresh Data"
             >
                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
@@ -421,7 +353,7 @@ on conflict (id) do nothing;
 
             <button 
                 onClick={handleSync}
-                disabled={isSaving || syncStatus === 'syncing' || !!connectionError}
+                disabled={isSaving || syncStatus === 'syncing'}
                 className={`flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-sm min-w-[120px] justify-center ${
                     (isSaving || syncStatus === 'syncing')
                     ? 'bg-neutral-100 text-neutral-400 border border-neutral-200 cursor-not-allowed'
@@ -431,7 +363,7 @@ on conflict (id) do nothing;
                     ? 'bg-red-50 text-red-600 border border-red-200'
                     : 'bg-neutral-900 text-white border border-neutral-900 hover:bg-neutral-800'
                 }`}
-                title="Backup current data to GitHub repository"
+                title="Backup Data"
             >
                 {getButtonContent()}
             </button>
@@ -445,33 +377,16 @@ on conflict (id) do nothing;
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="flex-grow p-4 md:p-8 max-w-7xl mx-auto w-full overflow-hidden flex flex-col">
-        
-        {/* Error Banner */}
-        {connectionError && (
-             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-4">
-                 <div className="p-2 bg-red-100 rounded-lg text-red-600">
-                     <AlertCircle className="w-5 h-5" />
-                 </div>
-                 <div>
-                     <h3 className="text-sm font-bold text-red-800 mb-1">Database Error</h3>
-                     <p className="text-sm text-red-600 mb-3">{connectionError}</p>
-                 </div>
-             </div>
-        )}
-
-        {/* Empty State Banner - Prompt to Seed */}
         {!connectionError && projects.length === 0 && (
             <div className="mb-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
                 <div className="flex gap-4">
                     <div className="p-3 bg-white rounded-xl shadow-sm text-blue-600">
-                        <Database className="w-6 h-6" />
+                        <Rocket className="w-6 h-6" />
                     </div>
                     <div>
                         <h3 className="text-lg font-bold text-blue-900">Database is Empty</h3>
                         <p className="text-blue-700/80 text-sm leading-relaxed max-w-md">
-                            It looks like you just set up the database. 
                             Would you like to populate it with the demo portfolio content?
                         </p>
                     </div>
@@ -486,7 +401,6 @@ on conflict (id) do nothing;
             </div>
         )}
 
-        {/* Tabs - Scrollable on mobile */}
         <div className="flex overflow-x-auto pb-1 mb-8 bg-neutral-200/50 p-1 rounded-xl w-full md:w-fit scrollbar-hide">
             <button 
                 onClick={() => setActiveTab('work')}
@@ -530,21 +444,19 @@ on conflict (id) do nothing;
             </button>
         </div>
 
-        {/* Tab Content */}
         {activeTab === 'work' && <WorkTable onEdit={onEditProject} />}
         {activeTab === 'experience' && <ExperienceTable />}
         {activeTab === 'skills' && <SkillsTable />}
         {activeTab === 'clients' && <ClientsTable />}
         {activeTab === 'settings' && <ProfileSettings />}
 
-        {/* Footer Actions */}
         <div className="mt-12 pt-8 border-t border-neutral-200 flex flex-col sm:flex-row justify-between items-center text-sm text-neutral-500 gap-4">
             <p className="flex items-center gap-2">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                Real-time connection active
+                System active
             </p>
             <button onClick={resetData} className="text-red-500 hover:text-red-700 underline text-xs">
-                Hard Reset Database (Dev Only)
+                Reset Database
             </button>
         </div>
       </main>

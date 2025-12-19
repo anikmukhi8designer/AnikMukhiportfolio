@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import './index.css';
 import { Project } from './types';
@@ -26,7 +27,7 @@ const AdminRoot = () => {
   const [session, setSession] = useState<any>(null);
   const [view, setView] = useState<'dashboard' | 'editor'>('dashboard');
   const [editorProjectId, setEditorProjectId] = useState<string | null>(null);
-  const { projects, updateProject, isLoading } = useData();
+  const { projects, updateProject } = useData();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
@@ -41,10 +42,7 @@ const AdminRoot = () => {
   }
 
   if (view === 'editor' && editorProjectId) {
-      // Find project from context (which is now populated from DB)
       const project = projects.find(p => p.id === editorProjectId);
-      
-      // If project not found (loading or invalid ID), show dashboard or loader
       if (!project) return <div>Loading Project...</div>;
 
       return (
@@ -78,7 +76,6 @@ const AppContent: React.FC = () => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
-  // Theme State - Default to 'dark'
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
         return localStorage.getItem('theme') as 'light' | 'dark' || 'dark';
@@ -86,7 +83,6 @@ const AppContent: React.FC = () => {
     return 'dark';
   });
 
-  // Apply Theme
   useEffect(() => {
     const root = window.document.documentElement;
     if (theme === 'dark') {
@@ -240,9 +236,7 @@ const App: React.FC = () => {
         const handleHashChange = () => {
             setIsAdmin(window.location.hash === '#admin');
         };
-        // Check initial hash
         handleHashChange();
-        // Listen for changes
         window.addEventListener('hashchange', handleHashChange);
         return () => window.removeEventListener('hashchange', handleHashChange);
     }, []);
