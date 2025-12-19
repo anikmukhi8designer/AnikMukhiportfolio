@@ -108,21 +108,51 @@ const AppContent: React.FC = () => {
   
   const { socials, config } = useData();
 
-  // SEO effect
+  // ADVANCED SEO EFFECT
   useEffect(() => {
-    if (config.seoTitle) {
-        document.title = config.seoTitle;
-    }
-    if (config.seoDescription) {
-        let meta = document.querySelector('meta[name="description"]');
-        if (!meta) {
-            meta = document.createElement('meta');
-            meta.setAttribute('name', 'description');
-            document.head.appendChild(meta);
+    const title = config.seoTitle || `${config.heroHeadline} | Mukhi Anik`;
+    const description = config.seoDescription || config.heroDescription;
+    const url = window.location.origin;
+    const image = config.heroImage || '/og-image.jpg'; // Fallback to a static asset if hero is missing
+
+    // 1. Basic Metadata
+    document.title = title;
+    
+    const updateMeta = (name: string, content: string, attr = 'name') => {
+        let el = document.querySelector(`meta[${attr}="${name}"]`);
+        if (!el) {
+            el = document.createElement('meta');
+            el.setAttribute(attr, name);
+            document.head.appendChild(el);
         }
-        meta.setAttribute('content', config.seoDescription);
+        el.setAttribute('content', content);
+    };
+
+    updateMeta('description', description);
+
+    // 2. Open Graph (Facebook / LinkedIn)
+    updateMeta('og:title', title, 'property');
+    updateMeta('og:description', description, 'property');
+    updateMeta('og:url', url, 'property');
+    updateMeta('og:image', image, 'property');
+    updateMeta('og:type', 'website', 'property');
+
+    // 3. Twitter
+    updateMeta('twitter:card', 'summary_large_image');
+    updateMeta('twitter:title', title);
+    updateMeta('twitter:description', description);
+    updateMeta('twitter:image', image);
+
+    // 4. Canonical Link
+    let canonical = document.querySelector('link[rel="canonical"]');
+    if (!canonical) {
+        canonical = document.createElement('link');
+        canonical.setAttribute('rel', 'canonical');
+        document.head.appendChild(canonical);
     }
-  }, [config.seoTitle, config.seoDescription]);
+    canonical.setAttribute('href', url);
+
+  }, [config]);
 
   const { scrollY } = useScroll();
   const heroTextY = useTransform(scrollY, [0, 500], [0, 100]);
@@ -165,7 +195,7 @@ const AppContent: React.FC = () => {
                className="mb-6 flex items-center gap-4"
             >
                 <div className="h-px w-12 bg-primary"></div>
-                <span className="text-xs uppercase tracking-widest text-primary font-bold">Portfolio 2024</span>
+                <span className="text-xs uppercase tracking-widest text-primary font-bold">Portfolio {new Date().getFullYear()}</span>
             </motion.div>
 
             <motion.h1 

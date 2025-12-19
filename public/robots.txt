@@ -1,0 +1,9 @@
+
+User-agent: *
+Allow: /
+
+# Exclude admin routes from search results
+Disallow: /#admin
+Disallow: /admin
+
+Sitemap: https://mukhianik.com/sitemap.xml

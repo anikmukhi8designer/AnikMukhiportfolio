@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useData } from '../contexts/DataContext';
 import { motion } from 'framer-motion';
@@ -63,26 +64,26 @@ const SkillCard: React.FC<SkillCardProps> = ({ item, index }) => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: index * 0.05, duration: 0.4, ease: "easeOut" }}
-            className="group relative flex flex-col items-center justify-center p-6 
-                       bg-card/50
-                       backdrop-blur-xl border border-border
-                       rounded-3xl
+            className="group relative flex flex-col items-center justify-center p-4 md:p-6 
+                       bg-card/40 md:bg-card/50
+                       backdrop-blur-xl border border-border/80 md:border-border
+                       rounded-2xl md:rounded-3xl
                        hover:bg-card 
-                       hover:border-primary/20
-                       hover:shadow-2xl
+                       hover:border-primary/30
+                       hover:shadow-xl
                        transition-all duration-500 ease-out aspect-square cursor-default overflow-hidden"
         >
-            <div className="w-10 h-10 mb-4 flex items-center justify-center relative z-10 transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-150 group-hover:-translate-y-2">
+            <div className="w-8 h-8 md:w-10 md:h-10 mb-3 md:mb-4 flex items-center justify-center relative z-10 transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-125 md:group-hover:scale-150 group-hover:-translate-y-1 md:group-hover:-translate-y-2">
                  {imageUrl ? (
                     <img 
                         src={imageUrl} 
                         alt={item.name} 
                         loading="lazy"
                         className="w-full h-full object-contain drop-shadow-sm 
-                                   filter grayscale opacity-60 
-                                   dark:brightness-0 dark:invert dark:opacity-70
+                                   filter grayscale opacity-50 
+                                   dark:grayscale dark:opacity-60 dark:brightness-125
                                    group-hover:grayscale-0 group-hover:opacity-100 
-                                   dark:group-hover:brightness-100 dark:group-hover:invert-0 dark:group-hover:opacity-100
+                                   dark:group-hover:brightness-100 dark:group-hover:opacity-100
                                    transition-all duration-500"
                         onError={(e) => {
                             e.currentTarget.style.display = 'none';
@@ -102,7 +103,7 @@ const SkillCard: React.FC<SkillCardProps> = ({ item, index }) => {
                 </div>
             </div>
 
-            <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-all duration-300 text-center relative z-10 group-hover:translate-y-1">
+            <span className="text-[9px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground/80 dark:text-muted-foreground group-hover:text-foreground transition-all duration-300 text-center relative z-10 group-hover:translate-y-1">
                 {item.name}
             </span>
 
@@ -119,7 +120,7 @@ const SkillsSection: React.FC = () => {
       <div className="max-w-screen-2xl mx-auto px-4 md:px-6">
         
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-baseline justify-between mb-20 gap-4">
+        <div className="flex flex-col md:flex-row md:items-baseline justify-between mb-12 md:mb-20 gap-4">
             <h2 className="text-3xl md:text-5xl font-medium tracking-tight text-foreground transition-colors">
                 Design & Tech
             </h2>
@@ -128,15 +129,15 @@ const SkillsSection: React.FC = () => {
             </span>
         </div>
 
-        <div className="space-y-24">
+        <div className="space-y-16 md:space-y-24">
             {skills.map((category) => (
                 <div key={category.id}>
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-8 pl-1 transition-colors flex items-center gap-4">
+                    <h3 className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground mb-6 md:mb-8 pl-1 transition-colors flex items-center gap-4">
                         {category.title}
                         <div className="h-px bg-border flex-grow"></div>
                     </h3>
                     
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6">
                         {category.items.map((item, idx) => (
                             <SkillCard key={idx} item={item} index={idx} />
                         ))}
