@@ -4,9 +4,9 @@ export type BlockType = 'paragraph' | 'h1' | 'h2' | 'quote' | 'image' | 'code' |
 export interface ContentBlock {
   id: string;
   type: BlockType;
-  content: string; // For columns, this might be JSON stringified array of strings
+  content: string; 
   caption?: string;
-  secondaryContent?: string; // Used for multi-column or complex blocks
+  secondaryContent?: string; 
 }
 
 export interface Project {
@@ -24,6 +24,7 @@ export interface Project {
   published: boolean;
   images?: string[];
   content?: ContentBlock[];
+  titleSize?: number; // 1 to 10 scale
 }
 
 export interface Experience {

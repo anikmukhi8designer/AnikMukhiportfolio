@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useData } from '../../contexts/DataContext';
 import { Edit2, Trash2, Plus, Loader2, Check, AlertCircle } from 'lucide-react';
@@ -25,7 +26,7 @@ const WorkTable: React.FC<WorkTableProps> = ({ onEdit }) => {
   const showStatus = (type: 'success' | 'error' | 'loading', message: string) => {
     setStatus({ type, message });
     if (type !== 'loading') {
-      setTimeout(() => setStatus({ type: null, message: '' }), 5000); // Extended time for error reading
+      setTimeout(() => setStatus({ type: null, message: '' }), 5000); 
     }
   };
 
@@ -41,18 +42,18 @@ const WorkTable: React.FC<WorkTableProps> = ({ onEdit }) => {
           roles: ["Design"],
           description: "Short description...",
           year: new Date().getFullYear(),
-          heroImage: "https://picsum.photos/1200/800",
+          heroImage: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=2070&auto=format&fit=crop",
           thumb: "https://picsum.photos/800/600",
           tags: ["Tag 1"],
-          published: true, // Set to true so it reflects on site immediately
+          published: true, 
           images: [],
-          content: []
+          content: [],
+          titleSize: 10
         };
         
         await addProject(newProject);
         showStatus('success', 'Project created successfully!');
         
-        // Delay opening editor slightly so user sees the success message
         setTimeout(() => {
             if (onEdit) onEdit(newId);
         }, 500);
@@ -174,7 +175,6 @@ const WorkTable: React.FC<WorkTableProps> = ({ onEdit }) => {
         </div>
       </div>
 
-      {/* Status Toast Notification */}
       {status.message && (
         <div className={`fixed bottom-8 right-8 px-4 py-3 rounded-xl shadow-2xl text-sm font-bold flex items-center gap-3 animate-in slide-in-from-bottom-4 fade-in z-[9999] border backdrop-blur-md ${
             status.type === 'error' ? 'bg-red-50/90 text-red-700 border-red-200' : 

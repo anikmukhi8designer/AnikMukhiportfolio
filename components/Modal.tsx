@@ -49,6 +49,12 @@ const Modal: React.FC<ModalProps> = ({ project, onClose, onProjectClick }) => {
     .filter(p => p.id !== project.id && p.published)
     .slice(0, 2);
 
+  // Dynamic font size based on project.titleSize (1-10 scale)
+  const titleSizeScale = project.titleSize || 10;
+  // Map scale 1-10 to rem values roughly
+  const desktopTitleSize = `${titleSizeScale * 0.8}rem`;
+  const mobileTitleSize = `${titleSizeScale * 0.4}rem`;
+
   return (
     <AnimatePresence mode="wait">
       {project && (
@@ -79,7 +85,7 @@ const Modal: React.FC<ModalProps> = ({ project, onClose, onProjectClick }) => {
                 </button>
             </div>
 
-            {/* Hero Section - Matching Screenshot */}
+            {/* Hero Section */}
             <div className="relative w-full h-[75vh] md:h-[85vh] overflow-hidden bg-muted flex items-center justify-center">
                 <motion.div 
                     className="absolute inset-0 w-full h-full"
@@ -109,7 +115,8 @@ const Modal: React.FC<ModalProps> = ({ project, onClose, onProjectClick }) => {
                             initial={{ opacity: 0, y: 50 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.3, duration: 1, ease: [0.16, 1, 0.3, 1] }}
-                            className="text-6xl md:text-8xl lg:text-[10rem] font-bold text-white tracking-tighter leading-[0.85]"
+                            className="font-bold text-white tracking-tighter leading-[0.85]"
+                            style={{ fontSize: `clamp(3rem, 15vw, ${desktopTitleSize})` }}
                         >
                             {project.title}
                         </motion.h1>
@@ -120,7 +127,7 @@ const Modal: React.FC<ModalProps> = ({ project, onClose, onProjectClick }) => {
             {/* Content Container */}
             <div className="bg-background relative z-10 min-h-screen">
                 
-                {/* Project Metadata Grid - Replicated from Screenshot */}
+                {/* Project Metadata Grid */}
                 <div className="border-b border-border">
                     <div className="max-w-screen-2xl mx-auto grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-border">
                         <div className="p-10 lg:p-14">
@@ -156,7 +163,6 @@ const Modal: React.FC<ModalProps> = ({ project, onClose, onProjectClick }) => {
 
                 {/* Main Content Area */}
                 <div className="max-w-screen-2xl mx-auto">
-                    {/* Intro Block if content is empty */}
                     {!project.content || project.content.length === 0 ? (
                         <div className="grid grid-cols-1 lg:grid-cols-12">
                             <div className="hidden lg:block lg:col-span-2 border-r border-border p-12">
@@ -228,7 +234,6 @@ const Modal: React.FC<ModalProps> = ({ project, onClose, onProjectClick }) => {
                         </div>
                     </div>
                     
-                    {/* Simple Footer */}
                     <footer className="py-24 border-t border-border bg-background">
                         <div className="max-w-screen-2xl mx-auto px-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-24">
