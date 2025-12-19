@@ -1,11 +1,12 @@
 
-export type BlockType = 'paragraph' | 'h1' | 'h2' | 'quote' | 'image' | 'code' | 'divider';
+export type BlockType = 'paragraph' | 'h1' | 'h2' | 'quote' | 'image' | 'code' | 'divider' | 'columns' | 'heavy-text';
 
 export interface ContentBlock {
   id: string;
   type: BlockType;
-  content: string;
+  content: string; // For columns, this might be JSON stringified array of strings
   caption?: string;
+  secondaryContent?: string; // Used for multi-column or complex blocks
 }
 
 export interface Project {
@@ -32,6 +33,7 @@ export interface Experience {
   period: string;
   description: string;
   published: boolean;
+  order?: number;
 }
 
 export interface Client {
@@ -39,6 +41,7 @@ export interface Client {
   name: string;
   logo?: string;
   url?: string;
+  order?: number;
 }
 
 export interface SocialLink {
@@ -46,6 +49,7 @@ export interface SocialLink {
   platform: string;
   url: string;
   label: string;
+  order?: number;
 }
 
 export interface SkillItem {
@@ -58,6 +62,7 @@ export interface SkillCategory {
   id: string;
   title: string;
   items: SkillItem[];
+  order?: number;
 }
 
 export interface GlobalConfig {

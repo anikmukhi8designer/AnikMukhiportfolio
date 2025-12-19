@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ContentBlock } from '../types';
 import { getOptimizedSrc, getOptimizedSrcSet } from '../utils/imageOptimizer';
@@ -16,7 +17,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ blocks }) => {
           case 'h1':
             return (
               <div key={block.id} className="px-8 md:px-24 pt-16 pb-8 max-w-5xl">
-                <h3 className="text-3xl md:text-4xl font-bold text-foreground">
+                <h3 className="text-4xl md:text-6xl font-bold text-foreground tracking-tighter">
                     {block.content}
                 </h3>
               </div>
@@ -30,6 +31,29 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ blocks }) => {
                 </h4>
               </div>
             );
+          case 'heavy-text':
+            return (
+              <div key={block.id} className="px-8 md:px-24 pt-12 pb-12">
+                <p className="text-3xl md:text-5xl lg:text-6xl font-bold text-foreground leading-[1.1] tracking-tight max-w-6xl">
+                    {block.content}
+                </p>
+              </div>
+            );
+          case 'columns':
+            return (
+              <div key={block.id} className="px-8 md:px-24 py-12 grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-24 border-t border-border mt-12">
+                <div className="space-y-4">
+                    <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
+                        {block.content}
+                    </p>
+                </div>
+                <div className="space-y-4">
+                    <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
+                        {block.secondaryContent}
+                    </p>
+                </div>
+              </div>
+            );
           case 'paragraph':
             return (
               <div key={block.id} className="px-8 md:px-24 pb-8 max-w-4xl">
@@ -40,8 +64,8 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ blocks }) => {
             );
           case 'quote':
             return (
-              <div key={block.id} className="px-8 md:px-24 py-16 bg-secondary/30 my-12 border-y border-border">
-                <blockquote className="text-3xl md:text-5xl font-bold text-foreground text-center tracking-tight leading-tight max-w-5xl mx-auto">
+              <div key={block.id} className="px-8 md:px-24 py-24 bg-secondary/30 my-12 border-y border-border">
+                <blockquote className="text-3xl md:text-6xl font-bold text-foreground text-center tracking-tighter leading-none max-w-5xl mx-auto">
                     "{block.content}"
                 </blockquote>
               </div>
@@ -49,18 +73,24 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ blocks }) => {
           case 'image':
             return (
               <figure key={block.id} className="w-full my-12 group">
-                <div className="overflow-hidden">
-                    <img 
-                    src={getOptimizedSrc(block.content, 1400)}
-                    srcSet={getOptimizedSrcSet(block.content)}
-                    sizes="100vw"
-                    loading="lazy"
-                    alt={block.caption || 'Project image'} 
-                    className="w-full h-auto object-cover grayscale-[20%] group-hover:grayscale-0 transition-all duration-700 hover:scale-[1.01]"
-                    />
+                <div className="overflow-hidden bg-muted min-h-[40vh] flex items-center justify-center">
+                    {block.content ? (
+                        <img 
+                            src={getOptimizedSrc(block.content, 1400)}
+                            srcSet={getOptimizedSrcSet(block.content)}
+                            sizes="100vw"
+                            loading="lazy"
+                            alt={block.caption || 'Project image'} 
+                            className="w-full h-auto object-cover grayscale-[20%] group-hover:grayscale-0 transition-all duration-700 hover:scale-[1.01]"
+                        />
+                    ) : (
+                        <div className="text-xs uppercase tracking-widest text-muted-foreground font-bold">
+                            // [ Placeholder Color Block ]
+                        </div>
+                    )}
                 </div>
                 {block.caption && (
-                  <figcaption className="px-8 md:px-24 mt-4 text-xs font-mono text-muted-foreground uppercase tracking-widest flex items-center gap-4">
+                  <figcaption className="px-8 md:px-24 mt-4 text-[10px] font-mono text-muted-foreground uppercase tracking-widest flex items-center gap-4">
                     <span className="h-px w-8 bg-border"></span>
                     {block.caption}
                   </figcaption>

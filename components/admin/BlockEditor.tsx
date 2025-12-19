@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Project, ContentBlock, BlockType } from '../../types';
 import { 
   ArrowLeft, Save, Trash2, Image as ImageIcon, 
   Type, Grid, PlayCircle, Code, Aperture, MousePointer2, Box,
-  Settings, Upload, Loader2, MoreHorizontal, Check, X, LayoutTemplate,
-  ChevronUp, ChevronDown, Plus
+  Settings, Upload, Loader2, Check, X, LayoutTemplate,
+  ChevronUp, ChevronDown, Plus, Heading1, Heading2, AlignLeft, Columns
 } from 'lucide-react';
 
 interface BlockEditorProps {
@@ -70,7 +71,8 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
       id: generateId(),
       type,
       content: '',
-      caption: type === 'code' ? 'javascript' : ''
+      caption: type === 'code' ? 'javascript' : '',
+      secondaryContent: type === 'columns' ? '' : undefined
     };
 
     let newBlocks = [...blocks];
@@ -90,8 +92,8 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
     }, 100);
   };
 
-  const updateBlock = (id: string, content: string, caption?: string) => {
-    setBlocks(blocks.map(b => b.id === id ? { ...b, content, caption } : b));
+  const updateBlock = (id: string, content: string, caption?: string, secondaryContent?: string) => {
+    setBlocks(blocks.map(b => b.id === id ? { ...b, content, caption, secondaryContent } : b));
     setHasUnsavedChanges(true);
   };
 
@@ -129,26 +131,26 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
     const file = e.target.files?.[0];
     if (!file || !pendingUploadHandler) return;
     
-    // Simulate upload or real GitHub upload
-    let token = getGitHubToken();
-    let { owner, repo } = getGitHubConfig();
-
     setIsUploading(true);
 
+    // Simple DataURL fallback if no GitHub keys
+    const token = getGitHubToken();
+    const { owner, repo } = getGitHubConfig();
+
     if (!owner || !repo || !token) {
-         // Demo Fallback
-         setTimeout(() => {
-             const demoUrl = URL.createObjectURL(file);
-             pendingUploadHandler(demoUrl);
-             setPendingUploadHandler(null);
+         const reader = new FileReader();
+         reader.readAsDataURL(file);
+         reader.onload = () => {
+             pendingUploadHandler(reader.result as string);
              setIsUploading(false);
-         }, 1000);
+             setPendingUploadHandler(null);
+         };
          return;
     }
 
     try {
         const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${fileExt}`;
+        const fileName = `${Date.now()}.${fileExt}`;
         const filePath = `public/uploads/${fileName}`;
         
         const reader = new FileReader();
@@ -178,346 +180,203 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
     }
   };
 
-  // --- Components ---
-
-  const EmptyState = () => (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center animate-in fade-in duration-500">
-        <h2 className="text-2xl font-light text-neutral-500 mb-12">Start building your project:</h2>
-        
-        <div className="flex flex-wrap justify-center gap-8 max-w-4xl">
-            {[
-                { label: 'Image', icon: ImageIcon, action: () => insertBlock('image') },
-                { label: 'Text', icon: Type, action: () => insertBlock('paragraph') },
-                { label: 'Photo Grid', icon: Grid, action: () => insertBlock('image') }, // Simplified to image for now
-                { label: 'Video & Audio', icon: PlayCircle, action: () => insertBlock('code') },
-                { label: 'Embed', icon: Code, action: () => insertBlock('code') },
-                { label: 'Lightroom', icon: Aperture, action: () => insertBlock('image') },
-                { label: 'Prototype', icon: MousePointer2, action: () => insertBlock('image') },
-                { label: '3D', icon: Box, action: () => insertBlock('image') },
-            ].map((tool, idx) => (
-                <button 
-                    key={idx}
-                    onClick={tool.action}
-                    className="group flex flex-col items-center gap-4 transition-transform hover:-translate-y-1"
-                >
-                    <div className="w-20 h-20 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shadow-sm group-hover:shadow-md group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
-                        <tool.icon className="w-8 h-8" />
-                    </div>
-                    <span className="text-xs font-bold text-neutral-600 group-hover:text-neutral-900">{tool.label}</span>
-                </button>
-            ))}
-        </div>
-    </div>
-  );
-
   return (
-    <div className="flex h-screen bg-[#F9F9F9] font-sans overflow-hidden">
+    <div className="flex h-screen bg-neutral-100 font-sans overflow-hidden">
       <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={processUpload} />
 
-      {/* 1. Main Canvas Area */}
+      {/* Main Canvas Area */}
       <div className="flex-1 flex flex-col h-full relative">
           
-          {/* Header */}
           <header className="h-16 flex items-center justify-between px-6 bg-white border-b border-neutral-200 z-10 shrink-0">
               <button onClick={onBack} className="flex items-center gap-2 text-neutral-500 hover:text-neutral-900 transition-colors">
                   <ArrowLeft className="w-5 h-5" />
-                  <span className="text-sm font-bold">Back to Dashboard</span>
+                  <span className="text-sm font-bold">Exit Editor</span>
               </button>
               <div className="flex items-center gap-4">
-                  <span className="text-xs text-neutral-400 font-mono">
-                      {hasUnsavedChanges ? 'Unsaved Changes' : 'All Changes Saved'}
-                  </span>
+                  {hasUnsavedChanges && <span className="text-[10px] text-orange-500 font-bold uppercase tracking-widest">Unsaved Draft</span>}
                   <button 
                     onClick={handleSave}
                     className={`px-6 py-2 rounded-full text-sm font-bold shadow-sm transition-all ${
-                        hasUnsavedChanges ? 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow' : 'bg-neutral-200 text-neutral-400 cursor-default'
+                        hasUnsavedChanges ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-neutral-200 text-neutral-400'
                     }`}
                   >
-                    Save Draft
+                    Save Changes
                   </button>
               </div>
           </header>
 
-          {/* Content Scroll Area */}
-          <div className="flex-1 overflow-y-auto" onClick={() => setSelectedBlockId(null)}>
-               {blocks.length === 0 ? (
-                   <EmptyState />
-               ) : (
-                   <div className="max-w-[1000px] mx-auto min-h-screen bg-white shadow-sm my-8 p-8 md:p-16 space-y-8" onClick={(e) => e.stopPropagation()}>
-                        
-                        {/* Title Block (Visual Representation) */}
-                        <div className="group relative border-b border-transparent hover:border-neutral-100 pb-8 mb-12">
-                             <h1 className="text-5xl font-bold tracking-tight text-neutral-900 mb-2">{formData.title}</h1>
-                             <p className="text-xl text-neutral-500">{formData.description}</p>
-                             <button 
-                                onClick={() => setActiveSettingsTab('settings')}
-                                className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 text-xs bg-neutral-100 px-2 py-1 rounded text-neutral-500 hover:text-blue-600"
-                             >
-                                Edit Details
-                             </button>
-                        </div>
+          <div className="flex-1 overflow-y-auto bg-neutral-100 py-12 px-4" onClick={() => setSelectedBlockId(null)}>
+               <div className="max-w-[1000px] mx-auto min-h-screen bg-white shadow-2xl p-12 md:p-20 space-y-12" onClick={(e) => e.stopPropagation()}>
+                    
+                    {/* Header Visualization */}
+                    <div className="border-b border-neutral-100 pb-12">
+                         <h1 className="text-6xl font-bold tracking-tighter text-neutral-900 leading-none">{formData.title}</h1>
+                         <p className="text-xl text-neutral-400 mt-4 max-w-2xl">{formData.description}</p>
+                    </div>
 
-                        {/* Dynamic Blocks */}
-                        {blocks.map((block, index) => (
-                            <div 
-                                key={block.id}
-                                onClick={() => setSelectedBlockId(block.id)}
-                                className={`relative group transition-all rounded-lg p-2 ${selectedBlockId === block.id ? 'ring-2 ring-blue-500 ring-offset-4' : 'hover:bg-neutral-50'}`}
-                            >
-                                {/* Block Controls (Hover) */}
-                                {selectedBlockId === block.id && (
-                                    <div className="absolute -right-12 top-0 flex flex-col gap-1 z-20">
-                                        <button onClick={() => moveBlock(block.id, 'up')} className="p-1.5 bg-white border border-neutral-200 rounded text-neutral-500 hover:text-blue-600 shadow-sm"><ChevronUp className="w-4 h-4"/></button>
-                                        <button onClick={() => moveBlock(block.id, 'down')} className="p-1.5 bg-white border border-neutral-200 rounded text-neutral-500 hover:text-blue-600 shadow-sm"><ChevronDown className="w-4 h-4"/></button>
-                                        <button onClick={() => deleteBlock(block.id)} className="p-1.5 bg-white border border-neutral-200 rounded text-neutral-500 hover:text-red-600 shadow-sm mt-2"><Trash2 className="w-4 h-4"/></button>
-                                    </div>
-                                )}
-
-                                {block.type === 'paragraph' && (
-                                    <textarea
-                                        ref={(el) => { blockInputRefs.current[block.id] = el; }}
-                                        value={block.content}
-                                        onChange={(e) => updateBlock(block.id, e.target.value)}
-                                        placeholder="Start typing..."
-                                        className="w-full bg-transparent border-none p-0 text-lg leading-relaxed focus:ring-0 resize-none"
-                                        rows={Math.max(2, block.content.split('\n').length)}
-                                    />
-                                )}
-
-                                {block.type === 'image' && (
-                                    <div className="w-full">
-                                        {block.content ? (
-                                            <div className="relative group/img">
-                                                <img src={block.content} alt="" className="w-full h-auto" />
-                                                <button 
-                                                    onClick={() => triggerUpload((url) => updateBlock(block.id, url, block.caption))}
-                                                    className="absolute top-4 right-4 bg-white/90 text-neutral-900 px-3 py-1.5 rounded text-xs font-bold opacity-0 group-hover/img:opacity-100 transition-opacity"
-                                                >
-                                                    Replace Image
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <button 
-                                                onClick={() => triggerUpload((url) => updateBlock(block.id, url, block.caption))}
-                                                className="w-full h-64 bg-neutral-50 border-2 border-dashed border-neutral-200 rounded-lg flex flex-col items-center justify-center gap-3 text-neutral-400 hover:border-blue-400 hover:text-blue-500 transition-all"
-                                            >
-                                                {isUploading ? <Loader2 className="w-8 h-8 animate-spin"/> : <ImageIcon className="w-10 h-10"/>}
-                                                <span className="font-bold">Upload Image</span>
-                                            </button>
-                                        )}
-                                        <input 
-                                            value={block.caption || ''}
-                                            onChange={(e) => updateBlock(block.id, block.content, e.target.value)}
-                                            placeholder="Add a caption (optional)"
-                                            className="w-full text-center mt-3 text-sm text-neutral-500 border-none bg-transparent focus:ring-0 italic"
-                                        />
-                                    </div>
-                                )}
-
-                                {block.type === 'code' && (
-                                    <div className="bg-neutral-900 rounded-lg p-6">
-                                        <div className="flex justify-between items-center mb-4 border-b border-neutral-800 pb-2">
-                                            <span className="text-xs font-mono text-neutral-500 uppercase">Code / Embed</span>
-                                            <input 
-                                                value={block.caption || ''}
-                                                onChange={(e) => updateBlock(block.id, block.content, e.target.value)}
-                                                placeholder="Language"
-                                                className="bg-transparent border-none text-right text-xs text-neutral-500 focus:ring-0 w-32"
-                                            />
-                                        </div>
-                                        <textarea
-                                            ref={(el) => { blockInputRefs.current[block.id] = el; }}
-                                            value={block.content}
-                                            onChange={(e) => updateBlock(block.id, e.target.value)}
-                                            placeholder="Paste code or embed script here..."
-                                            className="w-full bg-transparent border-none p-0 text-sm font-mono text-neutral-300 focus:ring-0 resize-none"
-                                            rows={Math.max(4, block.content.split('\n').length)}
-                                        />
-                                    </div>
-                                )}
-                                
-                                {block.type === 'divider' && (
-                                    <div className="flex items-center justify-center py-8 opacity-50">
-                                        <div className="h-px bg-neutral-300 w-full"></div>
-                                        <div className="mx-4 text-neutral-400 text-xs font-mono uppercase">Section Break</div>
-                                        <div className="h-px bg-neutral-300 w-full"></div>
-                                    </div>
-                                )}
-
-                                {/* Hover Insert Trigger */}
-                                <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                                    <button 
-                                        onClick={() => insertBlock('paragraph', block.id)}
-                                        className="bg-blue-600 text-white rounded-full p-1 shadow-md hover:scale-110 transition-transform"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                    </button>
+                    {/* Dynamic Blocks */}
+                    {blocks.map((block) => (
+                        <div 
+                            key={block.id}
+                            onClick={() => setSelectedBlockId(block.id)}
+                            className={`relative group transition-all rounded-xl p-4 ${selectedBlockId === block.id ? 'bg-blue-50/50 ring-2 ring-blue-500' : 'hover:bg-neutral-50'}`}
+                        >
+                            {/* Controls */}
+                            {selectedBlockId === block.id && (
+                                <div className="absolute -right-16 top-0 flex flex-col gap-2 z-20">
+                                    <button onClick={() => moveBlock(block.id, 'up')} className="p-2 bg-white border border-neutral-200 rounded-lg text-neutral-500 hover:text-blue-600 shadow-sm"><ChevronUp className="w-4 h-4"/></button>
+                                    <button onClick={() => moveBlock(block.id, 'down')} className="p-2 bg-white border border-neutral-200 rounded-lg text-neutral-500 hover:text-blue-600 shadow-sm"><ChevronDown className="w-4 h-4"/></button>
+                                    <button onClick={() => deleteBlock(block.id)} className="p-2 bg-white border border-neutral-200 rounded-lg text-neutral-500 hover:text-red-600 shadow-sm mt-4"><Trash2 className="w-4 h-4"/></button>
                                 </div>
-                            </div>
-                        ))}
-                   </div>
-               )}
+                            )}
+
+                            {/* Block Content Inputs */}
+                            {block.type === 'paragraph' && (
+                                <textarea
+                                    ref={(el) => { blockInputRefs.current[block.id] = el; }}
+                                    value={block.content}
+                                    onChange={(e) => updateBlock(block.id, e.target.value)}
+                                    placeholder="Type your paragraph here..."
+                                    className="w-full bg-transparent border-none p-0 text-lg leading-relaxed focus:ring-0 resize-none"
+                                    rows={Math.max(2, block.content.split('\n').length)}
+                                />
+                            )}
+
+                            {block.type === 'heavy-text' && (
+                                <textarea
+                                    ref={(el) => { blockInputRefs.current[block.id] = el; }}
+                                    value={block.content}
+                                    onChange={(e) => updateBlock(block.id, e.target.value)}
+                                    placeholder="Large Bold Statement..."
+                                    className="w-full bg-transparent border-none p-0 text-3xl font-bold tracking-tight leading-tight focus:ring-0 resize-none"
+                                    rows={Math.max(2, block.content.split('\n').length)}
+                                />
+                            )}
+
+                            {block.type === 'columns' && (
+                                <div className="grid grid-cols-2 gap-8">
+                                    <textarea
+                                        value={block.content}
+                                        onChange={(e) => updateBlock(block.id, e.target.value, block.caption, block.secondaryContent)}
+                                        placeholder="Left column text..."
+                                        className="w-full bg-neutral-50/50 border-none p-4 text-sm leading-relaxed focus:ring-2 focus:ring-blue-100 rounded-lg resize-none"
+                                        rows={4}
+                                    />
+                                    <textarea
+                                        value={block.secondaryContent || ''}
+                                        onChange={(e) => updateBlock(block.id, block.content, block.caption, e.target.value)}
+                                        placeholder="Right column text..."
+                                        className="w-full bg-neutral-50/50 border-none p-4 text-sm leading-relaxed focus:ring-2 focus:ring-blue-100 rounded-lg resize-none"
+                                        rows={4}
+                                    />
+                                </div>
+                            )}
+
+                            {(block.type === 'h1' || block.type === 'h2') && (
+                                <input
+                                    ref={(el) => { blockInputRefs.current[block.id] = el; }}
+                                    value={block.content}
+                                    onChange={(e) => updateBlock(block.id, e.target.value)}
+                                    placeholder={block.type === 'h1' ? "Main Heading" : "Subheading"}
+                                    className={`w-full bg-transparent border-none p-0 font-bold focus:ring-0 ${block.type === 'h1' ? 'text-4xl' : 'text-2xl'}`}
+                                />
+                            )}
+
+                            {block.type === 'image' && (
+                                <div className="space-y-4">
+                                    <div 
+                                        onClick={() => triggerUpload((url) => updateBlock(block.id, url, block.caption))}
+                                        className="w-full h-80 bg-neutral-50 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-neutral-100 transition-colors border-2 border-dashed border-neutral-200 overflow-hidden"
+                                    >
+                                        {isUploading ? (
+                                            <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                                        ) : block.content ? (
+                                            <img src={block.content} alt="" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="flex flex-col items-center gap-2">
+                                                <ImageIcon className="w-12 h-12 text-neutral-300" />
+                                                <span className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Click to Upload Image</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <input 
+                                        value={block.caption || ''}
+                                        onChange={(e) => updateBlock(block.id, block.content, e.target.value)}
+                                        placeholder="Image Caption (Optional)"
+                                        className="w-full text-center text-xs text-neutral-400 italic focus:ring-0 border-none bg-transparent"
+                                    />
+                                </div>
+                            )}
+
+                            {block.type === 'divider' && (
+                                <div className="h-px bg-neutral-200 w-full my-8" />
+                            )}
+                        </div>
+                    ))}
+
+                    <div className="flex justify-center pt-12">
+                        <button 
+                            onClick={() => insertBlock('paragraph')}
+                            className="flex items-center gap-2 px-6 py-3 bg-neutral-900 text-white rounded-full text-sm font-bold hover:scale-105 transition-transform shadow-xl"
+                        >
+                            <Plus className="w-4 h-4" /> Add Block
+                        </button>
+                    </div>
+               </div>
           </div>
       </div>
 
-      {/* 2. Right Sidebar (Tools) */}
-      <aside className="w-[280px] bg-white border-l border-neutral-200 flex flex-col shrink-0 z-20 shadow-xl shadow-neutral-200/50">
-          
-          {/* Tab Switcher */}
-          <div className="flex border-b border-neutral-200">
-             <button 
-                onClick={() => setActiveSettingsTab('content')}
-                className={`flex-1 py-4 text-xs font-bold uppercase tracking-wider text-center transition-colors ${activeSettingsTab === 'content' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-neutral-500 hover:bg-neutral-50'}`}
-             >
-                 Add Content
-             </button>
-             <button 
-                onClick={() => setActiveSettingsTab('settings')}
-                className={`flex-1 py-4 text-xs font-bold uppercase tracking-wider text-center transition-colors ${activeSettingsTab === 'settings' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-neutral-500 hover:bg-neutral-50'}`}
-             >
-                 Settings
-             </button>
+      {/* Toolbox Sidebar */}
+      <aside className="w-[320px] bg-white border-l border-neutral-200 flex flex-col shadow-2xl">
+          <div className="p-6 border-b border-neutral-100">
+              <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-neutral-400 mb-8">Page Settings</h2>
+              <div className="space-y-6">
+                  <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">Title</label>
+                      <input value={formData.title} onChange={e => handleMetaChange('title', e.target.value)} className="w-full p-3 bg-neutral-50 border border-neutral-200 rounded-lg text-sm font-bold"/>
+                  </div>
+                  <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">Client</label>
+                      <input value={formData.client} onChange={e => handleMetaChange('client', e.target.value)} className="w-full p-3 bg-neutral-50 border border-neutral-200 rounded-lg text-sm"/>
+                  </div>
+                  <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">Year</label>
+                      <input type="number" value={formData.year} onChange={e => handleMetaChange('year', parseInt(e.target.value))} className="w-full p-3 bg-neutral-50 border border-neutral-200 rounded-lg text-sm"/>
+                  </div>
+                  <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">Hero Image</label>
+                      <div 
+                        onClick={() => triggerUpload(url => handleMetaChange('heroImage', url))}
+                        className="w-full h-32 bg-neutral-50 border border-neutral-200 rounded-lg flex items-center justify-center cursor-pointer hover:bg-neutral-100 overflow-hidden"
+                      >
+                          {formData.heroImage ? <img src={formData.heroImage} className="w-full h-full object-cover"/> : <ImageIcon className="w-6 h-6 text-neutral-300"/>}
+                      </div>
+                  </div>
+              </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6">
-              
-              {/* CONTENT TOOLS TAB */}
-              {activeSettingsTab === 'content' && (
-                  <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-                      <div>
-                          <h6 className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-4">Media</h6>
-                          <div className="grid grid-cols-2 gap-3">
-                              <button onClick={() => insertBlock('image')} className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg bg-neutral-50 hover:bg-blue-50 hover:text-blue-600 transition-colors border border-transparent hover:border-blue-100">
-                                  <ImageIcon className="w-6 h-6" />
-                                  <span className="text-[10px] font-bold">Image</span>
-                              </button>
-                              <button onClick={() => insertBlock('image')} className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg bg-neutral-50 hover:bg-blue-50 hover:text-blue-600 transition-colors border border-transparent hover:border-blue-100">
-                                  <Grid className="w-6 h-6" />
-                                  <span className="text-[10px] font-bold">Photo Grid</span>
-                              </button>
-                              <button onClick={() => insertBlock('code')} className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg bg-neutral-50 hover:bg-blue-50 hover:text-blue-600 transition-colors border border-transparent hover:border-blue-100">
-                                  <PlayCircle className="w-6 h-6" />
-                                  <span className="text-[10px] font-bold">Video</span>
-                              </button>
-                              <button onClick={() => insertBlock('code')} className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg bg-neutral-50 hover:bg-blue-50 hover:text-blue-600 transition-colors border border-transparent hover:border-blue-100">
-                                  <Code className="w-6 h-6" />
-                                  <span className="text-[10px] font-bold">Embed</span>
-                              </button>
-                          </div>
-                      </div>
-
-                      <div>
-                          <h6 className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-4">Typography</h6>
-                          <div className="space-y-2">
-                              <button onClick={() => insertBlock('paragraph')} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-neutral-50 hover:bg-neutral-100 text-left transition-colors">
-                                  <Type className="w-4 h-4 text-neutral-500" />
-                                  <span className="text-xs font-bold">Paragraph</span>
-                              </button>
-                              <button onClick={() => insertBlock('h1')} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-neutral-50 hover:bg-neutral-100 text-left transition-colors">
-                                  <span className="text-lg font-bold leading-none w-4 text-center">H1</span>
-                                  <span className="text-xs font-bold">Large Heading</span>
-                              </button>
-                              <button onClick={() => insertBlock('h2')} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-neutral-50 hover:bg-neutral-100 text-left transition-colors">
-                                  <span className="text-base font-bold leading-none w-4 text-center">H2</span>
-                                  <span className="text-xs font-bold">Subheading</span>
-                              </button>
-                          </div>
-                      </div>
-
-                      <div>
-                           <h6 className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-4">Layout</h6>
-                           <button onClick={() => insertBlock('divider')} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-neutral-50 hover:bg-neutral-100 text-left transition-colors">
-                                  <LayoutTemplate className="w-4 h-4 text-neutral-500" />
-                                  <span className="text-xs font-bold">Divider / Spacer</span>
-                            </button>
-                      </div>
-                  </div>
-              )}
-
-              {/* SETTINGS TAB */}
-              {activeSettingsTab === 'settings' && (
-                  <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                      <div className="space-y-2">
-                          <label className="text-xs font-bold text-neutral-900">Project Title</label>
-                          <input 
-                              value={formData.title} 
-                              onChange={(e) => handleMetaChange('title', e.target.value)}
-                              className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded text-sm focus:outline-none focus:border-blue-500 transition-colors"
-                          />
-                      </div>
-
-                      <div className="space-y-2">
-                          <label className="text-xs font-bold text-neutral-900">Client / Company</label>
-                          <input 
-                              value={formData.client} 
-                              onChange={(e) => handleMetaChange('client', e.target.value)}
-                              className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded text-sm focus:outline-none focus:border-blue-500 transition-colors"
-                          />
-                      </div>
-
-                      <div className="space-y-2">
-                          <label className="text-xs font-bold text-neutral-900">Year</label>
-                          <input 
-                              type="number"
-                              value={formData.year} 
-                              onChange={(e) => handleMetaChange('year', parseInt(e.target.value))}
-                              className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded text-sm focus:outline-none focus:border-blue-500 transition-colors"
-                          />
-                      </div>
-
-                      <div className="space-y-2">
-                          <label className="text-xs font-bold text-neutral-900">Summary</label>
-                          <textarea 
-                              rows={4}
-                              value={formData.description} 
-                              onChange={(e) => handleMetaChange('description', e.target.value)}
-                              className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded text-sm focus:outline-none focus:border-blue-500 transition-colors resize-none"
-                          />
-                      </div>
-
-                      <div className="space-y-2">
-                          <label className="text-xs font-bold text-neutral-900">Cover Image</label>
-                          <div className="w-full aspect-video bg-neutral-100 rounded-lg overflow-hidden relative group">
-                                {formData.thumb ? (
-                                    <img src={formData.thumb} className="w-full h-full object-cover" alt="cover"/>
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-neutral-400">
-                                        <ImageIcon className="w-8 h-8" />
-                                    </div>
-                                )}
-                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <button 
-                                        onClick={() => triggerUpload((url) => handleMetaChange('thumb', url))}
-                                        className="bg-white text-black px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2"
-                                    >
-                                        <Upload className="w-3 h-3"/> Change
-                                    </button>
-                                </div>
-                          </div>
-                      </div>
-
-                      <div className="pt-6 border-t border-neutral-200">
-                          <div className="flex items-center justify-between mb-2">
-                              <label className="text-xs font-bold text-neutral-900">Publish Status</label>
-                              <div className={`w-2 h-2 rounded-full ${formData.published ? 'bg-green-500' : 'bg-neutral-300'}`}></div>
-                          </div>
-                          <button 
-                              onClick={() => handleMetaChange('published', !formData.published)}
-                              className={`w-full py-2 rounded-lg text-xs font-bold border transition-colors ${
-                                  formData.published 
-                                  ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' 
-                                  : 'bg-neutral-50 border-neutral-200 text-neutral-600 hover:bg-neutral-100'
-                              }`}
-                          >
-                              {formData.published ? 'Published (Live)' : 'Draft (Hidden)'}
-                          </button>
-                      </div>
-                  </div>
-              )}
+          <div className="p-6 flex-1 overflow-y-auto">
+              <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-neutral-400 mb-6">Blocks</h2>
+              <div className="grid grid-cols-2 gap-3">
+                  <ToolBtn icon={Heading1} label="Large H1" onClick={() => insertBlock('h1')} />
+                  <ToolBtn icon={Heading2} label="Small H2" onClick={() => insertBlock('h2')} />
+                  <ToolBtn icon={AlignLeft} label="Large Text" onClick={() => insertBlock('heavy-text')} />
+                  <ToolBtn icon={Columns} label="Columns" onClick={() => insertBlock('columns')} />
+                  <ToolBtn icon={Type} label="Paragraph" onClick={() => insertBlock('paragraph')} />
+                  <ToolBtn icon={ImageIcon} label="Image" onClick={() => insertBlock('image')} />
+                  <ToolBtn icon={LayoutTemplate} label="Divider" onClick={() => insertBlock('divider')} />
+              </div>
           </div>
       </aside>
     </div>
   );
 };
+
+const ToolBtn = ({ icon: Icon, label, onClick }: any) => (
+    <button onClick={onClick} className="flex flex-col items-center justify-center gap-2 p-4 bg-neutral-50 border border-neutral-100 rounded-xl hover:bg-blue-50 hover:border-blue-100 hover:text-blue-600 transition-all text-neutral-500">
+        <Icon className="w-5 h-5" />
+        <span className="text-[10px] font-bold uppercase tracking-tighter">{label}</span>
+    </button>
+);
 
 export default BlockEditor;

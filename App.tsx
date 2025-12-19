@@ -219,7 +219,7 @@ const AppContent: React.FC = () => {
           </div>
           <div className="flex flex-col md:flex-row justify-between items-center text-xs uppercase tracking-widest text-muted-foreground border-t border-border pt-8">
             <p>&copy; {new Date().getFullYear()} Mukhi Anik. All rights reserved.</p>
-            <p>Designed with Google AI Lab.</p>
+            <p>Designed with New Genre Principles.</p>
           </div>
         </div>
       </footer>
