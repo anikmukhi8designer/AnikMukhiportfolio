@@ -72,6 +72,9 @@ export interface GlobalConfig {
   heroHeadline: string;
   heroSubheadline: string;
   heroDescription: string;
+  experienceIntro: string; // New field
+  seoTitle?: string;       // New field
+  seoDescription?: string; // New field
 }
 
 export interface SyncLogEntry {

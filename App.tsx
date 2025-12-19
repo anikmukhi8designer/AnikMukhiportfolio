@@ -107,6 +107,23 @@ const AppContent: React.FC = () => {
   };
   
   const { socials, config } = useData();
+
+  // SEO effect
+  useEffect(() => {
+    if (config.seoTitle) {
+        document.title = config.seoTitle;
+    }
+    if (config.seoDescription) {
+        let meta = document.querySelector('meta[name="description"]');
+        if (!meta) {
+            meta = document.createElement('meta');
+            meta.setAttribute('name', 'description');
+            document.head.appendChild(meta);
+        }
+        meta.setAttribute('content', config.seoDescription);
+    }
+  }, [config.seoTitle, config.seoDescription]);
+
   const { scrollY } = useScroll();
   const heroTextY = useTransform(scrollY, [0, 500], [0, 100]);
 

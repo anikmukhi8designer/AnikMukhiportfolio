@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, RefreshCw, UserCircle, Check, AlertCircle, Loader2, Rocket, UploadCloud, Copy, X } from 'lucide-react';
+// Added missing Database icon to the imports from lucide-react
+import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, RefreshCw, UserCircle, Check, AlertCircle, Loader2, Rocket, UploadCloud, Copy, X, Database } from 'lucide-react';
 import WorkTable from './WorkTable';
 import ExperienceTable from './ExperienceTable';
 import SkillsTable from './SkillsTable';
@@ -32,6 +33,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
         try {
             const { error } = await supabase.from('projects').select('id').limit(1);
             if (error && error.code === '42P01') {
+                setShowSqlModal(true);
+            }
+            // Check for specific missing column error
+            if (error && error.message.includes("titleSize")) {
                 setShowSqlModal(true);
             }
         } catch (e) {
@@ -96,7 +101,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
       }
   };
 
-  const setupSQL = `-- 1. CREATE TABLES (Multi-User Ready)
+  const setupSQL = `-- 1. CREATE OR UPDATE TABLES
 create table if not exists projects (
   id text primary key, 
   user_id uuid default auth.uid(), 
@@ -116,6 +121,11 @@ create table if not exists projects (
   "titleSize" int default 10,
   created_at timestamptz default now()
 );
+
+-- Ensure missing columns are added if the table already existed
+alter table projects add column if not exists "titleSize" int default 10;
+alter table projects add column if not exists "roles" text[];
+alter table projects add column if not exists "tags" text[];
 
 create table if not exists experience (
   id text primary key, 
@@ -177,24 +187,51 @@ alter table skills enable row level security;
 alter table config enable row level security;
 alter table socials enable row level security;
 
--- 3. DROP EXISTING POLICIES
-drop policy if exists "Public read projects" on projects;
-drop policy if exists "Auth team write projects" on projects;
+-- 3. DROP EXISTING POLICIES (Optional: Use only if resetting permissions)
+-- drop policy if exists "Public read projects" on projects;
+-- drop policy if exists "Auth team write projects" on projects;
 
--- 4. CREATE POLICIES
-create policy "Public read projects" on projects for select using (true);
-create policy "Public read experience" on experience for select using (true);
-create policy "Public read clients" on clients for select using (true);
-create policy "Public read skills" on skills for select using (true);
-create policy "Public read config" on config for select using (true);
-create policy "Public read socials" on socials for select using (true);
+-- 4. CREATE POLICIES (Safely)
+do $$ 
+begin
+    if not exists (select 1 from pg_policies where policyname = 'Public read projects') then
+        create policy "Public read projects" on projects for select using (true);
+    end if;
+    if not exists (select 1 from pg_policies where policyname = 'Public read experience') then
+        create policy "Public read experience" on experience for select using (true);
+    end if;
+    if not exists (select 1 from pg_policies where policyname = 'Public read clients') then
+        create policy "Public read clients" on clients for select using (true);
+    end if;
+    if not exists (select 1 from pg_policies where policyname = 'Public read skills') then
+        create policy "Public read skills" on skills for select using (true);
+    end if;
+    if not exists (select 1 from pg_policies where policyname = 'Public read config') then
+        create policy "Public read config" on config for select using (true);
+    end if;
+    if not exists (select 1 from pg_policies where policyname = 'Public read socials') then
+        create policy "Public read socials" on socials for select using (true);
+    end if;
 
-create policy "Auth team write projects" on projects for all to authenticated using (true) with check (true);
-create policy "Auth team write experience" on experience for all to authenticated using (true) with check (true);
-create policy "Auth team write clients" on clients for all to authenticated using (true) with check (true);
-create policy "Auth team write skills" on skills for all to authenticated using (true) with check (true);
-create policy "Auth team write config" on config for all to authenticated using (true) with check (true);
-create policy "Auth team write socials" on socials for all to authenticated using (true) with check (true);
+    if not exists (select 1 from pg_policies where policyname = 'Auth team write projects') then
+        create policy "Auth team write projects" on projects for all to authenticated using (true) with check (true);
+    end if;
+    if not exists (select 1 from pg_policies where policyname = 'Auth team write experience') then
+        create policy "Auth team write experience" on experience for all to authenticated using (true) with check (true);
+    end if;
+    if not exists (select 1 from pg_policies where policyname = 'Auth team write clients') then
+        create policy "Auth team write clients" on clients for all to authenticated using (true) with check (true);
+    end if;
+    if not exists (select 1 from pg_policies where policyname = 'Auth team write skills') then
+        create policy "Auth team write skills" on skills for all to authenticated using (true) with check (true);
+    end if;
+    if not exists (select 1 from pg_policies where policyname = 'Auth team write config') then
+        create policy "Auth team write config" on config for all to authenticated using (true) with check (true);
+    end if;
+    if not exists (select 1 from pg_policies where policyname = 'Auth team write socials') then
+        create policy "Auth team write socials" on socials for all to authenticated using (true) with check (true);
+    end if;
+end $$;
 
 -- 5. SEED INITIAL CONFIG DATA
 insert into config (id, email, "heroHeadline", "heroSubheadline", "heroDescription") 
@@ -291,8 +328,8 @@ on conflict (id) do nothing;
                   >
                       <div className="p-6 border-b border-neutral-200 flex justify-between items-center bg-white flex-shrink-0">
                           <div>
-                            <h3 className="text-lg font-bold text-neutral-900">Database Setup Required</h3>
-                            <p className="text-xs text-neutral-500 mt-1">Run this script in your Supabase SQL editor to create the necessary tables.</p>
+                            <h3 className="text-lg font-bold text-neutral-900">Database Update Required</h3>
+                            <p className="text-xs text-neutral-500 mt-1">Run this script in your Supabase SQL editor to add missing columns like "titleSize".</p>
                           </div>
                           <button onClick={() => setShowSqlModal(false)} className="p-2 hover:bg-neutral-100 rounded-full">
                               <X className="w-5 h-5 text-neutral-500" />
@@ -341,6 +378,14 @@ on conflict (id) do nothing;
                 title="Refresh Data"
             >
                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
+
+            <button 
+                onClick={() => setShowSqlModal(true)}
+                className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-100 text-blue-600 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-blue-100 transition-colors"
+            >
+                <Database className="w-3 h-3" />
+                <span>Fix Schema</span>
             </button>
 
             <button 

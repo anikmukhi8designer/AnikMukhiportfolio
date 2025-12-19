@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useData } from '../contexts/DataContext';
 import { ArrowUpRight } from 'lucide-react';
@@ -24,8 +25,8 @@ const ExperienceSection: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
           {/* Introduction */}
           <div className="lg:col-span-4">
-            <h3 className="text-xl font-mono text-muted-foreground sticky top-32 leading-relaxed">
-              // Over the past 5 years, I've worked with startups and agencies to build scalable design systems and products.
+            <h3 className="text-xl font-mono text-muted-foreground sticky top-32 leading-relaxed whitespace-pre-wrap">
+              // {config.experienceIntro || "Over the past years, I've worked with startups and agencies to build scalable systems."}
             </h3>
           </div>
           
