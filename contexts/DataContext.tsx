@@ -78,24 +78,19 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchData = async () => {
     setIsLoading(true);
     try {
-        // We use individual await calls or handle individual errors in Promise.all 
-        // to prevent one missing column (like titleSize) from breaking the whole app boot.
-        const results = await Promise.all([
-            supabase.from('projects').select('*').order('year', { ascending: false }),
-            supabase.from('experience').select('*').order('order', { ascending: true }),
-            supabase.from('clients').select('*').order('order', { ascending: true }),
-            supabase.from('skills').select('*').order('order', { ascending: true }),
-            supabase.from('config').select('*').single(),
-            supabase.from('socials').select('*').order('order', { ascending: true })
-        ]);
+        // We fetch individual tables to prevent one missing column from breaking the whole app
+        const pRes = await supabase.from('projects').select('*').order('year', { ascending: false });
+        const eRes = await supabase.from('experience').select('*').order('order', { ascending: true });
+        const cRes = await supabase.from('clients').select('*').order('order', { ascending: true });
+        const sRes = await supabase.from('skills').select('*').order('order', { ascending: true });
+        const confRes = await supabase.from('config').select('*').single();
+        const socRes = await supabase.from('socials').select('*').order('order', { ascending: true });
 
-        const [pRes, eRes, cRes, sRes, confRes, socRes] = results;
-
-        // Check if projects or experience specifically failed due to missing columns
+        // Check for specific column errors
         if (pRes.error) {
-            console.warn("Projects fetch failed (might be missing columns):", pRes.error.message);
+            console.error("Projects load error:", pRes.error.message);
             if (pRes.error.message.includes('titleSize')) {
-                setError("Database schema out of sync: 'titleSize' column missing. Please go to #admin and click 'Fix Schema'.");
+                setError("Database missing 'titleSize' column. Click 'Fix Schema' in Admin panel.");
             }
         }
 
@@ -103,14 +98,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
         if (dbHasData) {
             setIsDbEmpty(false);
-            if (pRes.data) setProjects(pRes.data);
+            if (pRes.data) setProjects(pRes.data.map(p => ({ ...p, titleSize: p.titleSize || 10 })));
             if (eRes.data) setExperience(eRes.data);
             if (cRes.data) setClients(cRes.data);
             if (sRes.data) setSkills(sRes.data);
             if (confRes.data) setConfig(confRes.data);
             if (socRes.data) setSocials(socRes.data);
         } else {
-            console.log("Database appears empty or query failed, displaying static fallbacks.");
             setIsDbEmpty(true);
             setProjects(INITIAL_PROJECTS);
             setExperience(INITIAL_EXPERIENCE);
@@ -124,9 +118,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (e: any) {
         console.error("Critical error fetching data:", e);
         setError(e.message);
-        // Even on error, ensure we have fallback data so the UI doesn't crash
         setProjects(INITIAL_PROJECTS);
-        setExperience(INITIAL_EXPERIENCE);
         setConfig(INITIAL_CONFIG);
     } finally {
         setIsLoading(false);

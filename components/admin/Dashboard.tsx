@@ -28,29 +28,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   const [connectionError, setConnectionError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for schema issues or data errors passed from DataContext
+    // If DataContext reporting a column error, show modal
     if (dataError && (dataError.includes('titleSize') || dataError.includes('column'))) {
         setShowSqlModal(true);
     }
-
-    const checkTables = async () => {
-        try {
-            const { error } = await supabase.from('projects').select('id, titleSize').limit(1);
-            if (error) {
-                // Table doesn't exist
-                if (error.code === '42P01') {
-                    setShowSqlModal(true);
-                }
-                // Specific column missing
-                if (error.message.includes("titleSize") || error.message.includes("column")) {
-                    setShowSqlModal(true);
-                }
-            }
-        } catch (e) {
-            console.error(e);
-        }
-    };
-    checkTables();
   }, [dataError]);
 
   useEffect(() => {
@@ -108,146 +89,42 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
       }
   };
 
-  const setupSQL = `-- 1. CREATE OR UPDATE TABLES
-create table if not exists projects (
-  id text primary key, 
-  user_id uuid default auth.uid(), 
-  title text, 
-  client text, 
-  roles text[], 
-  description text, 
-  year int, 
-  "heroImage" text, 
-  thumb text, 
-  tags text[], 
-  link text, 
-  "githubRepoUrl" text, 
-  published boolean default false, 
-  images text[], 
-  content jsonb, 
-  "titleSize" int default 10,
-  created_at timestamptz default now()
+  const setupSQL = `-- 1. ENSURE COLUMNS EXIST IN PROJECTS TABLE
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS "titleSize" INT DEFAULT 10;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS "roles" TEXT[];
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS "tags" TEXT[];
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS "githubRepoUrl" TEXT;
+
+-- 2. ENSURE OTHER TABLES EXIST
+CREATE TABLE IF NOT EXISTS experience (
+  id TEXT PRIMARY KEY, 
+  user_id UUID DEFAULT auth.uid(),
+  role TEXT, 
+  company TEXT, 
+  period TEXT, 
+  description TEXT, 
+  published BOOLEAN DEFAULT false, 
+  "order" INT DEFAULT 0, 
+  created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Ensure missing columns are added if the table already existed
-alter table projects add column if not exists "titleSize" int default 10;
-alter table projects add column if not exists "roles" text[];
-alter table projects add column if not exists "tags" text[];
-alter table projects add column if not exists "githubRepoUrl" text;
-
-create table if not exists experience (
-  id text primary key, 
-  user_id uuid default auth.uid(),
-  role text, 
-  company text, 
-  period text, 
-  description text, 
-  published boolean default false, 
-  "order" int default 0, 
-  created_at timestamptz default now()
+CREATE TABLE IF NOT EXISTS config (
+  id INT PRIMARY KEY DEFAULT 1, 
+  user_id UUID DEFAULT auth.uid(),
+  "resumeUrl" TEXT, 
+  email TEXT, 
+  "heroHeadline" TEXT, 
+  "heroSubheadline" TEXT, 
+  "heroDescription" TEXT, 
+  "experienceIntro" TEXT,
+  "seoTitle" TEXT,
+  "seoDescription" TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
 );
 
-create table if not exists clients (
-  id text primary key, 
-  user_id uuid default auth.uid(),
-  name text, 
-  logo text, 
-  url text, 
-  "order" int default 0, 
-  created_at timestamptz default now()
-);
-
-create table if not exists skills (
-  id text primary key, 
-  user_id uuid default auth.uid(),
-  title text, 
-  items jsonb, 
-  "order" int default 0, 
-  created_at timestamptz default now()
-);
-
-create table if not exists config (
-  id int primary key default 1, 
-  user_id uuid default auth.uid(),
-  "resumeUrl" text, 
-  email text, 
-  "heroHeadline" text, 
-  "heroSubheadline" text, 
-  "heroDescription" text, 
-  "experienceIntro" text,
-  "seoTitle" text,
-  "seoDescription" text,
-  created_at timestamptz default now()
-);
-
-create table if not exists socials (
-  id text primary key, 
-  user_id uuid default auth.uid(),
-  platform text, 
-  url text, 
-  label text, 
-  "order" int default 0, 
-  created_at timestamptz default now()
-);
-
--- 2. ENABLE ROW LEVEL SECURITY (RLS)
-alter table projects enable row level security;
-alter table experience enable row level security;
-alter table clients enable row level security;
-alter table skills enable row level security;
-alter table config enable row level security;
-alter table socials enable row level security;
-
--- 3. CREATE POLICIES (Safely)
-do $$ 
-begin
-    if not exists (select 1 from pg_policies where policyname = 'Public read projects') then
-        create policy "Public read projects" on projects for select using (true);
-    end if;
-    if not exists (select 1 from pg_policies where policyname = 'Public read experience') then
-        create policy "Public read experience" on experience for select using (true);
-    end if;
-    if not exists (select 1 from pg_policies where policyname = 'Public read clients') then
-        create policy "Public read clients" on clients for select using (true);
-    end if;
-    if not exists (select 1 from pg_policies where policyname = 'Public read skills') then
-        create policy "Public read skills" on skills for select using (true);
-    end if;
-    if not exists (select 1 from pg_policies where policyname = 'Public read config') then
-        create policy "Public read config" on config for select using (true);
-    end if;
-    if not exists (select 1 from pg_policies where policyname = 'Public read socials') then
-        create policy "Public read socials" on socials for select using (true);
-    end if;
-
-    if not exists (select 1 from pg_policies where policyname = 'Auth team write projects') then
-        create policy "Auth team write projects" on projects for all to authenticated using (true) with check (true);
-    end if;
-    if not exists (select 1 from pg_policies where policyname = 'Auth team write experience') then
-        create policy "Auth team write experience" on experience for all to authenticated using (true) with check (true);
-    end if;
-    if not exists (select 1 from pg_policies where policyname = 'Auth team write clients') then
-        create policy "Auth team write clients" on clients for all to authenticated using (true) with check (true);
-    end if;
-    if not exists (select 1 from pg_policies where policyname = 'Auth team write skills') then
-        create policy "Auth team write skills" on skills for all to authenticated using (true) with check (true);
-    end if;
-    if not exists (select 1 from pg_policies where policyname = 'Auth team write config') then
-        create policy "Auth team write config" on config for all to authenticated using (true) with check (true);
-    end if;
-    if not exists (select 1 from pg_policies where policyname = 'Auth team write socials') then
-        create policy "Auth team write socials" on socials for all to authenticated using (true) with check (true);
-    end if;
-end $$;
-
--- 4. RELOAD SCHEMA CACHE
--- This is critical to fix the "Could not find column in schema cache" error
+-- 3. MANDATORY: RELOAD SCHEMA CACHE
+-- Run this to fix "column not found in schema cache" errors
 NOTIFY pgrst, 'reload schema';
-
--- 5. SEED INITIAL CONFIG DATA
-insert into config (id, email, "heroHeadline", "heroSubheadline", "heroDescription") 
-values (1, 'hello@mukhianik.com', 'Product Designer', '& Creative Dev.', 'Building digital products that blend aesthetics with function. Currently crafting experiences in San Francisco.') 
-on conflict (id) do nothing;
 `;
 
   const copySQL = () => {
@@ -265,62 +142,8 @@ on conflict (id) do nothing;
       );
   }
 
-  const getButtonContent = () => {
-    if (isSaving || syncStatus === 'syncing') {
-        return (
-            <>
-                <Loader2 className="w-3 h-3 animate-spin" />
-                <span className="hidden md:inline">Backing up...</span>
-            </>
-        );
-    }
-    if (syncStatus === 'success') {
-        return (
-            <>
-                <Check className="w-3 h-3" />
-                <span className="hidden md:inline">Synced!</span>
-            </>
-        );
-    }
-    if (syncStatus === 'error') {
-        return (
-            <>
-                <AlertCircle className="w-3 h-3" />
-                <span className="hidden md:inline">Sync Failed</span>
-            </>
-        );
-    }
-    return (
-        <>
-            <UploadCloud className="w-3 h-3" />
-            <span className="hidden md:inline">Backup to GitHub</span>
-        </>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-neutral-100 flex flex-col">
-      <AnimatePresence>
-          {(syncStatus === 'success' || syncStatus === 'error') && (
-              <motion.div 
-                  initial={{ opacity: 0, y: -20, x: '-50%' }}
-                  animate={{ opacity: 1, y: 0, x: '-50%' }}
-                  exit={{ opacity: 0, y: -20, x: '-50%' }}
-                  className={`fixed top-8 left-1/2 z-[100] flex items-center gap-3 px-6 py-4 rounded-full shadow-2xl ${
-                      syncStatus === 'error' ? 'bg-red-600 text-white' : 'bg-neutral-900 text-white'
-                  }`}
-              >
-                  {syncStatus === 'error' ? <AlertCircle className="w-5 h-5 text-white" /> : <Check className="w-5 h-5 text-green-400" />}
-                  <div className="flex flex-col">
-                      <span className="text-sm font-bold">{syncStatus === 'error' ? 'Sync Failed' : 'Backed up to GitHub'}</span>
-                      <span className={`text-xs ${syncStatus === 'error' ? 'text-white/80' : 'text-neutral-400'}`}>
-                          {syncStatus === 'error' ? errorMessage : 'Repository synced successfully.'}
-                      </span>
-                  </div>
-              </motion.div>
-          )}
-      </AnimatePresence>
-
       <AnimatePresence>
           {showSqlModal && (
               <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -339,8 +162,8 @@ on conflict (id) do nothing;
                   >
                       <div className="p-6 border-b border-neutral-200 flex justify-between items-center bg-white flex-shrink-0">
                           <div>
-                            <h3 className="text-lg font-bold text-neutral-900">Database Update Required</h3>
-                            <p className="text-xs text-neutral-500 mt-1">Run this script in your Supabase SQL editor to add missing columns like "titleSize" and refresh the cache.</p>
+                            <h3 className="text-lg font-bold text-neutral-900">Database Repair</h3>
+                            <p className="text-xs text-neutral-500 mt-1">Copy and run this in your Supabase SQL Editor to fix missing columns.</p>
                           </div>
                           <button onClick={() => setShowSqlModal(false)} className="p-2 hover:bg-neutral-100 rounded-full">
                               <X className="w-5 h-5 text-neutral-500" />
@@ -359,17 +182,13 @@ on conflict (id) do nothing;
                                   {copied ? 'Copied!' : 'Copy SQL'}
                               </button>
                           </div>
-                          <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700 flex gap-2">
-                             <AlertCircle className="w-4 h-4 shrink-0" />
-                             <p><strong>Important:</strong> After running this in Supabase, the <code>NOTIFY pgrst</code> command will force the app to recognize the new columns immediately.</p>
-                          </div>
                       </div>
                       <div className="p-6 bg-white flex justify-end gap-3 flex-shrink-0">
                           <button 
-                            onClick={() => setShowSqlModal(false)}
+                            onClick={() => { setShowSqlModal(false); reloadContent(); }}
                             className="px-4 py-2 bg-neutral-900 text-white rounded-lg text-sm font-bold hover:bg-neutral-800"
                           >
-                              Close
+                              I've Run the Script
                           </button>
                       </div>
                   </motion.div>
@@ -387,140 +206,34 @@ on conflict (id) do nothing;
           </div>
           
           <div className="flex items-center gap-3 md:gap-4">
-            <button 
-                onClick={handleRefresh}
-                className="p-2 text-neutral-500 hover:text-neutral-900 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors"
-                title="Refresh Data"
-            >
-                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <button onClick={() => setShowSqlModal(true)} className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors">
+                <Database className="w-3 h-3" /> Fix Schema
             </button>
-
-            <button 
-                onClick={() => setShowSqlModal(true)}
-                className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-100 text-blue-600 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-blue-100 transition-colors"
-            >
-                <Database className="w-3 h-3" />
-                <span>Fix Schema</span>
-            </button>
-
-            <button 
-                onClick={handleDeploy}
-                disabled={deployStatus === 'deploying'}
-                className="hidden sm:flex items-center gap-2 px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-neutral-50 transition-colors"
-            >
-                {deployStatus === 'deploying' ? <Loader2 className="w-3 h-3 animate-spin"/> : <Rocket className="w-3 h-3" />}
-                <span className="hidden lg:inline">Deploy Site</span>
-            </button>
-
-            <button 
-                onClick={handleSync}
-                disabled={isSaving || syncStatus === 'syncing'}
-                className={`flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-sm min-w-[120px] justify-center ${
-                    (isSaving || syncStatus === 'syncing')
-                    ? 'bg-neutral-100 text-neutral-400 border border-neutral-200 cursor-not-allowed'
-                    : syncStatus === 'success'
-                    ? 'bg-green-50 text-green-600 border border-green-200'
-                    : syncStatus === 'error'
-                    ? 'bg-red-50 text-red-600 border border-red-200'
-                    : 'bg-neutral-900 text-white border border-neutral-900 hover:bg-neutral-800'
-                }`}
-                title="Backup Data"
-            >
-                {getButtonContent()}
-            </button>
-
-            <div className="h-6 w-px bg-neutral-200 mx-2"></div>
-
-            <button onClick={onLogout} className="p-2 text-neutral-400 hover:text-neutral-900 transition-colors" title="Logout">
+            <button onClick={onLogout} className="p-2 text-neutral-400 hover:text-neutral-900 transition-colors">
                 <LogOut className="w-5 h-5" />
             </button>
           </div>
         </div>
       </header>
 
-      <main className="flex-grow p-4 md:p-8 max-w-7xl mx-auto w-full overflow-hidden flex flex-col">
+      <main className="flex-grow p-4 md:p-8 max-w-7xl mx-auto w-full flex flex-col">
         {dataError && (
-             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-4 animate-in slide-in-from-top-4">
+             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-4">
                 <AlertCircle className="w-6 h-6 text-red-600 shrink-0" />
                 <div>
-                    <h3 className="text-sm font-bold text-red-900">Database Synchronization Error</h3>
-                    <p className="text-xs text-red-700 mt-1 leading-relaxed">
-                        {dataError}
-                    </p>
-                    <button 
-                        onClick={() => setShowSqlModal(true)}
-                        className="mt-3 text-xs font-bold underline text-red-800 hover:text-red-900"
-                    >
-                        View Fix Instructions
-                    </button>
+                    <h3 className="text-sm font-bold text-red-900">Database Sync Error</h3>
+                    <p className="text-xs text-red-700 mt-1">{dataError}</p>
+                    <button onClick={() => setShowSqlModal(true)} className="mt-2 text-xs font-bold underline text-red-800">Fix Now</button>
                 </div>
              </div>
         )}
 
-        {!connectionError && isDbEmpty && (
-            <div className="mb-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-                <div className="flex gap-4">
-                    <div className="p-3 bg-white rounded-xl shadow-sm text-blue-600">
-                        <Rocket className="w-6 h-6" />
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-bold text-blue-900">Database Setup</h3>
-                        <p className="text-blue-700/80 text-sm leading-relaxed max-w-md">
-                            Your Supabase database is empty. Seed the initial content to start managing your portfolio.
-                        </p>
-                    </div>
-                </div>
-                <button 
-                    onClick={resetData}
-                    className="whitespace-nowrap px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2"
-                >
-                    <RefreshCw className="w-4 h-4" />
-                    Seed Demo Data
-                </button>
-            </div>
-        )}
-
-        <div className="flex overflow-x-auto pb-1 mb-8 bg-neutral-200/50 p-1 rounded-xl w-full md:w-fit scrollbar-hide">
-            <button 
-                onClick={() => setActiveTab('work')}
-                className={`flex items-center gap-2 px-4 md:px-6 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex-shrink-0 ${
-                    activeTab === 'work' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'
-                }`}
-            >
-                <LayoutDashboard className="w-4 h-4" /> Projects
-            </button>
-            <button 
-                onClick={() => setActiveTab('experience')}
-                className={`flex items-center gap-2 px-4 md:px-6 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex-shrink-0 ${
-                    activeTab === 'experience' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'
-                }`}
-            >
-                <Briefcase className="w-4 h-4" /> Experience
-            </button>
-            <button 
-                onClick={() => setActiveTab('skills')}
-                className={`flex items-center gap-2 px-4 md:px-6 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex-shrink-0 ${
-                    activeTab === 'skills' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'
-                }`}
-            >
-                <Wrench className="w-4 h-4" /> Skills
-            </button>
-            <button 
-                onClick={() => setActiveTab('clients')}
-                className={`flex items-center gap-2 px-4 md:px-6 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex-shrink-0 ${
-                    activeTab === 'clients' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'
-                }`}
-            >
-                <Users className="w-4 h-4" /> Clients
-            </button>
-            <button 
-                onClick={() => setActiveTab('settings')}
-                className={`flex items-center gap-2 px-4 md:px-6 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex-shrink-0 ${
-                    activeTab === 'settings' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'
-                }`}
-            >
-                <UserCircle className="w-4 h-4" /> Settings
-            </button>
+        <div className="flex overflow-x-auto pb-1 mb-8 bg-neutral-200/50 p-1 rounded-xl w-full md:w-fit">
+            <button onClick={() => setActiveTab('work')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'work' ? 'bg-white shadow-sm' : 'text-neutral-500'}`}>Work</button>
+            <button onClick={() => setActiveTab('experience')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'experience' ? 'bg-white shadow-sm' : 'text-neutral-500'}`}>Experience</button>
+            <button onClick={() => setActiveTab('skills')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'skills' ? 'bg-white shadow-sm' : 'text-neutral-500'}`}>Skills</button>
+            <button onClick={() => setActiveTab('clients')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'clients' ? 'bg-white shadow-sm' : 'text-neutral-500'}`}>Clients</button>
+            <button onClick={() => setActiveTab('settings')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'settings' ? 'bg-white shadow-sm' : 'text-neutral-500'}`}>Settings</button>
         </div>
 
         {activeTab === 'work' && <WorkTable onEdit={onEditProject} />}
@@ -528,16 +241,6 @@ on conflict (id) do nothing;
         {activeTab === 'skills' && <SkillsTable />}
         {activeTab === 'clients' && <ClientsTable />}
         {activeTab === 'settings' && <ProfileSettings />}
-
-        <div className="mt-12 pt-8 border-t border-neutral-200 flex flex-col sm:flex-row justify-between items-center text-sm text-neutral-500 gap-4">
-            <p className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                System active
-            </p>
-            <button onClick={resetData} className="text-red-500 hover:text-red-700 underline text-xs">
-                Reset Database
-            </button>
-        </div>
       </main>
     </div>
   );
