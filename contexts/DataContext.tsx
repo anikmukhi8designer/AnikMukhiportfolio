@@ -34,6 +34,7 @@ interface DataContextType {
   resetData: () => Promise<void>;
   
   updateProject: (id: string, data: Partial<Project>) => Promise<void>;
+  updateProjectInMemory: (id: string, data: Partial<Project>) => void;
   addProject: (project: Project) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   
@@ -61,6 +62,9 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
+// List of columns that actually exist in the database to avoid schema errors
+const PROJECT_COLUMNS = 'id, title, client, roles, description, year, heroImage, thumb, tags, link, githubRepoUrl, published, images, content';
+
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [experience, setExperience] = useState<Experience[]>([]);
@@ -78,7 +82,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchData = async () => {
     setIsLoading(true);
     try {
-        const pRes = await supabase.from('projects').select('*').order('year', { ascending: false });
+        // We explicitly select columns to avoid the "titleSize" missing column error in schema cache
+        const pRes = await supabase.from('projects').select(PROJECT_COLUMNS).order('year', { ascending: false });
         const eRes = await supabase.from('experience').select('*').order('order', { ascending: true });
         const cRes = await supabase.from('clients').select('*').order('order', { ascending: true });
         const sRes = await supabase.from('skills').select('*').order('order', { ascending: true });
@@ -126,12 +131,21 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       await fetchData();
   };
 
+  const updateProjectInMemory = (id: string, data: Partial<Project>) => {
+    setProjects(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
+  };
+
   const updateProject = async (id: string, data: Partial<Project>) => {
       setIsSaving(true);
       try {
-          const { error } = await supabase.from('projects').upsert({ ...data, id }).select();
+          // Strip titleSize before sending to Supabase to avoid schema errors
+          const { titleSize, ...supabaseData } = data as any;
+          const { error } = await supabase.from('projects').upsert({ ...supabaseData, id }).select(PROJECT_COLUMNS);
           if (error) throw error;
-          await fetchData();
+          
+          // We don't call fetchData here because we want to preserve the local titleSize 
+          // that might have been updated in memory but isn't in the DB.
+          updateProjectInMemory(id, data);
       } catch (e: any) {
           console.error("Update Project Error:", e);
           throw e;
@@ -143,7 +157,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const addProject = async (project: Project) => {
       setIsSaving(true);
       try {
-          const { error } = await supabase.from('projects').insert(project);
+          const { titleSize, ...supabaseData } = project as any;
+          const { error } = await supabase.from('projects').insert(supabaseData);
           if (error) throw error;
           await fetchData();
       } catch (e: any) {
@@ -292,7 +307,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         triggerDeploy: async () => {},
         resetData,
         
-        updateProject, addProject, deleteProject,
+        updateProject, 
+        updateProjectInMemory,
+        addProject, deleteProject,
         updateExperience, addExperience, deleteExperience, reorderExperience,
         updateClient, addClient, deleteClient,
         updateSkill, addSkill, deleteSkill,

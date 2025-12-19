@@ -1,9 +1,10 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { Project } from '../types';
-import { ArrowUpRight, Settings2 } from 'lucide-react';
+import { ArrowUpRight, Type } from 'lucide-react';
 import { getOptimizedSrc, getOptimizedSrcSet } from '../utils/imageOptimizer';
+import { useData } from '../contexts/DataContext';
 
 interface ProjectCardProps {
   project: Project;
@@ -13,7 +14,10 @@ interface ProjectCardProps {
 }
 
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnter, onMouseLeave }) => {
-  const [titleFontSize, setTitleFontSize] = useState(40);
+  const { updateProjectInMemory } = useData();
+
+  // Check if we are in admin mode to show the control
+  const isAdmin = typeof window !== 'undefined' && window.location.hash === '#admin';
 
   return (
     <motion.div
@@ -31,7 +35,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      {/* Image Container - Aspect Ratio preserved but sharp corners */}
+      {/* Image Container */}
       <div className="relative w-full aspect-[16/10] overflow-hidden bg-muted border-b border-border">
         <motion.img
           layoutId={`project-image-${project.id}`}
@@ -49,22 +53,22 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
         </div>
       </div>
 
-      {/* Content - Technical Layout */}
+      {/* Content */}
       <div className="p-5 flex flex-col gap-4">
         <div className="flex justify-between items-start">
-            <div className="space-y-1">
+            <div className="space-y-1 w-full">
                 <span className="text-[10px] uppercase tracking-widest text-muted-foreground block">
                     {project.client}
                 </span>
                 <motion.h3 
                   layoutId={`project-title-${project.id}`}
-                  style={{ fontSize: `${titleFontSize}px` }}
+                  style={{ fontSize: `${project.titleSize || 40}px` }}
                   className="font-bold text-foreground leading-tight group-hover:text-primary transition-all duration-300"
                 >
                   {project.title}
                 </motion.h3>
             </div>
-            <span className="text-xs font-mono text-muted-foreground border border-border px-2 py-1">
+            <span className="text-xs font-mono text-muted-foreground border border-border px-2 py-1 shrink-0">
                 {project.year}
             </span>
         </div>
@@ -78,24 +82,27 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
                 ))}
             </div>
 
-            {/* Font Size Control - Desktop Only */}
-            <div 
-              className="hidden md:flex items-center gap-2 bg-neutral-100/50 dark:bg-neutral-800/50 px-3 py-1.5 rounded-full border border-border opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={(e) => e.stopPropagation()}
-            >
-                <Settings2 className="w-3 h-3 text-muted-foreground" />
-                <input 
-                  type="range"
-                  min="10"
-                  max="60"
-                  value={titleFontSize}
-                  onChange={(e) => setTitleFontSize(Number(e.target.value))}
-                  className="w-24 accent-primary cursor-ew-resize h-1"
-                />
-                <span className="text-[9px] font-mono text-muted-foreground w-4">
-                  {titleFontSize}
-                </span>
-            </div>
+            {/* Font Size Control - Visible only in Admin for editing */}
+            {isAdmin && (
+                <div 
+                  className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 rounded-full border border-border"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                    <Type className="w-3 h-3 text-muted-foreground" />
+                    <input 
+                      type="range"
+                      min="10"
+                      max="60"
+                      step="1"
+                      value={project.titleSize || 40}
+                      onChange={(e) => updateProjectInMemory(project.id, { titleSize: parseInt(e.target.value) })}
+                      className="w-20 md:w-24 accent-primary cursor-ew-resize h-1"
+                    />
+                    <span className="text-[9px] font-mono text-muted-foreground w-4">
+                      {project.titleSize || 40}
+                    </span>
+                </div>
+            )}
         </div>
       </div>
     </motion.div>
