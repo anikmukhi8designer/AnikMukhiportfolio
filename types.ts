@@ -24,7 +24,8 @@ export interface Project {
   published: boolean;
   images?: string[];
   content?: ContentBlock[];
-  titleSize?: number; // 1 to 10 scale
+  // Added titleSize to allow controlling the font scale of project titles in the editor
+  titleSize?: number;
 }
 
 export interface Experience {

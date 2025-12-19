@@ -49,12 +49,6 @@ const Modal: React.FC<ModalProps> = ({ project, onClose, onProjectClick }) => {
     .filter(p => p.id !== project.id && p.published)
     .slice(0, 2);
 
-  // Dynamic font size based on project.titleSize (1-10 scale)
-  const titleSizeScale = project.titleSize || 10;
-  // Map scale 1-10 to rem values roughly
-  const desktopTitleSize = `${titleSizeScale * 0.8}rem`;
-  const mobileTitleSize = `${titleSizeScale * 0.4}rem`;
-
   return (
     <AnimatePresence mode="wait">
       {project && (
@@ -115,8 +109,7 @@ const Modal: React.FC<ModalProps> = ({ project, onClose, onProjectClick }) => {
                             initial={{ opacity: 0, y: 50 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.3, duration: 1, ease: [0.16, 1, 0.3, 1] }}
-                            className="font-bold text-white tracking-tighter leading-[0.85]"
-                            style={{ fontSize: `clamp(3rem, 15vw, ${desktopTitleSize})` }}
+                            className="font-bold text-white tracking-tighter leading-[0.85] text-5xl md:text-8xl"
                         >
                             {project.title}
                         </motion.h1>

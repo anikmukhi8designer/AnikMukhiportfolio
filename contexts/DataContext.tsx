@@ -78,7 +78,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchData = async () => {
     setIsLoading(true);
     try {
-        // We fetch individual tables to prevent one missing column from breaking the whole app
         const pRes = await supabase.from('projects').select('*').order('year', { ascending: false });
         const eRes = await supabase.from('experience').select('*').order('order', { ascending: true });
         const cRes = await supabase.from('clients').select('*').order('order', { ascending: true });
@@ -86,19 +85,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const confRes = await supabase.from('config').select('*').single();
         const socRes = await supabase.from('socials').select('*').order('order', { ascending: true });
 
-        // Check for specific column errors
-        if (pRes.error) {
-            console.error("Projects load error:", pRes.error.message);
-            if (pRes.error.message.includes('titleSize')) {
-                setError("Database missing 'titleSize' column. Click 'Fix Schema' in Admin panel.");
-            }
-        }
-
         const dbHasData = (pRes.data && pRes.data.length > 0) || (eRes.data && eRes.data.length > 0);
         
         if (dbHasData) {
             setIsDbEmpty(false);
-            if (pRes.data) setProjects(pRes.data.map(p => ({ ...p, titleSize: p.titleSize || 10 })));
+            if (pRes.data) setProjects(pRes.data);
             if (eRes.data) setExperience(eRes.data);
             if (cRes.data) setClients(cRes.data);
             if (sRes.data) setSkills(sRes.data);
@@ -115,6 +106,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         setLastUpdated(new Date());
+        setError(null);
     } catch (e: any) {
         console.error("Critical error fetching data:", e);
         setError(e.message);
