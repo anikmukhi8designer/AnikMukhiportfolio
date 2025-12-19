@@ -12,7 +12,8 @@ export const INITIAL_CONFIG: GlobalConfig = {
     heroDescription: "Building digital products that blend aesthetics with function. Currently crafting experiences in San Francisco.",
     experienceIntro: "Over the past 5 years, I've worked with startups and agencies to build scalable design systems and products.",
     seoTitle: "Mukhi Anik | Product Designer & Creative Developer",
-    seoDescription: "Product designer building digital products that blend aesthetics with function. Specializing in SaaS, Fintech, and high-end web experiences."
+    seoDescription: "Product designer building digital products that blend aesthetics with function. Specializing in SaaS, Fintech, and high-end web experiences.",
+    sectionOrder: ['clients', 'work', 'experience', 'skills']
 };
 
 export const PROJECTS: Project[] = [

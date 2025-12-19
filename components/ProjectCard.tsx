@@ -2,7 +2,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Project } from '../types';
-import { ArrowUpRight, Type } from 'lucide-react';
+import { ArrowUpRight, Type, Image as ImageIcon, Edit3 } from 'lucide-react';
 import { getOptimizedSrc, getOptimizedSrcSet } from '../utils/imageOptimizer';
 import { useData } from '../contexts/DataContext';
 
@@ -47,6 +47,22 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
           className="w-full h-full object-cover grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700 ease-out"
         />
         
+        {/* Admin Direct Image Edit Button */}
+        {isAdmin && (
+            <button 
+              onClick={(e) => {
+                  e.stopPropagation();
+                  const newUrl = prompt("Enter new thumbnail URL:", project.thumb);
+                  if (newUrl) updateProjectInMemory(project.id, { thumb: newUrl });
+              }}
+              className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px] z-10"
+            >
+                <div className="bg-white text-black px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 shadow-2xl transform translate-y-2 group-hover:translate-y-0 transition-transform">
+                    <Edit3 className="w-3 h-3" /> Edit Image
+                </div>
+            </button>
+        )}
+
         {/* Overlay Icon */}
         <div className="absolute top-4 right-4 bg-background/90 text-foreground p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
             <ArrowUpRight className="w-5 h-5" />
@@ -82,25 +98,43 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
                 ))}
             </div>
 
-            {/* Font Size Control - Visible only in Admin for editing */}
+            {/* Admin Controls - Visible only in Admin for editing */}
             {isAdmin && (
-                <div 
-                  className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 rounded-full border border-border"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                    <Type className="w-3 h-3 text-muted-foreground" />
-                    <input 
-                      type="range"
-                      min="10"
-                      max="60"
-                      step="1"
-                      value={project.titleSize || 40}
-                      onChange={(e) => updateProjectInMemory(project.id, { titleSize: parseInt(e.target.value) })}
-                      className="w-20 md:w-24 accent-primary cursor-ew-resize h-1"
-                    />
-                    <span className="text-[9px] font-mono text-muted-foreground w-4">
-                      {project.titleSize || 40}
-                    </span>
+                <div className="flex flex-wrap items-center gap-2">
+                    {/* Thumbnail URL Control */}
+                    <div 
+                      className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 rounded-full border border-border"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                        <ImageIcon className="w-3 h-3 text-muted-foreground" />
+                        <input 
+                          type="text"
+                          value={project.thumb}
+                          onChange={(e) => updateProjectInMemory(project.id, { thumb: e.target.value })}
+                          placeholder="Image URL..."
+                          className="w-24 md:w-32 bg-transparent border-none p-0 text-[10px] focus:ring-0 text-muted-foreground truncate font-mono"
+                        />
+                    </div>
+
+                    {/* Font Size Control */}
+                    <div 
+                      className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 rounded-full border border-border"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                        <Type className="w-3 h-3 text-muted-foreground" />
+                        <input 
+                          type="range"
+                          min="10"
+                          max="60"
+                          step="1"
+                          value={project.titleSize || 40}
+                          onChange={(e) => updateProjectInMemory(project.id, { titleSize: parseInt(e.target.value) })}
+                          className="w-20 md:w-24 accent-primary cursor-ew-resize h-1"
+                        />
+                        <span className="text-[9px] font-mono text-muted-foreground w-4">
+                          {project.titleSize || 40}
+                        </span>
+                    </div>
                 </div>
             )}
         </div>

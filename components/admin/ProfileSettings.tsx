@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Save, Plus, Trash2, Loader2, Check, Database, AlertTriangle, Wifi, ExternalLink, Globe, Search, Monitor, Info, Share2 } from 'lucide-react';
+import { Save, Plus, Trash2, Loader2, Check, Database, AlertTriangle, Wifi, ExternalLink, Globe, Search, Monitor, Info, Share2, ChevronUp, ChevronDown, Layout } from 'lucide-react';
 
 const ProfileSettings: React.FC = () => {
   const { config, socials, updateConfig, updateSocials, isSaving, verifyConnection } = useData();
@@ -23,7 +23,7 @@ const ProfileSettings: React.FC = () => {
     setDeployHook(localStorage.getItem('vercel_deploy_hook') || '');
   }, [config, socials]);
 
-  const handleConfigChange = (field: keyof typeof config, value: string) => {
+  const handleConfigChange = (field: keyof typeof config, value: any) => {
       setLocalConfig(prev => ({ ...prev, [field]: value }));
       setHasChanges(true);
       setJustSaved(false);
@@ -50,6 +50,23 @@ const ProfileSettings: React.FC = () => {
     setLocalSocials(newSocials);
     setHasChanges(true);
     setJustSaved(false);
+  };
+
+  const moveSection = (index: number, direction: 'up' | 'down') => {
+    const order = [...(localConfig.sectionOrder || ['clients', 'work', 'experience', 'skills'])];
+    if (direction === 'up' && index > 0) {
+      [order[index], order[index - 1]] = [order[index - 1], order[index]];
+    } else if (direction === 'down' && index < order.length - 1) {
+      [order[index], order[index + 1]] = [order[index + 1], order[index]];
+    }
+    handleConfigChange('sectionOrder', order);
+  };
+
+  const sectionLabels: Record<string, string> = {
+    clients: 'Clients & Collaborations',
+    work: 'Selected Work (Grid)',
+    experience: 'Work History (Experience)',
+    skills: 'Design & Tech (Skills)'
   };
 
   const saveChanges = () => {
@@ -139,6 +156,38 @@ const ProfileSettings: React.FC = () => {
                 {connectionMsg}
             </div>
         )}
+      </section>
+
+      {/* Section Layout Manager */}
+      <section className="space-y-6 bg-white p-6 rounded-xl border border-neutral-200 shadow-sm">
+        <h3 className="text-lg font-bold flex items-center gap-2">
+            <Layout className="w-5 h-5 text-neutral-400" /> Section Layout
+        </h3>
+        <p className="text-xs text-neutral-500">Arrange the sequence of sections on your homepage.</p>
+        
+        <div className="space-y-2 pt-2">
+          {(localConfig.sectionOrder || ['clients', 'work', 'experience', 'skills']).map((sectionId, idx, arr) => (
+            <div key={sectionId} className="flex items-center justify-between p-4 bg-neutral-50 border border-neutral-200 rounded-lg group hover:border-neutral-900 transition-all">
+              <span className="text-sm font-bold text-neutral-700">{sectionLabels[sectionId] || sectionId}</span>
+              <div className="flex items-center gap-1">
+                <button 
+                  disabled={idx === 0}
+                  onClick={() => moveSection(idx, 'up')}
+                  className="p-1.5 text-neutral-400 hover:text-neutral-900 disabled:opacity-20 transition-all"
+                >
+                  <ChevronUp className="w-4 h-4" />
+                </button>
+                <button 
+                  disabled={idx === arr.length - 1}
+                  onClick={() => moveSection(idx, 'down')}
+                  className="p-1.5 text-neutral-400 hover:text-neutral-900 disabled:opacity-20 transition-all"
+                >
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* Hero & About Section Configuration */}

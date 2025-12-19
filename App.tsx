@@ -164,6 +164,24 @@ const AppContent: React.FC = () => {
       element.scrollIntoView({ behavior: 'smooth' });
     }
   };
+
+  // Helper to render sections based on dynamic order
+  const renderSection = (sectionId: string) => {
+    switch (sectionId) {
+      case 'clients':
+        return <ClientsSection key="clients" />;
+      case 'work':
+        return <div id="work" key="work"><WorkSection onProjectClick={setSelectedProject} /></div>;
+      case 'experience':
+        return <div id="experience" key="experience"><ExperienceSection /></div>;
+      case 'skills':
+        return <SkillsSection key="skills" />;
+      default:
+        return null;
+    }
+  };
+
+  const currentSectionOrder = config.sectionOrder || ['clients', 'work', 'experience', 'skills'];
   
   return (
     <div className="min-h-screen bg-background text-foreground font-mono selection:bg-primary selection:text-primary-foreground cursor-none">
@@ -232,15 +250,7 @@ const AppContent: React.FC = () => {
           </motion.div>
         </section>
 
-        <ClientsSection />
-
-        <WorkSection onProjectClick={setSelectedProject} />
-
-        <div id="experience">
-          <ExperienceSection />
-        </div>
-
-        <SkillsSection />
+        {currentSectionOrder.map(sectionId => renderSection(sectionId))}
 
       </main>
 
@@ -271,7 +281,7 @@ const AppContent: React.FC = () => {
           </div>
           <div className="flex flex-col md:flex-row justify-between items-center text-xs uppercase tracking-widest text-muted-foreground border-t border-border pt-8">
             <p>&copy; {new Date().getFullYear()} Mukhi Anik. All rights reserved.</p>
-            <p>Designed with Google AI Lab.</p>
+            <p>Designed with New Genre Principles.</p>
           </div>
         </div>
       </footer>

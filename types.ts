@@ -72,9 +72,10 @@ export interface GlobalConfig {
   heroHeadline: string;
   heroSubheadline: string;
   heroDescription: string;
-  experienceIntro: string; // New field
-  seoTitle?: string;       // New field
-  seoDescription?: string; // New field
+  experienceIntro: string;
+  seoTitle?: string;
+  seoDescription?: string;
+  sectionOrder?: string[]; // Added for dynamic layout reordering
 }
 
 export interface SyncLogEntry {
