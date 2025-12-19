@@ -17,7 +17,7 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   const [activeTab, setActiveTab] = useState<'work' | 'experience' | 'skills' | 'clients' | 'settings'>('work');
-  const { resetData, syncData, triggerDeploy, projects, reloadContent, verifyConnection, isLoading, isSaving } = useData();
+  const { resetData, syncData, triggerDeploy, projects, reloadContent, verifyConnection, isLoading, isSaving, isDbEmpty } = useData();
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [deployStatus, setDeployStatus] = useState<'idle' | 'deploying' | 'success' | 'error'>('idle');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -113,6 +113,7 @@ create table if not exists projects (
   published boolean default false, 
   images text[], 
   content jsonb, 
+  "titleSize" int default 10,
   created_at timestamptz default now()
 );
 
@@ -378,16 +379,16 @@ on conflict (id) do nothing;
       </header>
 
       <main className="flex-grow p-4 md:p-8 max-w-7xl mx-auto w-full overflow-hidden flex flex-col">
-        {!connectionError && projects.length === 0 && (
+        {!connectionError && isDbEmpty && (
             <div className="mb-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
                 <div className="flex gap-4">
                     <div className="p-3 bg-white rounded-xl shadow-sm text-blue-600">
                         <Rocket className="w-6 h-6" />
                     </div>
                     <div>
-                        <h3 className="text-lg font-bold text-blue-900">Database is Empty</h3>
+                        <h3 className="text-lg font-bold text-blue-900">Database Setup</h3>
                         <p className="text-blue-700/80 text-sm leading-relaxed max-w-md">
-                            Would you like to populate it with the demo portfolio content?
+                            Your Supabase database is empty. Seed the initial content to start managing your portfolio.
                         </p>
                     </div>
                 </div>
