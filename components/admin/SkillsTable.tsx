@@ -1,34 +1,13 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Trash2, Plus, X, Check, Search, Loader2, Upload, AlertCircle, Save, RotateCcw } from 'lucide-react';
+import { Trash2, Plus, X, Check, Search, Loader2, Upload, AlertCircle, Save, RotateCcw, ImageIcon } from 'lucide-react';
 import { ICON_KEYS, SkillIcon } from '../SkillIcons';
 import { SkillCategory } from '../../types';
+import { supabase } from '../../src/supabaseClient';
 
 // Use the provided Brandfetch API Key
 const BRANDFETCH_API_KEY = "xcgD6C-HsoohCTMkqg3DR0i9wYmaqUB2nVktAG16TWiSgYr32T7dDkfOVBVc-DXgPyODc3hx2IgCr0Y3urqLrA";
-
-// --- Helpers for Upload (Copied to keep component self-contained) ---
-const getEnv = (key: string) => {
-    try {
-        // @ts-ignore
-        if (typeof import.meta !== 'undefined' && import.meta.env) {
-            // @ts-ignore
-            return import.meta.env[key];
-        }
-    } catch(e) {}
-    return '';
-};
-
-const getGitHubToken = () => {
-    const env = getEnv('VITE_GITHUB_TOKEN');
-    if (env) return env;
-    return localStorage.getItem('github_token') || '';
-};
-
-const getGitHubConfig = () => ({
-    owner: getEnv('VITE_GITHUB_OWNER') || localStorage.getItem('github_owner') || "",
-    repo: getEnv('VITE_GITHUB_REPO') || localStorage.getItem('github_repo') || ""
-});
 
 const generateUUID = () => {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -213,7 +192,7 @@ const SkillsTable: React.FC = () => {
       setShowResults(false);
   };
 
-  // Upload Logic
+  // Upload Logic to Supabase Storage
   const triggerUpload = () => {
       fileInputRef.current?.click();
   };
@@ -222,84 +201,37 @@ const SkillsTable: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    let token = getGitHubToken();
-    let { owner, repo } = getGitHubConfig();
-
-    if (!owner || !repo) {
-         const userOwner = prompt("GitHub Repository Owner (e.g. 'username'):");
-         if (!userOwner) return;
-         const userRepo = prompt("GitHub Repository Name (e.g. 'portfolio'):");
-         if (!userRepo) return;
-         
-         localStorage.setItem('github_owner', userOwner);
-         localStorage.setItem('github_repo', userRepo);
-         owner = userOwner;
-         repo = userRepo;
-    }
-    
-    if (!token) {
-        const userInput = prompt("GitHub Token is required for uploads. Please enter your GitHub Personal Access Token:");
-        if (userInput) {
-            localStorage.setItem('github_token', userInput.trim());
-            token = userInput.trim();
-        } else {
-            return;
-        }
-    }
-
     setIsUploading(true);
-    showStatus('loading', 'Uploading image...');
+    showStatus('loading', 'Uploading to Supabase...');
     
     try {
         const fileExt = file.name.split('.').pop();
         const fileName = `skill_${Date.now()}.${fileExt}`;
-        const filePath = `public/uploads/${fileName}`;
+        const filePath = `${fileName}`;
 
-        // Convert file to Base64
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
+        const { data, error } = await supabase.storage
+            .from('skills')
+            .upload(filePath, file);
+
+        if (error) throw error;
+
+        // Get Public URL
+        const { data: { publicUrl } } = supabase.storage
+            .from('skills')
+            .getPublicUrl(filePath);
         
-        reader.onload = async () => {
-            const base64Content = (reader.result as string).split(',')[1];
+        setNewItemImage(publicUrl);
+        if (!newItemName) {
+            setNewItemName(file.name.replace(`.${fileExt}`, ''));
+        }
+        showStatus('success', 'Logo stored in Supabase');
 
-            try {
-                const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        message: `Upload skill icon: ${fileName}`,
-                        content: base64Content
-                    })
-                });
-
-                if (!response.ok) throw new Error("GitHub Upload Failed");
-
-                // Use Raw URL
-                const publicUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${filePath}`;
-                
-                setNewItemImage(publicUrl);
-                // If name is empty, try to use filename (minus ext)
-                if (!newItemName) {
-                    setNewItemName(file.name.replace(`.${fileExt}`, ''));
-                }
-                showStatus('success', 'Image uploaded');
-
-            } catch (err) {
-                console.error(err);
-                showStatus('error', 'Upload failed. Verify permissions.');
-            } finally {
-                setIsUploading(false);
-                if (fileInputRef.current) fileInputRef.current.value = '';
-            }
-        };
-
-    } catch (error) {
+    } catch (error: any) {
         console.error("Upload failed", error);
+        showStatus('error', `Upload failed: ${error.message}`);
+    } finally {
         setIsUploading(false);
-        showStatus('error', 'Upload failed');
+        if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -448,7 +380,7 @@ const SkillsTable: React.FC = () => {
                                         onClick={triggerUpload} 
                                         disabled={isUploading}
                                         className="p-1.5 bg-neutral-100 hover:bg-neutral-200 rounded text-neutral-600 transition-colors flex-shrink-0"
-                                        title="Upload Image/SVG"
+                                        title="Store to Supabase"
                                     >
                                         {isUploading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Upload className="w-4 h-4"/>}
                                     </button>
