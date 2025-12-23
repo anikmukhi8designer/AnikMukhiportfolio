@@ -1,14 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Briefcase, LogOut, Wrench, Users, RefreshCw, UserCircle, Check, AlertCircle, Loader2, Rocket, UploadCloud, Copy, X, Database } from 'lucide-react';
+import { LogOut, RefreshCw, AlertCircle, Loader2, Github } from 'lucide-react';
 import WorkTable from './WorkTable';
 import ExperienceTable from './ExperienceTable';
 import SkillsTable from './SkillsTable';
 import ClientsTable from './ClientsTable';
 import ProfileSettings from './ProfileSettings';
 import { useData } from '../../contexts/DataContext';
-import { motion, AnimatePresence } from 'framer-motion';
-import { supabase } from '../../src/supabaseClient';
 import { Toaster } from 'sonner';
 
 interface DashboardProps {
@@ -18,252 +16,57 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   const [activeTab, setActiveTab] = useState<'work' | 'experience' | 'skills' | 'clients' | 'settings'>('work');
-  const { resetData, syncData, triggerDeploy, projects, reloadContent, verifyConnection, isLoading, isSaving, isDbEmpty, error: dataError } = useData();
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
-  const [deployStatus, setDeployStatus] = useState<'idle' | 'deploying' | 'success' | 'error'>('idle');
+  const { reloadContent, isLoading, error: dataError } = useData();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showSqlModal, setShowSqlModal] = useState(false);
-  const [copied, setCopied] = useState(false);
-  
-  const [errorMessage, setErrorMessage] = useState('');
-  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (dataError && (dataError.includes('titleSize') || dataError.includes('column') || dataError.includes('relation'))) {
-        setShowSqlModal(true);
-    }
-  }, [dataError]);
-
-  useEffect(() => {
-      reloadContent();
-      verifyConnection().then(result => {
-          if (!result.success) {
-              setConnectionError(result.message);
-          } else {
-              setConnectionError(null);
-          }
-      });
+    reloadContent();
   }, []);
 
   const handleRefresh = async () => {
-      setIsRefreshing(true);
-      await reloadContent();
-      setTimeout(() => setIsRefreshing(false), 800);
-  };
-
-  const setupSQL = `-- DATABASE REPAIR SCRIPT (v2)
--- 1. ENSURE PROJECTS TABLE EXISTS AND HAS ALL COLUMNS
-CREATE TABLE IF NOT EXISTS projects (
-  id TEXT PRIMARY KEY,
-  user_id UUID DEFAULT auth.uid(),
-  title TEXT,
-  client TEXT,
-  description TEXT,
-  year INT,
-  link TEXT,
-  published BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Fix projects columns if they are missing
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS "titleSize" INT DEFAULT 40;
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS "roles" TEXT[];
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS "tags" TEXT[];
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS "githubRepoUrl" TEXT;
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS "heroImage" TEXT;
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS "thumb" TEXT;
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS "images" TEXT[];
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS "content" JSONB;
-
--- 2. ENSURE OTHER TABLES EXIST
-CREATE TABLE IF NOT EXISTS experience (
-  id TEXT PRIMARY KEY, 
-  user_id UUID DEFAULT auth.uid(),
-  role TEXT, 
-  company TEXT, 
-  period TEXT, 
-  description TEXT, 
-  published BOOLEAN DEFAULT false, 
-  "order" INT DEFAULT 0, 
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS config (
-  id INT PRIMARY KEY DEFAULT 1, 
-  user_id UUID DEFAULT auth.uid(),
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Fix config columns if they are missing (Crucial for existing tables)
-ALTER TABLE config ADD COLUMN IF NOT EXISTS "resumeUrl" TEXT;
-ALTER TABLE config ADD COLUMN IF NOT EXISTS "email" TEXT;
-ALTER TABLE config ADD COLUMN IF NOT EXISTS "heroHeadline" TEXT;
-ALTER TABLE config ADD COLUMN IF NOT EXISTS "heroSubheadline" TEXT;
-ALTER TABLE config ADD COLUMN IF NOT EXISTS "heroDescription" TEXT;
-ALTER TABLE config ADD COLUMN IF NOT EXISTS "experienceIntro" TEXT;
-ALTER TABLE config ADD COLUMN IF NOT EXISTS "seoTitle" TEXT;
-ALTER TABLE config ADD COLUMN IF NOT EXISTS "seoDescription" TEXT;
-ALTER TABLE config ADD COLUMN IF NOT EXISTS "sectionOrder" TEXT[];
-ALTER TABLE config ADD COLUMN IF NOT EXISTS "heroImage" TEXT;
-
-CREATE TABLE IF NOT EXISTS clients (
-  id TEXT PRIMARY KEY,
-  name TEXT,
-  logo TEXT,
-  url TEXT,
-  "order" INT DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS skills (
-  id TEXT PRIMARY KEY,
-  title TEXT,
-  items JSONB,
-  "order" INT DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS socials (
-  id TEXT PRIMARY KEY,
-  platform TEXT,
-  url TEXT,
-  label TEXT,
-  "order" INT DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- 3. ENABLE ROW LEVEL SECURITY
-ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
-ALTER TABLE experience ENABLE ROW LEVEL SECURITY;
-ALTER TABLE config ENABLE ROW LEVEL SECURITY;
-ALTER TABLE skills ENABLE ROW LEVEL SECURITY;
-ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
-ALTER TABLE socials ENABLE ROW LEVEL SECURITY;
-
--- 4. CONFIGURE RLS POLICIES (Public Read, Auth All)
-DROP POLICY IF EXISTS "Public Select" ON projects;
-CREATE POLICY "Public Select" ON projects FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Auth All" ON projects;
-CREATE POLICY "Auth All" ON projects FOR ALL TO authenticated USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public Select" ON experience;
-CREATE POLICY "Public Select" ON experience FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Auth All" ON experience;
-CREATE POLICY "Auth All" ON experience FOR ALL TO authenticated USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public Select" ON config;
-CREATE POLICY "Public Select" ON config FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Auth All" ON config;
-CREATE POLICY "Auth All" ON config FOR ALL TO authenticated USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public Select" ON clients;
-CREATE POLICY "Public Select" ON clients FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Auth All" ON clients;
-CREATE POLICY "Auth All" ON clients FOR ALL TO authenticated USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public Select" ON skills;
-CREATE POLICY "Public Select" ON skills FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Auth All" ON skills;
-CREATE POLICY "Auth All" ON skills FOR ALL TO authenticated USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public Select" ON socials;
-CREATE POLICY "Public Select" ON socials FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Auth All" ON socials;
-CREATE POLICY "Auth All" ON socials FOR ALL TO authenticated USING (true) WITH CHECK (true);
-
--- 5. GRANT PERMISSIONS
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
-
--- 6. RELOAD CACHE
-NOTIFY pgrst, 'reload schema';
-`;
-
-  const copySQL = () => {
-    navigator.clipboard.writeText(setupSQL);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setIsRefreshing(true);
+    await reloadContent();
+    setTimeout(() => setIsRefreshing(false), 800);
   };
 
   if (isLoading) {
-      return (
-          <div className="min-h-screen bg-neutral-100 flex items-center justify-center flex-col gap-4">
-              <Loader2 className="w-10 h-10 animate-spin text-neutral-400" />
-              <p className="text-neutral-500 text-sm font-medium">Loading CMS...</p>
-          </div>
-      );
+    return (
+      <div className="min-h-screen bg-neutral-100 flex items-center justify-center flex-col gap-4">
+        <Loader2 className="w-10 h-10 animate-spin text-neutral-400" />
+        <p className="text-neutral-500 text-sm font-medium">Loading CMS...</p>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-neutral-100 flex flex-col">
+    <div className="min-h-screen bg-neutral-100 flex flex-col font-sans">
       <Toaster position="top-center" richColors />
-      <AnimatePresence>
-          {showSqlModal && (
-              <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-                  <motion.div 
-                    initial={{ opacity: 0 }} 
-                    animate={{ opacity: 1 }} 
-                    exit={{ opacity: 0 }}
-                    onClick={() => setShowSqlModal(false)}
-                    className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
-                  />
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
-                  >
-                      <div className="p-6 border-b border-neutral-200 flex justify-between items-center bg-white flex-shrink-0">
-                          <div>
-                            <h3 className="text-lg font-bold text-neutral-900">Database Repair</h3>
-                            <p className="text-xs text-neutral-500 mt-1">Copy and run this in your Supabase SQL Editor to fix missing columns and permissions.</p>
-                          </div>
-                          <button onClick={() => setShowSqlModal(false)} className="p-2 hover:bg-neutral-100 rounded-full">
-                              <X className="w-5 h-5 text-neutral-500" />
-                          </button>
-                      </div>
-                      <div className="p-6 bg-neutral-50 flex-grow overflow-auto">
-                          <div className="relative">
-                              <pre className="bg-neutral-900 text-neutral-300 p-4 rounded-lg text-xs font-mono overflow-auto max-h-[300px] whitespace-pre-wrap">
-                                  {setupSQL}
-                              </pre>
-                              <button 
-                                onClick={copySQL}
-                                className="absolute top-2 right-2 p-2 bg-white/10 hover:bg-white/20 rounded text-white flex items-center gap-2 text-xs font-bold transition-colors"
-                              >
-                                  {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                                  {copied ? 'Copied!' : 'Copy SQL'}
-                              </button>
-                          </div>
-                      </div>
-                      <div className="p-6 bg-white flex justify-end gap-3 flex-shrink-0">
-                          <button 
-                            onClick={() => { setShowSqlModal(false); reloadContent(); }}
-                            className="px-4 py-2 bg-neutral-900 text-white rounded-lg text-sm font-bold hover:bg-neutral-800"
-                          >
-                              I've Run the Script
-                          </button>
-                      </div>
-                  </motion.div>
-              </div>
-          )}
-      </AnimatePresence>
-
+      
       <header className="bg-white border-b border-neutral-200 sticky top-0 z-[100]">
         <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <span className="font-bold text-neutral-900 text-base md:text-lg truncate flex items-center gap-2">
-                <img src="/favicon.svg" alt="Logo" className="w-6 h-6" />
-                Mukhi Anik
+              <img src="/favicon.svg" alt="Logo" className="w-6 h-6" />
+              Admin Panel
             </span>
+            <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-neutral-100 rounded-full border border-neutral-200 text-[10px] font-bold text-neutral-500 uppercase tracking-widest">
+              <Github className="w-3 h-3" /> GitHub Linked
+            </div>
           </div>
           
           <div className="flex items-center gap-3 md:gap-4">
-            <button onClick={() => setShowSqlModal(true)} className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors">
-                <Database className="w-3 h-3" /> Fix Schema & Permissions
+            <button 
+              onClick={handleRefresh} 
+              disabled={isRefreshing}
+              className="p-2 text-neutral-400 hover:text-neutral-900 transition-colors"
+              title="Refresh Data"
+            >
+              <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
-            <button onClick={onLogout} className="p-2 text-neutral-400 hover:text-neutral-900 transition-colors">
-                <LogOut className="w-5 h-5" />
+            <div className="h-6 w-px bg-neutral-200"></div>
+            <button onClick={onLogout} className="flex items-center gap-2 px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg text-xs font-bold transition-all">
+              <LogOut className="w-4 h-4" />
+              Sign Out
             </button>
           </div>
         </div>
@@ -271,29 +74,31 @@ NOTIFY pgrst, 'reload schema';
 
       <main className="flex-grow p-4 md:p-8 max-w-7xl mx-auto w-full flex flex-col">
         {dataError && (
-             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-4">
-                <AlertCircle className="w-6 h-6 text-red-600 shrink-0" />
-                <div>
-                    <h3 className="text-sm font-bold text-red-900">Database Sync Error</h3>
-                    <p className="text-xs text-red-700 mt-1">{dataError}</p>
-                    <button onClick={() => setShowSqlModal(true)} className="mt-2 text-xs font-bold underline text-red-800">Fix Now</button>
-                </div>
-             </div>
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-4">
+            <AlertCircle className="w-6 h-6 text-red-600 shrink-0" />
+            <div>
+              <h3 className="text-sm font-bold text-red-900">Sync Error</h3>
+              <p className="text-xs text-red-700 mt-1">{dataError}</p>
+              <p className="text-[10px] text-red-500 mt-2 font-bold uppercase">Check your GitHub credentials in Settings.</p>
+            </div>
+          </div>
         )}
 
         <div className="flex overflow-x-auto pb-1 mb-8 bg-neutral-200/50 p-1 rounded-xl w-full md:w-fit">
-            <button onClick={() => setActiveTab('work')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'work' ? 'bg-white shadow-sm' : 'text-neutral-900'}`}>Work</button>
-            <button onClick={() => setActiveTab('experience')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'experience' ? 'bg-white shadow-sm' : 'text-neutral-500'}`}>Experience</button>
-            <button onClick={() => setActiveTab('skills')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'skills' ? 'bg-white shadow-sm' : 'text-neutral-500'}`}>Skills</button>
-            <button onClick={() => setActiveTab('clients')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'clients' ? 'bg-white shadow-sm' : 'text-neutral-500'}`}>Clients</button>
-            <button onClick={() => setActiveTab('settings')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'settings' ? 'bg-white shadow-sm' : 'text-neutral-500'}`}>Settings</button>
+          <button onClick={() => setActiveTab('work')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'work' ? 'bg-white shadow-sm' : 'text-neutral-900'}`}>Work</button>
+          <button onClick={() => setActiveTab('experience')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'experience' ? 'bg-white shadow-sm' : 'text-neutral-500'}`}>Experience</button>
+          <button onClick={() => setActiveTab('skills')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'skills' ? 'bg-white shadow-sm' : 'text-neutral-500'}`}>Skills</button>
+          <button onClick={() => setActiveTab('clients')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'clients' ? 'bg-white shadow-sm' : 'text-neutral-500'}`}>Clients</button>
+          <button onClick={() => setActiveTab('settings')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'settings' ? 'bg-white shadow-sm' : 'text-neutral-500'}`}>Settings</button>
         </div>
 
-        {activeTab === 'work' && <WorkTable onEdit={onEditProject} />}
-        {activeTab === 'experience' && <ExperienceTable />}
-        {activeTab === 'skills' && <SkillsTable />}
-        {activeTab === 'clients' && <ClientsTable />}
-        {activeTab === 'settings' && <ProfileSettings />}
+        <div className="flex-grow">
+          {activeTab === 'work' && <WorkTable onEdit={onEditProject} />}
+          {activeTab === 'experience' && <ExperienceTable />}
+          {activeTab === 'skills' && <SkillsTable />}
+          {activeTab === 'clients' && <ClientsTable />}
+          {activeTab === 'settings' && <ProfileSettings />}
+        </div>
       </main>
     </div>
   );

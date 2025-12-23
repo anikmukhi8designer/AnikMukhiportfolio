@@ -12,7 +12,7 @@ import SplitNavPanel from './components/SplitNavPanel';
 import CustomCursor from './components/CustomCursor';
 import ScrollToTop from './components/ScrollToTop';
 import { ArrowDown } from 'lucide-react';
-import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
+import { motion, useScroll, useTransform } from 'framer-motion';
 
 // Admin Imports
 import AdminLogin from './components/admin/AdminLogin';
@@ -25,54 +25,64 @@ import { DataProvider, useData } from './contexts/DataContext';
 const AdminRoot = () => {
   const [view, setView] = useState<'dashboard' | 'editor'>('dashboard');
   const [editorProjectId, setEditorProjectId] = useState<string | null>(null);
-  const { projects, updateProject, deleteProject } = useData();
+  const { projects, updateProject, deleteProject, isLoading } = useData();
 
-  // Simple check for GitHub token in localStorage as our session indicator
+  // Check for GitHub credentials in localStorage
   const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('github_token');
 
   if (!hasToken) {
     return <AdminLogin onLogin={() => window.location.reload()} />;
   }
 
-  if (view === 'editor' && editorProjectId) {
-      const project = projects.find(p => p.id === editorProjectId);
-      if (!project) return <div className="p-20 text-center font-mono uppercase text-xs tracking-widest animate-pulse">Loading Project...</div>;
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-neutral-100 flex items-center justify-center flex-col gap-4 font-sans">
+        <div className="w-12 h-12 border-4 border-neutral-300 border-t-neutral-900 rounded-full animate-spin"></div>
+        <p className="text-neutral-500 text-xs font-bold uppercase tracking-widest">Synchronizing...</p>
+      </div>
+    );
+  }
 
-      return (
-        <BlockEditor 
-            project={project} 
-            onSave={async (updated) => {
-                try {
-                    // Rename logic: if the ID changed, delete the old record and create the new one
-                    if (editorProjectId && updated.id !== editorProjectId) {
-                        await deleteProject(editorProjectId);
-                    }
-                    await updateProject(updated.id, updated);
-                    setView('dashboard');
-                    setEditorProjectId(null);
-                } catch (e: any) {
-                    console.error("Save failed:", e);
-                    throw e; 
-                }
-            }} 
-            onBack={() => {
-                setView('dashboard');
-                setEditorProjectId(null);
-            }} 
-        />
-      );
+  if (view === 'editor' && editorProjectId) {
+    const project = projects.find(p => p.id === editorProjectId);
+    if (!project) return <div className="p-20 text-center font-sans uppercase text-xs tracking-widest">Project Not Found</div>;
+
+    return (
+      <BlockEditor 
+        project={project} 
+        onSave={async (updated) => {
+          try {
+            if (editorProjectId && updated.id !== editorProjectId) {
+              await deleteProject(editorProjectId);
+            }
+            await updateProject(updated.id, updated);
+            setView('dashboard');
+            setEditorProjectId(null);
+          } catch (e: any) {
+            console.error("Save failed:", e);
+            throw e; 
+          }
+        }} 
+        onBack={() => {
+          setView('dashboard');
+          setEditorProjectId(null);
+        }} 
+      />
+    );
   }
 
   return (
     <Dashboard 
-        onLogout={() => {
-            localStorage.removeItem('github_token');
-            window.location.reload();
-        }} 
-        onEditProject={(id) => {
-            setEditorProjectId(id);
-            setView('editor');
-        }} 
+      onLogout={() => {
+        localStorage.removeItem('github_token');
+        localStorage.removeItem('github_owner');
+        localStorage.removeItem('github_repo');
+        window.location.reload();
+      }} 
+      onEditProject={(id) => {
+        setEditorProjectId(id);
+        setView('editor');
+      }} 
     />
   );
 };
@@ -83,7 +93,7 @@ const AppContent: React.FC = () => {
   
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
-        return localStorage.getItem('theme') as 'light' | 'dark' || 'dark';
+      return (localStorage.getItem('theme') as 'light' | 'dark') || 'dark';
     }
     return 'dark';
   });
@@ -91,9 +101,9 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     const root = window.document.documentElement;
     if (theme === 'dark') {
-        root.classList.add('dark');
+      root.classList.add('dark');
     } else {
-        root.classList.remove('dark');
+      root.classList.remove('dark');
     }
     localStorage.setItem('theme', theme);
   }, [theme]);
@@ -104,43 +114,31 @@ const AppContent: React.FC = () => {
   
   const { socials, config } = useData();
 
-  // SEO Effect
   useEffect(() => {
     const title = config.seoTitle || `${config.heroHeadline} | Mukhi Anik`;
     const description = config.seoDescription || config.heroDescription;
     const url = window.location.origin;
-    const image = config.heroImage || '/og-image.jpg';
 
     document.title = title;
     
     const updateMeta = (name: string, content: string, attr = 'name') => {
-        let el = document.querySelector(`meta[${attr}="${name}"]`);
-        if (!el) {
-            el = document.createElement('meta');
-            el.setAttribute(attr, name);
-            document.head.appendChild(el);
-        }
-        el.setAttribute('content', content);
+      let el = document.querySelector(`meta[${attr}="${name}"]`);
+      if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute(attr, name);
+        document.head.appendChild(el);
+      }
+      el.setAttribute('content', content);
     };
 
     updateMeta('description', description);
     updateMeta('og:title', title, 'property');
     updateMeta('og:description', description, 'property');
     updateMeta('og:url', url, 'property');
-    updateMeta('og:image', image, 'property');
     updateMeta('og:type', 'website', 'property');
     updateMeta('twitter:card', 'summary_large_image');
     updateMeta('twitter:title', title);
     updateMeta('twitter:description', description);
-    updateMeta('twitter:image', image);
-
-    let canonical = document.querySelector('link[rel="canonical"]');
-    if (!canonical) {
-        canonical = document.createElement('link');
-        canonical.setAttribute('rel', 'canonical');
-        document.head.appendChild(canonical);
-    }
-    canonical.setAttribute('href', url);
 
   }, [config]);
 
@@ -293,7 +291,7 @@ const App: React.FC = () => {
         };
         handleHashChange();
         window.addEventListener('hashchange', handleHashChange);
-        return () => window.removeEventListener('hashchange', handleHashChange);
+        return () => window.location.hash === '#admin' ? setIsAdmin(true) : setIsAdmin(false);
     }, []);
 
     return (

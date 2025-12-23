@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useData } from '../contexts/DataContext';
 import { Project } from '../types';
@@ -9,7 +10,12 @@ interface WorkSectionProps {
 
 const WorkSection: React.FC<WorkSectionProps> = ({ onProjectClick }) => {
   const { projects } = useData();
-  const publishedProjects = projects.filter(p => p.published);
+  
+  // Check if we are in admin mode to show unpublished work
+  const isAdmin = typeof window !== 'undefined' && window.location.hash === '#admin';
+  
+  // Show all projects in admin, otherwise only published
+  const displayProjects = isAdmin ? projects : projects.filter(p => p.published);
   
   const [hoveredProject, setHoveredProject] = useState<string | null>(null);
 
@@ -21,26 +27,26 @@ const WorkSection: React.FC<WorkSectionProps> = ({ onProjectClick }) => {
         <div className="flex flex-col md:flex-row items-start md:items-end justify-between mb-12 gap-4 pb-8 border-b border-border">
            <div>
              <h2 className="text-4xl md:text-5xl font-bold tracking-tighter text-foreground mb-2">
-               Selected Work
+               {isAdmin ? 'Project Manager' : 'Selected Work'}
              </h2>
              <p className="text-muted-foreground text-sm font-mono uppercase tracking-widest">
-               / Case Studies & Experiments
+               {isAdmin ? '/ Content Repository' : '/ Case Studies & Experiments'}
              </p>
            </div>
            
            <div className="text-right hidden md:block">
              <span className="text-lg font-bold text-primary block">
-               {String(publishedProjects.length).padStart(2, '0')}
+               {String(displayProjects.length).padStart(2, '0')}
              </span>
              <span className="text-[10px] uppercase text-muted-foreground tracking-widest">
-               Projects
+               Total items
              </span>
            </div>
         </div>
 
-        {/* Projects Grid - No Gap or small gap for grid lines */}
+        {/* Projects Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 md:gap-8">
-          {publishedProjects.map((project) => (
+          {displayProjects.map((project) => (
             <ProjectCard 
               key={project.id} 
               project={project} 
@@ -51,9 +57,9 @@ const WorkSection: React.FC<WorkSectionProps> = ({ onProjectClick }) => {
           ))}
         </div>
 
-        {publishedProjects.length === 0 && (
+        {displayProjects.length === 0 && (
             <div className="py-24 text-center text-muted-foreground font-mono">
-                [ No projects published ]
+                [ No projects found ]
             </div>
         )}
       </div>
