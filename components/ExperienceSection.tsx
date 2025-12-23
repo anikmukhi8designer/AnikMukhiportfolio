@@ -26,7 +26,7 @@ const ExperienceSection: React.FC = () => {
           {/* Introduction */}
           <div className="lg:col-span-4">
             <h3 className="text-xl font-mono text-muted-foreground sticky top-32 leading-relaxed whitespace-pre-wrap">
-              // {config.experienceIntro || "Over the past years, I've worked with startups and agencies to build scalable systems."}
+              // {config.experienceIntro || "Over the past few years, I’ve collaborated with startups and agencies to design scalable, user-focused digital systems."}
             </h3>
           </div>
           
