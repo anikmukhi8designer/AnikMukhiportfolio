@@ -51,46 +51,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
       setTimeout(() => setIsRefreshing(false), 800);
   };
 
-  const handleSync = async () => {
-    if (isSaving || syncStatus === 'syncing') return;
-
-    setSyncStatus('syncing');
-    setErrorMessage('');
-    
-    try {
-        await syncData("Manual Sync from Admin Dashboard");
-        setSyncStatus('success');
-        await reloadContent();
-        setTimeout(() => setSyncStatus('idle'), 4000);
-    } catch (e: any) {
-        console.error("Sync Error:", e);
-        setSyncStatus('error');
-        setErrorMessage(e.message || "Database Sync Failed.");
-        setTimeout(() => {
-            setSyncStatus('idle');
-            setErrorMessage('');
-        }, 5000);
-    }
-  };
-
-  const handleDeploy = async () => {
-      setDeployStatus('deploying');
-      try {
-          await triggerDeploy();
-          setDeployStatus('success');
-          setTimeout(() => setDeployStatus('idle'), 3000);
-      } catch (e: any) {
-          setDeployStatus('error');
-          setErrorMessage("Deploy failed. Check settings.");
-          setTimeout(() => {
-            setDeployStatus('idle');
-            setErrorMessage('');
-        }, 3000);
-      }
-  };
-
   const setupSQL = `-- 1. ENSURE COLUMNS EXIST IN PROJECTS TABLE
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS "titleSize" INT DEFAULT 10;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS "titleSize" INT DEFAULT 40;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS "roles" TEXT[];
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS "tags" TEXT[];
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS "githubRepoUrl" TEXT;
@@ -119,11 +81,31 @@ CREATE TABLE IF NOT EXISTS config (
   "experienceIntro" TEXT,
   "seoTitle" TEXT,
   "seoDescription" TEXT,
+  "sectionOrder" TEXT[],
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 3. MANDATORY: RELOAD SCHEMA CACHE
--- Run this to fix "column not found in schema cache" errors
+-- 3. ENABLE PUBLIC READ ACCESS (RLS)
+ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE experience ENABLE ROW LEVEL SECURITY;
+ALTER TABLE config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE skills ENABLE ROW LEVEL SECURITY;
+ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE socials ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read-only access to projects" ON projects FOR SELECT USING (true);
+CREATE POLICY "Allow public read-only access to experience" ON experience FOR SELECT USING (true);
+CREATE POLICY "Allow public read-only access to config" ON config FOR SELECT USING (true);
+CREATE POLICY "Allow public read-only access to skills" ON skills FOR SELECT USING (true);
+CREATE POLICY "Allow public read-only access to clients" ON clients FOR SELECT USING (true);
+CREATE POLICY "Allow public read-only access to socials" ON socials FOR SELECT USING (true);
+
+-- 4. GRANT PERMISSIONS TO ANON AND AUTH ROLES
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+
+-- 5. RELOAD SCHEMA CACHE
 NOTIFY pgrst, 'reload schema';
 `;
 
@@ -163,7 +145,7 @@ NOTIFY pgrst, 'reload schema';
                       <div className="p-6 border-b border-neutral-200 flex justify-between items-center bg-white flex-shrink-0">
                           <div>
                             <h3 className="text-lg font-bold text-neutral-900">Database Repair</h3>
-                            <p className="text-xs text-neutral-500 mt-1">Copy and run this in your Supabase SQL Editor to fix missing columns.</p>
+                            <p className="text-xs text-neutral-500 mt-1">Copy and run this in your Supabase SQL Editor to fix missing columns and permissions.</p>
                           </div>
                           <button onClick={() => setShowSqlModal(false)} className="p-2 hover:bg-neutral-100 rounded-full">
                               <X className="w-5 h-5 text-neutral-500" />
@@ -207,7 +189,7 @@ NOTIFY pgrst, 'reload schema';
           
           <div className="flex items-center gap-3 md:gap-4">
             <button onClick={() => setShowSqlModal(true)} className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors">
-                <Database className="w-3 h-3" /> Fix Schema
+                <Database className="w-3 h-3" /> Fix Schema & Permissions
             </button>
             <button onClick={onLogout} className="p-2 text-neutral-400 hover:text-neutral-900 transition-colors">
                 <LogOut className="w-5 h-5" />

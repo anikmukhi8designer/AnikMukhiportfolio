@@ -1,8 +1,8 @@
 
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Project } from '../types';
-import { ArrowUpRight, Type, Image as ImageIcon, Edit3 } from 'lucide-react';
+import { ArrowUpRight, Type, Image as ImageIcon, Edit3, Eye, EyeOff, Check } from 'lucide-react';
 import { getOptimizedSrc, getOptimizedSrcSet } from '../utils/imageOptimizer';
 import { useData } from '../contexts/DataContext';
 
@@ -14,10 +14,28 @@ interface ProjectCardProps {
 }
 
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnter, onMouseLeave }) => {
-  const { updateProjectInMemory } = useData();
+  const { updateProjectInMemory, updateProject } = useData();
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   // Check if we are in admin mode to show the control
   const isAdmin = typeof window !== 'undefined' && window.location.hash === '#admin';
+
+  const handleTitleBlur = async () => {
+    setSaveStatus('saving');
+    try {
+        await updateProject(project.id, { title: project.title });
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch (e) {
+        setSaveStatus('idle');
+    }
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') {
+          (e.target as HTMLInputElement).blur();
+      }
+  };
 
   return (
     <motion.div
@@ -30,7 +48,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
       }}
       viewport={{ once: true }}
       transition={{ duration: 0.5 }}
-      className="group cursor-pointer flex flex-col border border-border bg-card hover:border-primary/40 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15)] dark:hover:shadow-[0_30px_60px_-15px_rgba(255,255,255,0.05)] transition-all duration-500 ease-out"
+      className={`group cursor-pointer flex flex-col border border-border bg-card hover:border-primary/40 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15)] dark:hover:shadow-[0_30px_60px_-15px_rgba(255,255,255,0.05)] transition-all duration-500 ease-out ${!project.published && isAdmin ? 'opacity-60 grayscale' : ''}`}
       onClick={() => onClick(project)}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -53,7 +71,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
               onClick={(e) => {
                   e.stopPropagation();
                   const newUrl = prompt("Enter new thumbnail URL:", project.thumb);
-                  if (newUrl) updateProjectInMemory(project.id, { thumb: newUrl });
+                  if (newUrl) updateProject(project.id, { thumb: newUrl });
               }}
               className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px] z-10"
             >
@@ -67,22 +85,57 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
         <div className="absolute top-4 right-4 bg-background/90 text-foreground p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
             <ArrowUpRight className="w-5 h-5" />
         </div>
+
+        {/* Visibility Status Badge (Admin Only) */}
+        {isAdmin && !project.published && (
+            <div className="absolute top-4 left-4 bg-orange-500 text-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest z-20">
+                Draft
+            </div>
+        )}
       </div>
 
       {/* Content */}
       <div className="p-5 flex flex-col gap-4">
         <div className="flex justify-between items-start">
-            <div className="space-y-1 w-full">
+            <div className="space-y-1 w-full relative">
                 <span className="text-[10px] uppercase tracking-widest text-muted-foreground block">
                     {project.client}
                 </span>
-                <motion.h3 
-                  layoutId={`project-title-${project.id}`}
-                  style={{ fontSize: `${project.titleSize || 40}px` }}
-                  className="font-bold text-foreground leading-tight group-hover:text-primary transition-all duration-300"
-                >
-                  {project.title}
-                </motion.h3>
+                
+                {isAdmin ? (
+                  <div className="relative">
+                    <input
+                        type="text"
+                        value={project.title}
+                        onChange={(e) => updateProjectInMemory(project.id, { title: e.target.value })}
+                        onBlur={handleTitleBlur}
+                        onKeyDown={handleTitleKeyDown}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ fontSize: `${project.titleSize || 40}px` }}
+                        className="font-bold text-foreground leading-tight bg-transparent border-none p-0 w-full focus:ring-0 focus:outline-none hover:text-primary transition-all duration-300"
+                    />
+                    <AnimatePresence>
+                        {saveStatus === 'saved' && (
+                            <motion.div 
+                                initial={{ opacity: 0, x: 10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0 }}
+                                className="absolute -right-8 top-1/2 -translate-y-1/2 text-green-500"
+                            >
+                                <Check className="w-4 h-4" />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                  </div>
+                ) : (
+                  <motion.h3 
+                    layoutId={`project-title-${project.id}`}
+                    style={{ fontSize: `${project.titleSize || 40}px` }}
+                    className="font-bold text-foreground leading-tight group-hover:text-primary transition-all duration-300"
+                  >
+                    {project.title}
+                  </motion.h3>
+                )}
             </div>
             <span className="text-xs font-mono text-muted-foreground border border-border px-2 py-1 shrink-0">
                 {project.year}
@@ -100,27 +153,38 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
 
             {/* Admin Controls - Visible only in Admin for editing */}
             {isAdmin && (
-                <div className="flex flex-wrap items-center gap-2">
-                    {/* Thumbnail URL Control */}
-                    <div 
-                      className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 rounded-full border border-border"
-                      onClick={(e) => e.stopPropagation()}
+                <div className="flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    {/* Visibility Toggle */}
+                    <button 
+                      onClick={() => updateProject(project.id, { published: !project.published })}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all ${
+                        project.published 
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 border-green-200 hover:bg-green-200' 
+                          : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 border-orange-200 hover:bg-orange-200'
+                      }`}
+                      title={project.published ? "Click to set as Draft" : "Click to Publish"}
                     >
+                        {project.published ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                        <span className="text-[10px] font-bold uppercase tracking-widest">
+                            {project.published ? 'Live' : 'Draft'}
+                        </span>
+                    </button>
+
+                    {/* Thumbnail URL Control */}
+                    <div className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 rounded-full border border-border">
                         <ImageIcon className="w-3 h-3 text-muted-foreground" />
                         <input 
                           type="text"
                           value={project.thumb}
                           onChange={(e) => updateProjectInMemory(project.id, { thumb: e.target.value })}
+                          onBlur={(e) => updateProject(project.id, { thumb: e.target.value })}
                           placeholder="Image URL..."
                           className="w-24 md:w-32 bg-transparent border-none p-0 text-[10px] focus:ring-0 text-muted-foreground truncate font-mono"
                         />
                     </div>
 
                     {/* Font Size Control */}
-                    <div 
-                      className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 rounded-full border border-border"
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <div className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 rounded-full border border-border">
                         <Type className="w-3 h-3 text-muted-foreground" />
                         <input 
                           type="range"
@@ -129,6 +193,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
                           step="1"
                           value={project.titleSize || 40}
                           onChange={(e) => updateProjectInMemory(project.id, { titleSize: parseInt(e.target.value) })}
+                          onMouseUp={(e) => updateProject(project.id, { titleSize: parseInt((e.target as HTMLInputElement).value) })}
                           className="w-20 md:w-24 accent-primary cursor-ew-resize h-1"
                         />
                         <span className="text-[9px] font-mono text-muted-foreground w-4">

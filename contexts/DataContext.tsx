@@ -62,8 +62,7 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-// List of columns that actually exist in the database to avoid schema errors
-const PROJECT_COLUMNS = 'id, title, client, roles, description, year, heroImage, thumb, tags, link, githubRepoUrl, published, images, content';
+const PROJECT_COLUMNS = 'id, title, client, roles, description, year, heroImage, thumb, tags, link, githubRepoUrl, published, images, content, titleSize';
 const CONFIG_COLUMNS = 'id, resumeUrl, email, heroHeadline, heroSubheadline, heroDescription, experienceIntro, seoTitle, seoDescription, sectionOrder';
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -83,40 +82,50 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchData = async () => {
     setIsLoading(true);
     try {
-        const pRes = await supabase.from('projects').select(PROJECT_COLUMNS).order('year', { ascending: false });
-        const eRes = await supabase.from('experience').select('*').order('order', { ascending: true });
-        const cRes = await supabase.from('clients').select('*').order('order', { ascending: true });
-        const sRes = await supabase.from('skills').select('*').order('order', { ascending: true });
-        
-        // We attempt to select with sectionOrder but handle error if column is missing (brutal schema resilience)
-        const confRes = await supabase.from('config').select(CONFIG_COLUMNS).single();
-        const socRes = await supabase.from('socials').select('*').order('order', { ascending: true });
+        // Fetch all tables
+        const [pRes, eRes, cRes, sRes, confRes, socRes] = await Promise.all([
+            supabase.from('projects').select(PROJECT_COLUMNS).order('year', { ascending: false }),
+            supabase.from('experience').select('*').order('order', { ascending: true }),
+            supabase.from('clients').select('*').order('order', { ascending: true }),
+            supabase.from('skills').select('*').order('order', { ascending: true }),
+            supabase.from('config').select(CONFIG_COLUMNS).single(),
+            supabase.from('socials').select('*').order('order', { ascending: true })
+        ]);
 
-        const dbHasData = (pRes.data && pRes.data.length > 0) || (eRes.data && eRes.data.length > 0);
-        
-        if (dbHasData) {
+        // Logic fix: Don't check for total data. Apply whatever exists.
+        if (pRes.data && pRes.data.length > 0) {
+            setProjects(pRes.data);
             setIsDbEmpty(false);
-            if (pRes.data) setProjects(pRes.data);
-            if (eRes.data) setExperience(eRes.data);
-            if (cRes.data) setClients(cRes.data);
-            if (sRes.data) setSkills(sRes.data);
-            if (confRes.data) setConfig({ ...INITIAL_CONFIG, ...confRes.data });
-            if (socRes.data) setSocials(socRes.data);
         } else {
-            setIsDbEmpty(true);
             setProjects(INITIAL_PROJECTS);
-            setExperience(INITIAL_EXPERIENCE);
-            setClients(INITIAL_CLIENTS);
-            setSkills(INITIAL_SKILLS);
-            setConfig(INITIAL_CONFIG);
-            setSocials(INITIAL_SOCIALS);
+            setIsDbEmpty(true);
         }
+
+        if (eRes.data && eRes.data.length > 0) setExperience(eRes.data);
+        else setExperience(INITIAL_EXPERIENCE);
+
+        if (cRes.data && cRes.data.length > 0) setClients(cRes.data);
+        else setClients(INITIAL_CLIENTS);
+
+        if (sRes.data && sRes.data.length > 0) setSkills(sRes.data);
+        else setSkills(INITIAL_SKILLS);
+
+        // CONFIG IS INDEPENDENT: If row exists in DB, use it!
+        if (confRes.data) {
+            setConfig({ ...INITIAL_CONFIG, ...confRes.data });
+        } else {
+            setConfig(INITIAL_CONFIG);
+        }
+
+        if (socRes.data && socRes.data.length > 0) setSocials(socRes.data);
+        else setSocials(INITIAL_SOCIALS);
 
         setLastUpdated(new Date());
         setError(null);
     } catch (e: any) {
         console.error("Critical error fetching data:", e);
         setError(e.message);
+        // Fallbacks
         setProjects(INITIAL_PROJECTS);
         setConfig(INITIAL_CONFIG);
     } finally {
@@ -140,8 +149,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateProject = async (id: string, data: Partial<Project>) => {
       setIsSaving(true);
       try {
+          // Clean data before Supabase send
           const { titleSize, ...supabaseData } = data as any;
-          const { error } = await supabase.from('projects').upsert({ ...supabaseData, id }).select(PROJECT_COLUMNS);
+          const { error } = await supabase.from('projects').upsert({ ...supabaseData, id });
           if (error) throw error;
           updateProjectInMemory(id, data);
       } catch (e: any) {
@@ -155,8 +165,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const addProject = async (project: Project) => {
       setIsSaving(true);
       try {
-          const { titleSize, ...supabaseData } = project as any;
-          const { error } = await supabase.from('projects').insert(supabaseData);
+          const { error } = await supabase.from('projects').insert(project);
           if (error) throw error;
           await fetchData();
       } catch (e: any) {
@@ -240,7 +249,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateConfig = async (data: Partial<GlobalConfig>) => {
     setIsSaving(true);
     try {
-      // Stripping potential unknown columns during update to avoid 42703
       const { error } = await supabase.from('config').upsert({ id: 1, ...data });
       if (error) throw error;
       await fetchData();
