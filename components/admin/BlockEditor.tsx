@@ -5,7 +5,7 @@ import {
   ArrowLeft, Save, Trash2, Image as ImageIcon, 
   Type, Layout, Settings, Upload, Loader2, Check, X, 
   LayoutTemplate, ChevronUp, ChevronDown, Plus, 
-  Heading1, Heading2, AlignLeft, Columns, Tag, Users, AlertCircle
+  Heading1, Heading2, AlignLeft, Columns, Tag, Users, AlertCircle, Copy, RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useData } from '../../contexts/DataContext';
@@ -245,8 +245,7 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
                 
                 {/* Hero Editor */}
                 <div 
-                    onClick={() => triggerUpload(url => handleMetaChange('heroImage', url))}
-                    className="relative w-full h-[500px] bg-neutral-900 flex items-center justify-center group cursor-pointer overflow-hidden"
+                    className="relative w-full h-[500px] bg-neutral-900 flex items-center justify-center group overflow-hidden"
                 >
                     {isUploading ? (
                         <Loader2 className="w-10 h-10 animate-spin text-white" />
@@ -260,10 +259,22 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
                                     <span className="text-xs font-bold uppercase tracking-widest opacity-40">Upload Hero Image</span>
                                 </div>
                             )}
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
-                                <div className="bg-white text-black px-6 py-3 rounded-full text-xs font-bold shadow-2xl flex items-center gap-2 transform translate-y-4 group-hover:translate-y-0 transition-transform">
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-[2px] gap-4">
+                                <button 
+                                  onClick={() => triggerUpload(url => handleMetaChange('heroImage', url))}
+                                  className="bg-white text-black px-6 py-3 rounded-full text-xs font-bold shadow-2xl flex items-center gap-2 transform translate-y-4 group-hover:translate-y-0 transition-all hover:bg-neutral-100"
+                                >
                                   <Upload className="w-4 h-4" /> Change Hero Image
-                                </div>
+                                </button>
+                                
+                                {formData.thumb && (
+                                  <button 
+                                    onClick={() => handleMetaChange('heroImage', formData.thumb)}
+                                    className="bg-neutral-900/80 text-white px-6 py-3 rounded-full text-xs font-bold shadow-2xl flex items-center gap-2 transform translate-y-6 group-hover:translate-y-0 transition-all hover:bg-neutral-800 border border-white/20"
+                                  >
+                                    <RefreshCw className="w-4 h-4" /> Use Thumbnail Image
+                                  </button>
+                                )}
                             </div>
                         </>
                     )}
@@ -482,6 +493,15 @@ const BlockEditor: React.FC<BlockEditorProps> = ({ project, onSave, onBack }) =>
                       >
                           {formData.thumb ? <img src={formData.thumb} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="thumb"/> : <ImageIcon className="w-8 h-8 text-neutral-300"/>}
                       </div>
+                      
+                      {formData.heroImage && (
+                        <button 
+                          onClick={() => handleMetaChange('thumb', formData.heroImage)}
+                          className="w-full py-2 text-[10px] font-bold uppercase tracking-widest text-neutral-400 hover:text-neutral-900 flex items-center justify-center gap-2 transition-colors border border-dashed border-neutral-200 rounded-lg hover:border-neutral-400"
+                        >
+                          <Copy className="w-3 h-3" /> Apply Banner Image
+                        </button>
+                      )}
                   </div>
 
                   <div className="space-y-3">

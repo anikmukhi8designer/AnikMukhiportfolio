@@ -28,8 +28,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   const [connectionError, setConnectionError] = useState<string | null>(null);
 
   useEffect(() => {
-    // If DataContext reporting a column error, show modal
-    if (dataError && (dataError.includes('titleSize') || dataError.includes('column'))) {
+    if (dataError && (dataError.includes('titleSize') || dataError.includes('column') || dataError.includes('relation'))) {
         setShowSqlModal(true);
     }
   }, [dataError]);
@@ -51,11 +50,29 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
       setTimeout(() => setIsRefreshing(false), 800);
   };
 
-  const setupSQL = `-- 1. ENSURE COLUMNS EXIST IN PROJECTS TABLE
+  const setupSQL = `-- DATABASE REPAIR SCRIPT (v2)
+-- 1. ENSURE PROJECTS TABLE EXISTS AND HAS ALL COLUMNS
+CREATE TABLE IF NOT EXISTS projects (
+  id TEXT PRIMARY KEY,
+  user_id UUID DEFAULT auth.uid(),
+  title TEXT,
+  client TEXT,
+  description TEXT,
+  year INT,
+  link TEXT,
+  published BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Fix projects columns if they are missing
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS "titleSize" INT DEFAULT 40;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS "roles" TEXT[];
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS "tags" TEXT[];
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS "githubRepoUrl" TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS "heroImage" TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS "thumb" TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS "images" TEXT[];
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS "content" JSONB;
 
 -- 2. ENSURE OTHER TABLES EXIST
 CREATE TABLE IF NOT EXISTS experience (
@@ -73,19 +90,48 @@ CREATE TABLE IF NOT EXISTS experience (
 CREATE TABLE IF NOT EXISTS config (
   id INT PRIMARY KEY DEFAULT 1, 
   user_id UUID DEFAULT auth.uid(),
-  "resumeUrl" TEXT, 
-  email TEXT, 
-  "heroHeadline" TEXT, 
-  "heroSubheadline" TEXT, 
-  "heroDescription" TEXT, 
-  "experienceIntro" TEXT,
-  "seoTitle" TEXT,
-  "seoDescription" TEXT,
-  "sectionOrder" TEXT[],
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 3. ENABLE PUBLIC READ ACCESS (RLS)
+-- Fix config columns if they are missing (Crucial for existing tables)
+ALTER TABLE config ADD COLUMN IF NOT EXISTS "resumeUrl" TEXT;
+ALTER TABLE config ADD COLUMN IF NOT EXISTS "email" TEXT;
+ALTER TABLE config ADD COLUMN IF NOT EXISTS "heroHeadline" TEXT;
+ALTER TABLE config ADD COLUMN IF NOT EXISTS "heroSubheadline" TEXT;
+ALTER TABLE config ADD COLUMN IF NOT EXISTS "heroDescription" TEXT;
+ALTER TABLE config ADD COLUMN IF NOT EXISTS "experienceIntro" TEXT;
+ALTER TABLE config ADD COLUMN IF NOT EXISTS "seoTitle" TEXT;
+ALTER TABLE config ADD COLUMN IF NOT EXISTS "seoDescription" TEXT;
+ALTER TABLE config ADD COLUMN IF NOT EXISTS "sectionOrder" TEXT[];
+ALTER TABLE config ADD COLUMN IF NOT EXISTS "heroImage" TEXT;
+
+CREATE TABLE IF NOT EXISTS clients (
+  id TEXT PRIMARY KEY,
+  name TEXT,
+  logo TEXT,
+  url TEXT,
+  "order" INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS skills (
+  id TEXT PRIMARY KEY,
+  title TEXT,
+  items JSONB,
+  "order" INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS socials (
+  id TEXT PRIMARY KEY,
+  platform TEXT,
+  url TEXT,
+  label TEXT,
+  "order" INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 3. ENABLE ROW LEVEL SECURITY
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE experience ENABLE ROW LEVEL SECURITY;
 ALTER TABLE config ENABLE ROW LEVEL SECURITY;
@@ -93,19 +139,42 @@ ALTER TABLE skills ENABLE ROW LEVEL SECURITY;
 ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE socials ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow public read-only access to projects" ON projects FOR SELECT USING (true);
-CREATE POLICY "Allow public read-only access to experience" ON experience FOR SELECT USING (true);
-CREATE POLICY "Allow public read-only access to config" ON config FOR SELECT USING (true);
-CREATE POLICY "Allow public read-only access to skills" ON skills FOR SELECT USING (true);
-CREATE POLICY "Allow public read-only access to clients" ON clients FOR SELECT USING (true);
-CREATE POLICY "Allow public read-only access to socials" ON socials FOR SELECT USING (true);
+-- 4. CONFIGURE RLS POLICIES (Public Read, Auth All)
+DROP POLICY IF EXISTS "Public Select" ON projects;
+CREATE POLICY "Public Select" ON projects FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Auth All" ON projects;
+CREATE POLICY "Auth All" ON projects FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
--- 4. GRANT PERMISSIONS TO ANON AND AUTH ROLES
+DROP POLICY IF EXISTS "Public Select" ON experience;
+CREATE POLICY "Public Select" ON experience FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Auth All" ON experience;
+CREATE POLICY "Auth All" ON experience FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public Select" ON config;
+CREATE POLICY "Public Select" ON config FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Auth All" ON config;
+CREATE POLICY "Auth All" ON config FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public Select" ON clients;
+CREATE POLICY "Public Select" ON clients FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Auth All" ON clients;
+CREATE POLICY "Auth All" ON clients FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public Select" ON skills;
+CREATE POLICY "Public Select" ON skills FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Auth All" ON skills;
+CREATE POLICY "Auth All" ON skills FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public Select" ON socials;
+CREATE POLICY "Public Select" ON socials FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Auth All" ON socials;
+CREATE POLICY "Auth All" ON socials FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- 5. GRANT PERMISSIONS
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO authenticated;
-GRANT INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
 
--- 5. RELOAD SCHEMA CACHE
+-- 6. RELOAD CACHE
 NOTIFY pgrst, 'reload schema';
 `;
 
@@ -211,7 +280,7 @@ NOTIFY pgrst, 'reload schema';
         )}
 
         <div className="flex overflow-x-auto pb-1 mb-8 bg-neutral-200/50 p-1 rounded-xl w-full md:w-fit">
-            <button onClick={() => setActiveTab('work')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'work' ? 'bg-white shadow-sm' : 'text-neutral-500'}`}>Work</button>
+            <button onClick={() => setActiveTab('work')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'work' ? 'bg-white shadow-sm' : 'text-neutral-900'}`}>Work</button>
             <button onClick={() => setActiveTab('experience')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'experience' ? 'bg-white shadow-sm' : 'text-neutral-500'}`}>Experience</button>
             <button onClick={() => setActiveTab('skills')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'skills' ? 'bg-white shadow-sm' : 'text-neutral-500'}`}>Skills</button>
             <button onClick={() => setActiveTab('clients')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'clients' ? 'bg-white shadow-sm' : 'text-neutral-500'}`}>Clients</button>

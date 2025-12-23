@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Project } from '../types';
-import { ArrowUpRight, Type, Image as ImageIcon, Edit3, Eye, EyeOff, Check } from 'lucide-react';
+import { ArrowUpRight, Type, Image as ImageIcon, Edit3, Eye, EyeOff, Check, X, Save, RotateCcw } from 'lucide-react';
 import { getOptimizedSrc, getOptimizedSrcSet } from '../utils/imageOptimizer';
 import { useData } from '../contexts/DataContext';
 
@@ -14,21 +14,35 @@ interface ProjectCardProps {
 }
 
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnter, onMouseLeave }) => {
-  const { updateProjectInMemory, updateProject } = useData();
+  const { updateProjectInMemory, updateProject, reloadContent } = useData();
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [hasChanges, setHasChanges] = useState(false);
 
   // Check if we are in admin mode to show the control
   const isAdmin = typeof window !== 'undefined' && window.location.hash === '#admin';
 
-  const handleTitleBlur = async () => {
+  const handleFieldEdit = (data: Partial<Project>) => {
+    updateProjectInMemory(project.id, data);
+    setHasChanges(true);
+  };
+
+  const handleConfirmSave = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     setSaveStatus('saving');
     try {
-        await updateProject(project.id, { title: project.title });
+        await updateProject(project.id, project);
         setSaveStatus('saved');
+        setHasChanges(false);
         setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (e) {
         setSaveStatus('idle');
     }
+  };
+
+  const handleDiscardChanges = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await reloadContent(); // This will reset the global state to what's in DB
+    setHasChanges(false);
   };
 
   const handleTitleKeyDown = (e: React.KeyboardEvent) => {
@@ -48,11 +62,45 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
       }}
       viewport={{ once: true }}
       transition={{ duration: 0.5 }}
-      className={`group cursor-pointer flex flex-col border border-border bg-card hover:border-primary/40 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15)] dark:hover:shadow-[0_30px_60px_-15px_rgba(255,255,255,0.05)] transition-all duration-500 ease-out ${!project.published && isAdmin ? 'opacity-60 grayscale' : ''}`}
+      className={`group cursor-pointer flex flex-col border border-border bg-card hover:border-primary/40 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15)] dark:hover:shadow-[0_30px_60px_-15px_rgba(255,255,255,0.05)] transition-all duration-500 ease-out relative ${!project.published && isAdmin ? 'opacity-60 grayscale' : ''}`}
       onClick={() => onClick(project)}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
+      {/* Admin Confirmation Overlay */}
+      <AnimatePresence>
+        {hasChanges && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="absolute inset-x-0 top-0 z-[100] p-4 bg-neutral-900/95 backdrop-blur-md text-white flex items-center justify-between border-b border-white/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+               <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+               <span className="text-[10px] font-bold uppercase tracking-widest">Unsaved Edits</span>
+            </div>
+            <div className="flex items-center gap-2">
+               <button 
+                  onClick={handleDiscardChanges}
+                  className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 transition-colors"
+                >
+                  <RotateCcw className="w-3 h-3" /> Discard
+               </button>
+               <button 
+                  onClick={handleConfirmSave}
+                  disabled={saveStatus === 'saving'}
+                  className="px-4 py-1.5 rounded-full bg-white text-black hover:bg-neutral-200 text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                >
+                  {saveStatus === 'saving' ? <span className="w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin" /> : <Save className="w-3 h-3" />}
+                  Confirm Save
+               </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Image Container */}
       <div className="relative w-full aspect-[16/10] overflow-hidden bg-muted border-b border-border">
         <motion.img
@@ -71,7 +119,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
               onClick={(e) => {
                   e.stopPropagation();
                   const newUrl = prompt("Enter new thumbnail URL:", project.thumb);
-                  if (newUrl) updateProject(project.id, { thumb: newUrl });
+                  if (newUrl) handleFieldEdit({ thumb: newUrl });
               }}
               className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px] z-10"
             >
@@ -107,12 +155,11 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
                     <input
                         type="text"
                         value={project.title}
-                        onChange={(e) => updateProjectInMemory(project.id, { title: e.target.value })}
-                        onBlur={handleTitleBlur}
+                        onChange={(e) => handleFieldEdit({ title: e.target.value })}
                         onKeyDown={handleTitleKeyDown}
                         onClick={(e) => e.stopPropagation()}
                         style={{ fontSize: `${project.titleSize || 40}px` }}
-                        className="font-bold text-foreground leading-tight bg-transparent border-none p-0 w-full focus:ring-0 focus:outline-none hover:text-primary transition-all duration-300"
+                        className={`font-bold text-foreground leading-tight bg-transparent border-none p-0 w-full focus:ring-0 focus:outline-none hover:text-primary transition-all duration-300 ${hasChanges ? 'text-orange-500' : ''}`}
                     />
                     <AnimatePresence>
                         {saveStatus === 'saved' && (
@@ -156,7 +203,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
                 <div className="flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     {/* Visibility Toggle */}
                     <button 
-                      onClick={() => updateProject(project.id, { published: !project.published })}
+                      onClick={() => handleFieldEdit({ published: !project.published })}
                       className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all ${
                         project.published 
                           ? 'bg-green-100 dark:bg-green-900/30 text-green-700 border-green-200 hover:bg-green-200' 
@@ -176,8 +223,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
                         <input 
                           type="text"
                           value={project.thumb}
-                          onChange={(e) => updateProjectInMemory(project.id, { thumb: e.target.value })}
-                          onBlur={(e) => updateProject(project.id, { thumb: e.target.value })}
+                          onChange={(e) => handleFieldEdit({ thumb: e.target.value })}
                           placeholder="Image URL..."
                           className="w-24 md:w-32 bg-transparent border-none p-0 text-[10px] focus:ring-0 text-muted-foreground truncate font-mono"
                         />
@@ -192,8 +238,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
                           max="60"
                           step="1"
                           value={project.titleSize || 40}
-                          onChange={(e) => updateProjectInMemory(project.id, { titleSize: parseInt(e.target.value) })}
-                          onMouseUp={(e) => updateProject(project.id, { titleSize: parseInt((e.target as HTMLInputElement).value) })}
+                          onChange={(e) => handleFieldEdit({ titleSize: parseInt(e.target.value) })}
                           className="w-20 md:w-24 accent-primary cursor-ew-resize h-1"
                         />
                         <span className="text-[9px] font-mono text-muted-foreground w-4">
