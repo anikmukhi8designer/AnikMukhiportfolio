@@ -2,9 +2,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Project } from '../types';
-import { ArrowUpRight, Type, Image as ImageIcon, Edit3, Eye, EyeOff, Check, X, Save, RotateCcw } from 'lucide-react';
+import { ArrowUpRight, Type, Image as ImageIcon, Edit3, Eye, EyeOff, Check, X, Save, RotateCcw, Loader2 } from 'lucide-react';
 import { getOptimizedSrc, getOptimizedSrcSet } from '../utils/imageOptimizer';
 import { useData } from '../contexts/DataContext';
+import { toast } from 'sonner';
 
 interface ProjectCardProps {
   project: Project;
@@ -14,35 +15,81 @@ interface ProjectCardProps {
 }
 
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnter, onMouseLeave }) => {
-  const { updateProjectInMemory, updateProject, reloadContent } = useData();
+  const { updateProjectInMemory, reloadContent, saveAllData, isSaving: globalSaving } = useData();
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Check if we are in admin mode to show the control
+  // Check if we are in admin mode
   const isAdmin = typeof window !== 'undefined' && window.location.hash === '#admin';
 
   const handleFieldEdit = (data: Partial<Project>) => {
     updateProjectInMemory(project.id, data);
     setHasChanges(true);
+    setSaveStatus('idle');
   };
 
-  const handleConfirmSave = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleConfirmSave = async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    
+    // Safety check - prevent accidental data loss
+    const confirmSave = window.confirm(`Are you sure you want to save and publish changes for "${project.title}"?`);
+    if (!confirmSave) return;
+
     setSaveStatus('saving');
     try {
-        await updateProject(project.id, project);
+        await saveAllData(`Update project details: ${project.title}`);
         setSaveStatus('saved');
         setHasChanges(false);
+        toast.success("Project updated and published to GitHub");
         setTimeout(() => setSaveStatus('idle'), 2000);
-    } catch (e) {
+    } catch (e: any) {
         setSaveStatus('idle');
+        toast.error(e.message || "Failed to save changes");
+    }
+  };
+
+  const handleTogglePublish = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newState = !project.published;
+    
+    // Safety check - visibility is a sensitive action
+    const confirmVisibility = window.confirm(
+        `Do you want to set "${project.title}" to ${newState ? 'LIVE' : 'DRAFT'} mode? This will trigger a site update.`
+    );
+    if (!confirmVisibility) return;
+
+    // Update local state first
+    updateProjectInMemory(project.id, { published: newState });
+    
+    try {
+        setSaveStatus('saving');
+        // Small delay to ensure state batching finishes
+        setTimeout(async () => {
+            try {
+                await saveAllData(`${newState ? 'Publish' : 'Unpublish'} project: ${project.title}`);
+                setSaveStatus('idle');
+                toast.success(newState ? "Project is now Live" : "Project set to Draft");
+            } catch (err: any) {
+                setSaveStatus('idle');
+                // Rollback on failure
+                updateProjectInMemory(project.id, { published: !newState });
+                toast.error("Failed to update visibility on GitHub");
+            }
+        }, 100);
+    } catch (err: any) {
+        setSaveStatus('idle');
+        updateProjectInMemory(project.id, { published: !newState });
+        toast.error("An unexpected error occurred.");
     }
   };
 
   const handleDiscardChanges = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    await reloadContent(); // This will reset the global state to what's in DB
-    setHasChanges(false);
+    if (window.confirm("Discard all unsaved edits for this card?")) {
+        await reloadContent();
+        setHasChanges(false);
+        toast.info("Changes discarded");
+    }
   };
 
   const handleTitleKeyDown = (e: React.KeyboardEvent) => {
@@ -69,7 +116,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
     >
       {/* Admin Confirmation Overlay */}
       <AnimatePresence>
-        {hasChanges && (
+        {hasChanges && isAdmin && (
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -89,11 +136,11 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
                   <RotateCcw className="w-3 h-3" /> Discard
                </button>
                <button 
-                  onClick={handleConfirmSave}
-                  disabled={saveStatus === 'saving'}
-                  className="px-4 py-1.5 rounded-full bg-white text-black hover:bg-neutral-200 text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                  onClick={() => handleConfirmSave()}
+                  disabled={saveStatus === 'saving' || globalSaving}
+                  className="px-4 py-1.5 rounded-full bg-white text-black hover:bg-neutral-200 text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 transition-colors disabled:opacity-50 shadow-sm"
                 >
-                  {saveStatus === 'saving' ? <span className="w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin" /> : <Save className="w-3 h-3" />}
+                  {saveStatus === 'saving' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                   Confirm Save
                </button>
             </div>
@@ -198,26 +245,28 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
                 ))}
             </div>
 
-            {/* Admin Controls - Visible only in Admin for editing */}
+            {/* Admin Controls */}
             {isAdmin && (
-                <div className="flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    {/* Visibility Toggle */}
-                    <button 
-                      onClick={() => handleFieldEdit({ published: !project.published })}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all ${
-                        project.published 
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 border-green-200 hover:bg-green-200' 
-                          : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 border-orange-200 hover:bg-orange-200'
-                      }`}
-                      title={project.published ? "Click to set as Draft" : "Click to Publish"}
-                    >
-                        {project.published ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                        <span className="text-[10px] font-bold uppercase tracking-widest">
+                <div className="flex flex-wrap items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                    {/* Toggle Switch */}
+                    <div className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 rounded-full border border-border shadow-inner">
+                        <span className={`text-[9px] font-bold uppercase tracking-widest transition-colors ${project.published ? 'text-green-600' : 'text-neutral-400'}`}>
                             {project.published ? 'Live' : 'Draft'}
                         </span>
-                    </button>
+                        <button 
+                            onClick={handleTogglePublish}
+                            disabled={globalSaving}
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-all focus:outline-none ${
+                                project.published ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-neutral-300 dark:bg-neutral-600'
+                            }`}
+                        >
+                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${
+                                project.published ? 'translate-x-5' : 'translate-x-0.5'
+                            }`} />
+                        </button>
+                    </div>
 
-                    {/* Thumbnail URL Control */}
+                    {/* Image URL Control */}
                     <div className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 rounded-full border border-border">
                         <ImageIcon className="w-3 h-3 text-muted-foreground" />
                         <input 
@@ -225,11 +274,11 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
                           value={project.thumb}
                           onChange={(e) => handleFieldEdit({ thumb: e.target.value })}
                           placeholder="Image URL..."
-                          className="w-24 md:w-32 bg-transparent border-none p-0 text-[10px] focus:ring-0 text-muted-foreground truncate font-mono"
+                          className="w-20 md:w-28 bg-transparent border-none p-0 text-[9px] focus:ring-0 text-muted-foreground truncate font-mono"
                         />
                     </div>
 
-                    {/* Font Size Control */}
+                    {/* Scale Control */}
                     <div className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 rounded-full border border-border">
                         <Type className="w-3 h-3 text-muted-foreground" />
                         <input 
@@ -239,11 +288,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
                           step="1"
                           value={project.titleSize || 40}
                           onChange={(e) => handleFieldEdit({ titleSize: parseInt(e.target.value) })}
-                          className="w-20 md:w-24 accent-primary cursor-ew-resize h-1"
+                          className="w-16 md:w-20 accent-primary cursor-ew-resize h-1"
                         />
-                        <span className="text-[9px] font-mono text-muted-foreground w-4">
-                          {project.titleSize || 40}
-                        </span>
                     </div>
                 </div>
             )}

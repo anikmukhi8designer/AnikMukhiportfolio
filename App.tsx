@@ -18,32 +18,25 @@ import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion'
 import AdminLogin from './components/admin/AdminLogin';
 import Dashboard from './components/admin/Dashboard';
 import BlockEditor from './components/admin/BlockEditor';
-import { supabase } from './src/supabaseClient';
 
 // Context
 import { DataProvider, useData } from './contexts/DataContext';
 
 const AdminRoot = () => {
-  const [session, setSession] = useState<any>(null);
   const [view, setView] = useState<'dashboard' | 'editor'>('dashboard');
   const [editorProjectId, setEditorProjectId] = useState<string | null>(null);
   const { projects, updateProject, deleteProject } = useData();
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+  // Simple check for GitHub token in localStorage as our session indicator
+  const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('github_token');
 
-  if (!session) {
-    return <AdminLogin onLogin={() => {}} />;
+  if (!hasToken) {
+    return <AdminLogin onLogin={() => window.location.reload()} />;
   }
 
   if (view === 'editor' && editorProjectId) {
       const project = projects.find(p => p.id === editorProjectId);
-      if (!project) return <div className="p-20 text-center font-mono">Loading Project...</div>;
+      if (!project) return <div className="p-20 text-center font-mono uppercase text-xs tracking-widest animate-pulse">Loading Project...</div>;
 
       return (
         <BlockEditor 
@@ -59,7 +52,7 @@ const AdminRoot = () => {
                     setEditorProjectId(null);
                 } catch (e: any) {
                     console.error("Save failed:", e);
-                    throw e; // Rethrow so the editor can show the error
+                    throw e; 
                 }
             }} 
             onBack={() => {
@@ -72,7 +65,10 @@ const AdminRoot = () => {
 
   return (
     <Dashboard 
-        onLogout={() => supabase.auth.signOut()} 
+        onLogout={() => {
+            localStorage.removeItem('github_token');
+            window.location.reload();
+        }} 
         onEditProject={(id) => {
             setEditorProjectId(id);
             setView('editor');
@@ -108,14 +104,13 @@ const AppContent: React.FC = () => {
   
   const { socials, config } = useData();
 
-  // ADVANCED SEO EFFECT
+  // SEO Effect
   useEffect(() => {
     const title = config.seoTitle || `${config.heroHeadline} | Mukhi Anik`;
     const description = config.seoDescription || config.heroDescription;
     const url = window.location.origin;
-    const image = config.heroImage || '/og-image.jpg'; // Fallback to a static asset if hero is missing
+    const image = config.heroImage || '/og-image.jpg';
 
-    // 1. Basic Metadata
     document.title = title;
     
     const updateMeta = (name: string, content: string, attr = 'name') => {
@@ -129,21 +124,16 @@ const AppContent: React.FC = () => {
     };
 
     updateMeta('description', description);
-
-    // 2. Open Graph (Facebook / LinkedIn)
     updateMeta('og:title', title, 'property');
     updateMeta('og:description', description, 'property');
     updateMeta('og:url', url, 'property');
     updateMeta('og:image', image, 'property');
     updateMeta('og:type', 'website', 'property');
-
-    // 3. Twitter
     updateMeta('twitter:card', 'summary_large_image');
     updateMeta('twitter:title', title);
     updateMeta('twitter:description', description);
     updateMeta('twitter:image', image);
 
-    // 4. Canonical Link
     let canonical = document.querySelector('link[rel="canonical"]');
     if (!canonical) {
         canonical = document.createElement('link');
@@ -165,7 +155,6 @@ const AppContent: React.FC = () => {
     }
   };
 
-  // Helper to render sections based on dynamic order
   const renderSection = (sectionId: string) => {
     switch (sectionId) {
       case 'clients':
