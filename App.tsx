@@ -11,7 +11,7 @@ import NavBar from './components/NavBar';
 import SplitNavPanel from './components/SplitNavPanel';
 import CustomCursor from './components/CustomCursor';
 import ScrollToTop from './components/ScrollToTop';
-import { ArrowDown, RefreshCw, AlertTriangle, ShieldOff } from 'lucide-react';
+import { ArrowDown, RefreshCw, AlertTriangle, ShieldOff, AlertCircle } from 'lucide-react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 
 // Admin Imports
@@ -52,10 +52,20 @@ const AdminRoot = () => {
             <p className="text-neutral-500 text-xs">Communicating with GitHub API proxy...</p>
         </div>
         
+        {syncError && (
+          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 text-left max-w-sm">
+            <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-bold text-red-900 uppercase tracking-wide">Sync Failed</p>
+              <p className="text-[11px] text-red-700 mt-1 leading-relaxed">{syncError}</p>
+            </div>
+          </div>
+        )}
+
         {/* Stuck Helper */}
         <div className="mt-8 pt-8 border-t border-neutral-200 w-full max-w-xs space-y-4">
             <p className="text-[10px] text-neutral-400 font-medium leading-relaxed">
-                Stuck here for more than 10 seconds? Your credentials might be invalid or the API is unreachable.
+                Stuck here? Your credentials might be invalid or the repository is unreachable.
             </p>
             <div className="flex flex-col gap-2">
                 <button 
@@ -324,7 +334,7 @@ const App: React.FC = () => {
         };
         handleHashChange();
         window.addEventListener('hashchange', handleHashChange);
-        return () => window.location.hash === '#admin' ? setIsAdmin(true) : setIsAdmin(false);
+        return () => window.removeEventListener('hashchange', handleHashChange);
     }, []);
 
     return (

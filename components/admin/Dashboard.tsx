@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { LogOut, RefreshCw, AlertCircle, Loader2, Github } from 'lucide-react';
 import WorkTable from './WorkTable';
 import ExperienceTable from './ExperienceTable';
@@ -19,24 +19,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
   const { reloadContent, isLoading, error: dataError } = useData();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    reloadContent();
-  }, []);
-
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await reloadContent();
-    setTimeout(() => setIsRefreshing(false), 800);
+    try {
+      await reloadContent();
+    } finally {
+      setIsRefreshing(false);
+    }
   };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-neutral-100 flex items-center justify-center flex-col gap-4">
-        <Loader2 className="w-10 h-10 animate-spin text-neutral-400" />
-        <p className="text-neutral-500 text-sm font-medium">Loading CMS...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-neutral-100 flex flex-col font-sans">
@@ -57,11 +47,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onEditProject }) => {
           <div className="flex items-center gap-3 md:gap-4">
             <button 
               onClick={handleRefresh} 
-              disabled={isRefreshing}
-              className="p-2 text-neutral-400 hover:text-neutral-900 transition-colors"
+              disabled={isRefreshing || isLoading}
+              className="p-2 text-neutral-400 hover:text-neutral-900 transition-colors disabled:opacity-30"
               title="Refresh Data"
             >
-              <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-5 h-5 ${isRefreshing || isLoading ? 'animate-spin' : ''}`} />
             </button>
             <div className="h-6 w-px bg-neutral-200"></div>
             <button onClick={onLogout} className="flex items-center gap-2 px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg text-xs font-bold transition-all">
