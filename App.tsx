@@ -222,8 +222,8 @@ const AppContent: React.FC = () => {
               transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
               className="text-5xl sm:text-7xl md:text-9xl font-bold tracking-tighter mb-8 leading-[0.9] text-foreground"
             >
-              {config.heroHeadline || "Product Designer"} <br />
-              <span className="text-muted-foreground">{config.heroSubheadline || "& Creative Dev."}</span>
+              {config.heroHeadline || "UI/UX Designer"} <br />
+              <span className="text-muted-foreground">{config.heroSubheadline || "& Vibe Coder."}</span>
             </motion.h1>
 
             <motion.div 
@@ -233,7 +233,7 @@ const AppContent: React.FC = () => {
                 className="max-w-xl"
             >
                 <p className="text-lg md:text-xl text-muted-foreground leading-relaxed mb-12 border-l-2 border-primary/50 pl-6">
-                    {config.heroDescription || "Building digital products that blend aesthetics with function. Currently crafting experiences in San Francisco."}
+                    {config.heroDescription || "Building digital products that blend aesthetics with function. Currently crafting experiences in India."}
                 </p>
                 
                 <a 
