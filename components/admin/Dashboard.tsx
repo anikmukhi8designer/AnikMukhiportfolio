@@ -9,6 +9,7 @@ import ProfileSettings from './ProfileSettings';
 import { useData } from '../../contexts/DataContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../src/supabaseClient';
+import { Toaster } from 'sonner';
 
 interface DashboardProps {
   onLogout: () => void;
@@ -195,6 +196,7 @@ NOTIFY pgrst, 'reload schema';
 
   return (
     <div className="min-h-screen bg-neutral-100 flex flex-col">
+      <Toaster position="top-center" richColors />
       <AnimatePresence>
           {showSqlModal && (
               <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
