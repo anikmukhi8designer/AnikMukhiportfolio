@@ -1,7 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Project, Experience, Client, SkillCategory, GlobalConfig, SocialLink, SyncLogEntry } from '../types';
-import { supabase } from '../src/supabaseClient';
+import { Project, Experience, Client, SkillCategory, GlobalConfig, SocialLink } from '../types';
 import { 
   PROJECTS as INITIAL_PROJECTS, 
   EXPERIENCE as INITIAL_EXPERIENCE, 
@@ -20,18 +19,11 @@ interface DataContextType {
   socials: SocialLink[];
   isLoading: boolean;
   isSaving: boolean;
-  isDbEmpty: boolean;
   error: string | null;
   lastUpdated: Date | null;
   
-  branch: string;
-  hasNewVersion: boolean;
-  latestPreviewUrl: string | null;
-  
   reloadContent: () => Promise<void>;
-  syncData: (commitMessage?: string) => Promise<void>; 
-  triggerDeploy: () => Promise<void>;
-  resetData: () => Promise<void>;
+  saveAllData: (commitMessage?: string) => Promise<void>;
   
   updateProject: (id: string, data: Partial<Project>) => Promise<void>;
   updateProjectInMemory: (id: string, data: Partial<Project>) => void;
@@ -41,97 +33,57 @@ interface DataContextType {
   updateExperience: (id: string, data: Partial<Experience>) => Promise<void>;
   addExperience: (exp: Experience) => Promise<void>;
   deleteExperience: (id: string) => Promise<void>;
-  reorderExperience: (items: Experience[]) => Promise<void>;
-  
-  updateClient: (id: string, data: Partial<Client>) => Promise<void>;
-  addClient: (client: Client) => Promise<void>;
-  deleteClient: (id: string) => Promise<void>;
-  
-  updateSkill: (id: string, data: Partial<SkillCategory>) => Promise<void>;
-  addSkill: (skill: SkillCategory) => Promise<void>;
-  deleteSkill: (id: string) => Promise<void>;
   
   updateConfig: (data: Partial<GlobalConfig>) => Promise<void>;
   updateSocials: (data: SocialLink[]) => Promise<void>;
-  
-  verifyConnection: () => Promise<{ success: boolean; message: string }>;
-  getHistory: () => Promise<any[]>;
-  restoreVersion: (sha: string) => Promise<void>;
-  getSyncHistory: () => Promise<SyncLogEntry[]>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-// CRITICAL: PostgreSQL is case-insensitive for unquoted names. 
-// We MUST quote camelCase columns to match the quoted names in our SQL schema.
-const PROJECT_COLUMNS = 'id, title, client, roles, description, year, "heroImage", thumb, tags, link, "githubRepoUrl", published, images, content, "titleSize"';
-const CONFIG_COLUMNS = 'id, "resumeUrl", email, "heroHeadline", "heroSubheadline", "heroDescription", "experienceIntro", "seoTitle", "seoDescription", "sectionOrder"';
-
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [experience, setExperience] = useState<Experience[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [skills, setSkills] = useState<SkillCategory[]>([]);
+  const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
+  const [experience, setExperience] = useState<Experience[]>(INITIAL_EXPERIENCE);
+  const [clients, setClients] = useState<Client[]>(INITIAL_CLIENTS);
+  const [skills, setSkills] = useState<SkillCategory[]>(INITIAL_SKILLS);
   const [config, setConfig] = useState<GlobalConfig>(INITIAL_CONFIG);
-  const [socials, setSocials] = useState<SocialLink[]>([]);
+  const [socials, setSocials] = useState<SocialLink[]>(INITIAL_SOCIALS);
   
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isDbEmpty, setIsDbEmpty] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [currentSha, setCurrentSha] = useState<string | null>(null);
 
   const fetchData = async () => {
     setIsLoading(true);
     try {
-        console.log("Fetching fresh data from Supabase...");
-        
-        // 1. Fetch Config
-        let confRes = await supabase.from('config').select(CONFIG_COLUMNS).maybeSingle();
-        if (confRes.error) {
-             console.warn("Retrying config fetch with generic selection...");
-             confRes = await supabase.from('config').select('*').maybeSingle();
+        const owner = localStorage.getItem('github_owner');
+        const repo = localStorage.getItem('github_repo');
+        const token = localStorage.getItem('github_token');
+
+        if (!owner || !repo || !token) {
+            console.log("GitHub credentials missing, using local data.");
+            setIsLoading(false);
+            return;
         }
 
-        // 2. Fetch Projects
-        let pRes = await supabase.from('projects').select(PROJECT_COLUMNS).order('year', { ascending: false });
-        if (pRes.error) {
-            console.warn("Retrying projects fetch with generic selection...");
-            pRes = await supabase.from('projects').select('*').order('year', { ascending: false });
-        }
-
-        // 3. Fetch Rest
-        const [eRes, cRes, sRes, socRes] = await Promise.all([
-            supabase.from('experience').select('*').order('order', { ascending: true }),
-            supabase.from('clients').select('*').order('order', { ascending: true }),
-            supabase.from('skills').select('*').order('order', { ascending: true }),
-            supabase.from('socials').select('*').order('order', { ascending: true })
-        ]);
-
-        const hasDbData = (pRes.data && pRes.data.length > 0) || (confRes.data);
-        setIsDbEmpty(!hasDbData);
-
-        // Map data to state with fallbacks
-        setProjects(pRes.data && pRes.data.length > 0 ? pRes.data : INITIAL_PROJECTS);
-        setExperience(eRes.data && eRes.data.length > 0 ? eRes.data : INITIAL_EXPERIENCE);
-        setClients(cRes.data && cRes.data.length > 0 ? cRes.data : INITIAL_CLIENTS);
-        setSkills(sRes.data && sRes.data.length > 0 ? sRes.data : INITIAL_SKILLS);
+        const res = await fetch(`/api/data?owner=${owner}&repo=${repo}&t=${Date.now()}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
         
-        if (confRes.data) {
-            setConfig({ ...INITIAL_CONFIG, ...confRes.data });
-        } else {
-            setConfig(INITIAL_CONFIG);
+        if (res.ok) {
+            const data = await res.json();
+            setProjects(data.projects || INITIAL_PROJECTS);
+            setExperience(data.experience || INITIAL_EXPERIENCE);
+            setClients(data.clients || INITIAL_CLIENTS);
+            setSkills(data.skills || INITIAL_SKILLS);
+            setConfig(data.config || INITIAL_CONFIG);
+            setSocials(data.socials || INITIAL_SOCIALS);
+            setCurrentSha(data._sha);
+            setLastUpdated(new Date());
         }
-        
-        setSocials(socRes.data && socRes.data.length > 0 ? socRes.data : INITIAL_SOCIALS);
-
-        setLastUpdated(new Date());
-        setError(null);
     } catch (e: any) {
-        console.error("Critical Exception in fetchData:", e);
-        setError(e.message);
-        setProjects(INITIAL_PROJECTS);
-        setConfig(INITIAL_CONFIG);
+        setError("Failed to sync with GitHub. Using bundled data.");
     } finally {
         setIsLoading(false);
     }
@@ -141,9 +93,47 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     fetchData();
   }, []);
 
-  const reloadContent = async () => {
-      setError(null);
-      await fetchData();
+  const saveAllData = async (commitMessage = "Update via CMS") => {
+    setIsSaving(true);
+    try {
+        const owner = localStorage.getItem('github_owner');
+        const repo = localStorage.getItem('github_repo');
+        const token = localStorage.getItem('github_token');
+
+        if (!owner || !repo || !token) throw new Error("GitHub credentials missing in Settings.");
+
+        const payload = {
+            projects,
+            experience,
+            clients,
+            skills,
+            config,
+            socials,
+            _sha: currentSha,
+            _commitMessage: commitMessage
+        };
+
+        const res = await fetch(`/api/data?owner=${owner}&repo=${repo}`, {
+            method: 'PUT',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || "GitHub sync failed");
+
+        setCurrentSha(result.newSha);
+        setLastUpdated(new Date());
+        setError(null);
+    } catch (e: any) {
+        setError(e.message);
+        throw e;
+    } finally {
+        setIsSaving(false);
+    }
   };
 
   const updateProjectInMemory = (id: string, data: Partial<Project>) => {
@@ -151,217 +141,46 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const updateProject = async (id: string, data: Partial<Project>) => {
-      setIsSaving(true);
-      try {
-          const { error } = await supabase.from('projects').upsert({ ...data, id });
-          if (error) throw error;
-          updateProjectInMemory(id, data);
-      } catch (e: any) {
-          console.error("Update Project Error:", e);
-          throw e;
-      } finally {
-          setIsSaving(false);
-      }
+      setProjects(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
   };
 
   const addProject = async (project: Project) => {
-      setIsSaving(true);
-      try {
-          const { error } = await supabase.from('projects').insert(project);
-          if (error) throw error;
-          await fetchData();
-      } catch (e: any) {
-          throw e;
-      } finally {
-          setIsSaving(false);
-      }
+      setProjects(prev => [project, ...prev]);
   };
 
   const deleteProject = async (id: string) => {
-      setIsSaving(true);
-      try {
-          const { error } = await supabase.from('projects').delete().eq('id', id);
-          if (error) throw error;
-          await fetchData();
-      } catch (e: any) {
-          throw e;
-      } finally {
-          setIsSaving(false);
-      }
+      setProjects(prev => prev.filter(p => p.id !== id));
   };
 
   const updateExperience = async (id: string, data: Partial<Experience>) => {
-    setIsSaving(true);
-    try {
-        const { error } = await supabase.from('experience').upsert({ ...data, id });
-        if (error) throw error;
-        await fetchData();
-    } catch (e: any) {
-        throw e;
-    } finally {
-        setIsSaving(false);
-    }
+    setExperience(prev => prev.map(e => e.id === id ? { ...e, ...data } : e));
   };
 
   const addExperience = async (exp: Experience) => {
-    setIsSaving(true);
-    try {
-        const { error } = await supabase.from('experience').insert(exp);
-        if (error) throw error;
-        await fetchData();
-    } catch (e: any) {
-        throw e;
-    } finally {
-        setIsSaving(false);
-    }
+    setExperience(prev => [...prev, exp]);
   };
 
   const deleteExperience = async (id: string) => {
-    setIsSaving(true);
-    try {
-        const { error } = await supabase.from('experience').delete().eq('id', id);
-        if (error) throw error;
-        await fetchData();
-    } catch (e: any) {
-        throw e;
-    } finally {
-        setIsSaving(false);
-    }
-  };
-  
-  const reorderExperience = async (items: Experience[]) => {
-      setExperience(items);
-      for(let i=0; i<items.length; i++) {
-          await supabase.from('experience').update({ order: i }).eq('id', items[i].id);
-      }
-  };
-
-  const updateClient = async (id: string, data: Partial<Client>) => {
-    await supabase.from('clients').upsert({ ...data, id });
-    fetchData();
-  };
-
-  const addClient = async (client: Client) => {
-    await supabase.from('clients').insert(client);
-    fetchData();
-  };
-
-  const deleteClient = async (id: string) => {
-    await supabase.from('clients').delete().eq('id', id);
-    fetchData();
-  };
-
-  const updateSkill = async (id: string, data: Partial<SkillCategory>) => {
-    await supabase.from('skills').upsert({ ...data, id });
-    fetchData();
-  };
-
-  const addSkill = async (skill: SkillCategory) => {
-    await supabase.from('skills').insert(skill);
-    fetchData();
-  };
-
-  const deleteSkill = async (id: string) => {
-    await supabase.from('skills').delete().eq('id', id);
-    fetchData();
+    setExperience(prev => prev.filter(e => e.id !== id));
   };
 
   const updateConfig = async (data: Partial<GlobalConfig>) => {
-    setIsSaving(true);
-    try {
-      console.log("Saving global config...");
-      const { error } = await supabase.from('config').upsert({ id: 1, ...data });
-      if (error) throw error;
-      
-      // Update local state and trigger a refresh
       setConfig(prev => ({ ...prev, ...data }));
-      console.log("Global config saved successfully.");
-    } catch (e: any) {
-      console.error("Config update failed:", e);
-      throw e;
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   const updateSocials = async (data: SocialLink[]) => {
-      setIsSaving(true);
-      try {
-          await supabase.from('socials').delete().neq('id', '0');
-          if (data.length > 0) {
-            const { error } = await supabase.from('socials').insert(data.map((s, i) => ({ ...s, order: i })));
-            if(error) throw error;
-          }
-          await fetchData();
-      } catch (e: any) {
-          throw e;
-      } finally {
-          setIsSaving(false);
-      }
-  };
-
-  const resetData = async () => {
-    setIsSaving(true);
-    try {
-        await Promise.all([
-            supabase.from('projects').delete().neq('id', '0'),
-            supabase.from('experience').delete().neq('id', '0'),
-            supabase.from('clients').delete().neq('id', '0'),
-            supabase.from('skills').delete().neq('id', '0'),
-            supabase.from('config').delete().neq('id', 0),
-            supabase.from('socials').delete().neq('id', '0')
-        ]);
-
-        await Promise.all([
-            supabase.from('projects').insert(INITIAL_PROJECTS),
-            supabase.from('experience').insert(INITIAL_EXPERIENCE.map((e,i) => ({...e, order: i}))),
-            supabase.from('clients').insert(INITIAL_CLIENTS.map((c,i) => ({...c, order: i}))),
-            supabase.from('skills').insert(INITIAL_SKILLS.map((s,i) => ({...s, order: i}))),
-            supabase.from('config').insert({ id: 1, ...INITIAL_CONFIG }),
-            supabase.from('socials').insert(INITIAL_SOCIALS.map((s,i) => ({...s, order: i})))
-        ]);
-        
-        await fetchData();
-    } catch(e) {
-        console.error("Reset failed", e);
-    } finally {
-        setIsSaving(false);
-    }
-  };
-
-  const verifyConnection = async () => {
-      try {
-          const { count, error } = await supabase.from('projects').select('*', { count: 'exact', head: true });
-          if (error) throw error;
-          return { success: true, message: `Connected (${count} records)` };
-      } catch (e: any) {
-          return { success: false, message: e.message };
-      }
+      setSocials(data);
   };
 
   return (
     <DataContext.Provider value={{
         projects, experience, clients, skills, config, socials,
-        isLoading, isSaving, isDbEmpty, error, lastUpdated,
-        branch: 'main', hasNewVersion: false, latestPreviewUrl: null,
-        
-        reloadContent,
-        syncData: async () => {}, 
-        triggerDeploy: async () => {},
-        resetData,
-        
-        updateProject, 
-        updateProjectInMemory,
-        addProject, deleteProject,
-        updateExperience, addExperience, deleteExperience, reorderExperience,
-        updateClient, addClient, deleteClient,
-        updateSkill, addSkill, deleteSkill,
-        updateConfig, updateSocials,
-        
-        verifyConnection,
-        getHistory: async () => [], 
-        restoreVersion: async () => {}, 
-        getSyncHistory: async () => []
+        isLoading, isSaving, error, lastUpdated,
+        reloadContent: fetchData,
+        saveAllData,
+        updateProject, updateProjectInMemory, addProject, deleteProject,
+        updateExperience, addExperience, deleteExperience,
+        updateConfig, updateSocials
     }}>
       {children}
     </DataContext.Provider>

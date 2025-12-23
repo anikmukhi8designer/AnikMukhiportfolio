@@ -1,200 +1,106 @@
 
-// Explicitly define types for Vercel Serverless Functions
-interface VercelRequest {
-  query: Partial<{ [key: string]: string | string[] }>;
-  cookies: Partial<{ [key: string]: string }>;
-  body: any;
-  method?: string;
-  headers: { [key: string]: string | undefined };
-  [key: string]: any;
-}
+import { Buffer } from 'buffer';
 
-interface VercelResponse {
-  status(code: number): VercelResponse;
-  send(body: any): VercelResponse;
-  json(jsonBody: any): VercelResponse;
-  setHeader(name: string, value: string): VercelResponse;
-  [key: string]: any;
-}
-
-declare const process: {
-  env: { [key: string]: string | undefined };
-};
-
-declare const Buffer: {
-  from: (str: string, encoding?: string) => any;
-};
-
-// --- Github API Helpers ---
-const GITHUB_API = "https://api.github.com";
-
-async function getFileSha(token: string, owner: string, repo: string, path: string, branch: string) {
-    const url = `${GITHUB_API}/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
-    const res = await fetch(url, {
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/vnd.github.v3+json',
-            'Cache-Control': 'no-cache' // Critical for validating sync
-        }
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.sha;
-}
-
-async function updateFile(token: string, owner: string, repo: string, path: string, content: string, message: string, branch: string, sha?: string) {
-    const url = `${GITHUB_API}/repos/${owner}/${repo}/contents/${path}`;
-    const body: any = {
-        message,
-        content: Buffer.from(content).toString('base64'),
-        branch
-    };
-    if (sha) body.sha = sha;
-
-    const res = await fetch(url, {
-        method: 'PUT',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/vnd.github.v3+json',
-        },
-        body: JSON.stringify(body)
-    });
-
-    if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || `Failed to update ${path}`);
-    }
-    return await res.json();
-}
-
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // 1. Kill Cache - Strict Headers
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
-  
-  // 2. CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-github-owner, x-github-repo');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).send('ok');
-  }
-
-  // 3. Auth Extraction
+export default async function handler(req: any, res: any) {
+  const { owner, repo, branch = 'main' } = req.query;
   const authHeader = req.headers.authorization;
-  const token = authHeader ? authHeader.replace('Bearer ', '') : (process.env.VITE_GITHUB_TOKEN || process.env.GITHUB_TOKEN);
-  
-  // SUPPORT LOCAL STORAGE CONFIG: Check headers first, then env vars
-  const ownerHeader = req.headers['x-github-owner'];
-  const repoHeader = req.headers['x-github-repo'];
-  
-  const owner = ownerHeader || process.env.VITE_GITHUB_OWNER || process.env.GITHUB_OWNER;
-  const repo = repoHeader || process.env.VITE_GITHUB_REPO || process.env.GITHUB_REPO;
+  const token = authHeader?.replace('Bearer ', '');
 
   if (!token || !owner || !repo) {
-    return res.status(500).json({ 
-        error: 'Missing GitHub Configuration', 
-        details: 'Owner, Repo, or Token not found in headers or env.' 
-    });
+    return res.status(401).json({ error: 'GitHub credentials required' });
   }
 
-  const { branch = 'main' } = req.query;
-  const branchName = Array.isArray(branch) ? branch[0] : branch;
+  const GITHUB_API = `https://api.github.com/repos/${owner}/${repo}`;
 
   try {
-    // --- READ (GET) ---
     if (req.method === 'GET') {
-        const path = 'src/data.json';
-        const url = `${GITHUB_API}/repos/${owner}/${repo}/contents/${path}?ref=${branchName}&t=${Date.now()}`;
-        
-        const ghRes = await fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Accept': 'application/vnd.github.v3+json',
-                'Cache-Control': 'no-store'
-            }
-        });
+      const path = 'src/data.json';
+      const ghRes = await fetch(`${GITHUB_API}/contents/${path}?ref=${branch}`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' }
+      });
 
-        if (!ghRes.ok) {
-             const errText = await ghRes.text();
-             console.error(`GitHub Fetch Error (${ghRes.status}):`, errText);
-             return res.status(ghRes.status).json({ error: 'Failed to fetch data from GitHub', details: errText });
-        }
+      if (!ghRes.ok) return res.status(ghRes.status).json({ error: 'Data file not found' });
 
-        const data: any = await ghRes.json();
-        const content = Buffer.from(data.content, 'base64').toString('utf-8');
-        const json = JSON.parse(content);
-        
-        // Append SHA for optimistic locking
-        json._sha = data.sha;
-        
-        return res.status(200).json(json);
+      const data = await ghRes.json();
+      const content = Buffer.from(data.content, 'base64').toString('utf-8');
+      const json = JSON.parse(content);
+      json._sha = data.sha;
+      return res.status(200).json(json);
     }
 
-    // --- WRITE (PUT) ---
     if (req.method === 'PUT') {
-        const payload = req.body;
-        
-        // 1. Validate Payload Structure
-        if (!payload.projects || !payload.config) {
-            return res.status(400).json({ error: "Invalid Data Schema" });
-        }
+      const payload = req.body;
+      const commitMessage = payload._commitMessage || "Update content via CMS";
+      const sha = payload._sha;
 
-        const commitMessage = payload._commitMessage || "Update content via CMS";
-        const clientSha = payload._sha; // The SHA the client *thinks* exists
+      // Clean payload for JSON storage
+      const dataToStore = { ...payload };
+      delete dataToStore._sha;
+      delete dataToStore._commitMessage;
 
-        // 2. Get Current SHA (Concurrency Check)
-        const currentJsonSha = await getFileSha(token, owner, repo, 'src/data.json', branchName);
-        
-        // Safety: If client provided a SHA, and it doesn't match server, reject.
-        if (clientSha && currentJsonSha && clientSha !== currentJsonSha) {
-             return res.status(409).json({ 
-                 error: "Conflict detected. The data has changed on the server since you loaded it. Please refresh.",
-                 serverSha: currentJsonSha,
-                 clientSha: clientSha
-             });
-        }
+      const jsonContent = JSON.stringify(dataToStore, null, 2);
 
-        // 3. Update src/data.json (Runtime Data)
-        const dataToSave = { ...payload };
-        delete dataToSave._sha;
-        delete dataToSave._commitMessage;
-        
-        const jsonString = JSON.stringify(dataToSave, null, 2);
-        const jsonResult = await updateFile(token, owner, repo, 'src/data.json', jsonString, commitMessage, branchName, currentJsonSha || undefined);
+      // 1. Update src/data.json
+      const putJson = await fetch(`${GITHUB_API}/contents/src/data.json`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: commitMessage,
+          content: Buffer.from(jsonContent).toString('base64'),
+          sha,
+          branch
+        })
+      });
 
-        // 4. Update src/data.ts (Source Code)
-        const tsContent = `import { Project, Experience, SocialLink, Client, SkillCategory, GlobalConfig } from './types';
+      if (!putJson.ok) {
+        const err = await putJson.json();
+        throw new Error(`JSON update failed: ${err.message}`);
+      }
+
+      const jsonResult = await putJson.json();
+
+      // 2. Sync to src/data.ts for static build compatibility
+      const tsFile = await fetch(`${GITHUB_API}/contents/src/data.ts?ref=${branch}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      let tsSha = null;
+      if (tsFile.ok) {
+        const tsData = await tsFile.json();
+        tsSha = tsData.sha;
+      }
+
+      const tsTemplate = `
+import { Project, Experience, SocialLink, Client, SkillCategory, GlobalConfig } from './types';
 
 export const LAST_UPDATED = "${new Date().toISOString()}";
 
-export const INITIAL_CONFIG: GlobalConfig = ${JSON.stringify(payload.config, null, 2)};
+export const INITIAL_CONFIG: GlobalConfig = ${JSON.stringify(dataToStore.config, null, 2)};
 
-export const PROJECTS: Project[] = ${JSON.stringify(payload.projects, null, 2)};
+export const PROJECTS: Project[] = ${JSON.stringify(dataToStore.projects, null, 2)};
 
-export const EXPERIENCE: Experience[] = ${JSON.stringify(payload.experience, null, 2)};
+export const EXPERIENCE: Experience[] = ${JSON.stringify(dataToStore.experience, null, 2)};
 
-export const CLIENTS: Client[] = ${JSON.stringify(payload.clients, null, 2)};
+export const CLIENTS: Client[] = ${JSON.stringify(dataToStore.clients, null, 2)};
 
-export const SKILLS: SkillCategory[] = ${JSON.stringify(payload.skills, null, 2)};
+export const SKILLS: SkillCategory[] = ${JSON.stringify(dataToStore.skills, null, 2)};
 
-export const SOCIALS: SocialLink[] = ${JSON.stringify(payload.socials, null, 2)};
+export const SOCIALS: SocialLink[] = ${JSON.stringify(dataToStore.socials, null, 2)};
 `;
-        const currentTsSha = await getFileSha(token, owner, repo, 'src/data.ts', branchName);
-        await updateFile(token, owner, repo, 'src/data.ts', tsContent, commitMessage, branchName, currentTsSha || undefined);
 
-        return res.status(200).json({ 
-            success: true, 
-            newSha: jsonResult.content.sha,
-            timestamp: Date.now()
-        });
+      await fetch(`${GITHUB_API}/contents/src/data.ts`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `${commitMessage} (Sync TS)`,
+          content: Buffer.from(tsTemplate).toString('base64'),
+          sha: tsSha,
+          branch
+        })
+      });
+
+      return res.status(200).json({ success: true, newSha: jsonResult.content.sha });
     }
-
-    return res.status(405).json({ error: 'Method Not Allowed' });
-
   } catch (error: any) {
-    console.error("API Error", error);
     return res.status(500).json({ error: error.message });
   }
 }

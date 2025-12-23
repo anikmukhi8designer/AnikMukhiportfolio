@@ -30,7 +30,7 @@ const ExperienceSection: React.FC = () => {
             </h3>
           </div>
           
-          {/* Experience List - Tabular Style */}
+          {/* Experience List */}
           <div className="lg:col-span-8 flex flex-col border-t border-border">
             {publishedExperience.map((job, index) => (
               <motion.div 
