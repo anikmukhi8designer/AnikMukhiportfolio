@@ -2,9 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { useData } from '../../contexts/DataContext';
 import { Save, Plus, Trash2, Loader2, Check, Database, AlertTriangle, Wifi, ExternalLink, Globe, Search, Monitor, Info, Share2, ChevronUp, ChevronDown, Layout } from 'lucide-react';
+import { toast } from 'sonner';
 
 const ProfileSettings: React.FC = () => {
-  const { config, socials, updateConfig, updateSocials, isSaving, verifyConnection } = useData();
+  const { config, socials, updateConfig, updateSocials, isSaving, verifyConnection, reloadContent } = useData();
   
   const [localConfig, setLocalConfig] = useState(config);
   const [localSocials, setLocalSocials] = useState(socials);
@@ -12,6 +13,7 @@ const ProfileSettings: React.FC = () => {
 
   const [hasChanges, setHasChanges] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   // Connection Test State
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
@@ -27,6 +29,7 @@ const ProfileSettings: React.FC = () => {
       setLocalConfig(prev => ({ ...prev, [field]: value }));
       setHasChanges(true);
       setJustSaved(false);
+      setError(null);
   };
 
   const handleSocialChange = (index: number, field: keyof typeof localSocials[0], value: string) => {
@@ -35,6 +38,7 @@ const ProfileSettings: React.FC = () => {
     setLocalSocials(newSocials);
     setHasChanges(true);
     setJustSaved(false);
+    setError(null);
   };
 
   const handleAddSocial = () => {
@@ -69,19 +73,32 @@ const ProfileSettings: React.FC = () => {
     skills: 'Design & Tech (Skills)'
   };
 
-  const saveChanges = () => {
-      updateConfig(localConfig);
-      updateSocials(localSocials);
-      
-      if (deployHook) {
-          localStorage.setItem('vercel_deploy_hook', deployHook);
-      } else {
-          localStorage.removeItem('vercel_deploy_hook');
+  const saveChanges = async () => {
+      setError(null);
+      try {
+          // Perform updates in parallel
+          await Promise.all([
+            updateConfig(localConfig),
+            updateSocials(localSocials)
+          ]);
+          
+          if (deployHook) {
+              localStorage.setItem('vercel_deploy_hook', deployHook);
+          } else {
+              localStorage.removeItem('vercel_deploy_hook');
+          }
+          
+          // Re-fetch to ensure local sync is perfect
+          await reloadContent();
+          
+          setHasChanges(false);
+          setJustSaved(true);
+          toast.success("Settings updated successfully");
+          setTimeout(() => setJustSaved(false), 3000);
+      } catch (e: any) {
+          setError(e.message || "Failed to update settings. Please check your database connection.");
+          toast.error("Update failed");
       }
-      
-      setHasChanges(false);
-      setJustSaved(true);
-      setTimeout(() => setJustSaved(false), 3000);
   };
 
   const testConnection = async () => {
@@ -106,7 +123,10 @@ const ProfileSettings: React.FC = () => {
       
       {/* Header Actions */}
       <div className="flex justify-between items-center sticky top-0 bg-neutral-100/80 backdrop-blur-md py-4 z-50 border-b border-neutral-200/50 -mx-4 px-4 md:-mx-8 md:px-8">
-          <h2 className="text-2xl font-bold text-neutral-900">Settings</h2>
+          <div>
+            <h2 className="text-2xl font-bold text-neutral-900">Settings</h2>
+            {error && <p className="text-[10px] text-red-600 font-bold mt-1 uppercase tracking-wider">{error}</p>}
+          </div>
           <button 
             onClick={saveChanges}
             disabled={!hasChanges && !isSaving}

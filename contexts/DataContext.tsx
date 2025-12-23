@@ -62,8 +62,10 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-const PROJECT_COLUMNS = 'id, title, client, roles, description, year, heroImage, thumb, tags, link, githubRepoUrl, published, images, content, "titleSize"';
-const CONFIG_COLUMNS = 'id, resumeUrl, email, heroHeadline, heroSubheadline, heroDescription, experienceIntro, seoTitle, seoDescription, sectionOrder';
+// CRITICAL: PostgreSQL is case-insensitive for unquoted names. 
+// We MUST quote camelCase columns to match the quoted names in our SQL schema.
+const PROJECT_COLUMNS = 'id, title, client, roles, description, year, "heroImage", thumb, tags, link, "githubRepoUrl", published, images, content, "titleSize"';
+const CONFIG_COLUMNS = 'id, "resumeUrl", email, "heroHeadline", "heroSubheadline", "heroDescription", "experienceIntro", "seoTitle", "seoDescription", "sectionOrder"';
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -84,37 +86,27 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
         console.log("Fetching fresh data from Supabase...");
         
-        // Strategy: First try fetching with explicit columns (to capture camelCase issues)
-        // If it fails with a 42703 (missing column), we try a generic select(*) to let the app load
-        
-        let pRes = await supabase.from('projects').select(PROJECT_COLUMNS).order('year', { ascending: false });
-        if (pRes.error && pRes.error.code === '42703') {
-            console.warn("Retrying projects fetch with generic selection due to missing column...");
-            pRes = await supabase.from('projects').select('*').order('year', { ascending: false });
-        }
-
+        // 1. Fetch Config
         let confRes = await supabase.from('config').select(CONFIG_COLUMNS).maybeSingle();
-        if (confRes.error && confRes.error.code === '42703') {
-             console.warn("Retrying config fetch with generic selection due to missing column...");
+        if (confRes.error) {
+             console.warn("Retrying config fetch with generic selection...");
              confRes = await supabase.from('config').select('*').maybeSingle();
         }
 
+        // 2. Fetch Projects
+        let pRes = await supabase.from('projects').select(PROJECT_COLUMNS).order('year', { ascending: false });
+        if (pRes.error) {
+            console.warn("Retrying projects fetch with generic selection...");
+            pRes = await supabase.from('projects').select('*').order('year', { ascending: false });
+        }
+
+        // 3. Fetch Rest
         const [eRes, cRes, sRes, socRes] = await Promise.all([
             supabase.from('experience').select('*').order('order', { ascending: true }),
             supabase.from('clients').select('*').order('order', { ascending: true }),
             supabase.from('skills').select('*').order('order', { ascending: true }),
             supabase.from('socials').select('*').order('order', { ascending: true })
         ]);
-
-        // Detailed error logging
-        if (pRes.error) {
-            console.error("Projects Fetch Error:", pRes.error.message, "| Code:", pRes.error.code);
-            setError(`Project data error: ${pRes.error.message}`);
-        }
-        if (confRes.error) {
-            console.error("Config Fetch Error:", confRes.error.message, "| Code:", confRes.error.code);
-            setError(prev => prev ? prev + ' | ' : '' + `Config data error: ${confRes.error.message}`);
-        }
 
         const hasDbData = (pRes.data && pRes.data.length > 0) || (confRes.data);
         setIsDbEmpty(!hasDbData);
@@ -124,10 +116,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setExperience(eRes.data && eRes.data.length > 0 ? eRes.data : INITIAL_EXPERIENCE);
         setClients(cRes.data && cRes.data.length > 0 ? cRes.data : INITIAL_CLIENTS);
         setSkills(sRes.data && sRes.data.length > 0 ? sRes.data : INITIAL_SKILLS);
-        setConfig(confRes.data ? { ...INITIAL_CONFIG, ...confRes.data } : INITIAL_CONFIG);
+        
+        if (confRes.data) {
+            setConfig({ ...INITIAL_CONFIG, ...confRes.data });
+        } else {
+            setConfig(INITIAL_CONFIG);
+        }
+        
         setSocials(socRes.data && socRes.data.length > 0 ? socRes.data : INITIAL_SOCIALS);
 
         setLastUpdated(new Date());
+        setError(null);
     } catch (e: any) {
         console.error("Critical Exception in fetchData:", e);
         setError(e.message);
@@ -154,8 +153,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateProject = async (id: string, data: Partial<Project>) => {
       setIsSaving(true);
       try {
-          const { titleSize, ...supabaseData } = data as any;
-          const { error } = await supabase.from('projects').upsert({ ...supabaseData, id });
+          const { error } = await supabase.from('projects').upsert({ ...data, id });
           if (error) throw error;
           updateProjectInMemory(id, data);
       } catch (e: any) {
@@ -198,8 +196,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const { error } = await supabase.from('experience').upsert({ ...data, id });
         if (error) throw error;
         await fetchData();
-    } catch (e) {
-        console.error(e);
+    } catch (e: any) {
+        throw e;
     } finally {
         setIsSaving(false);
     }
@@ -207,16 +205,28 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const addExperience = async (exp: Experience) => {
     setIsSaving(true);
-    await supabase.from('experience').insert(exp);
-    await fetchData();
-    setIsSaving(false);
+    try {
+        const { error } = await supabase.from('experience').insert(exp);
+        if (error) throw error;
+        await fetchData();
+    } catch (e: any) {
+        throw e;
+    } finally {
+        setIsSaving(false);
+    }
   };
 
   const deleteExperience = async (id: string) => {
     setIsSaving(true);
-    await supabase.from('experience').delete().eq('id', id);
-    await fetchData();
-    setIsSaving(false);
+    try {
+        const { error } = await supabase.from('experience').delete().eq('id', id);
+        if (error) throw error;
+        await fetchData();
+    } catch (e: any) {
+        throw e;
+    } finally {
+        setIsSaving(false);
+    }
   };
   
   const reorderExperience = async (items: Experience[]) => {
@@ -259,11 +269,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateConfig = async (data: Partial<GlobalConfig>) => {
     setIsSaving(true);
     try {
+      console.log("Saving global config...");
       const { error } = await supabase.from('config').upsert({ id: 1, ...data });
       if (error) throw error;
+      
+      // Update local state and trigger a refresh
       setConfig(prev => ({ ...prev, ...data }));
-    } catch (e) {
+      console.log("Global config saved successfully.");
+    } catch (e: any) {
       console.error("Config update failed:", e);
+      throw e;
     } finally {
       setIsSaving(false);
     }
@@ -275,11 +290,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           await supabase.from('socials').delete().neq('id', '0');
           if (data.length > 0) {
             const { error } = await supabase.from('socials').insert(data.map((s, i) => ({ ...s, order: i })));
-            if(error) console.error(error);
+            if(error) throw error;
           }
           await fetchData();
-      } catch (e) {
-          console.error(e);
+      } catch (e: any) {
+          throw e;
       } finally {
           setIsSaving(false);
       }
