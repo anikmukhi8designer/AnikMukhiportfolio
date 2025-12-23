@@ -19,23 +19,18 @@ interface DataContextType {
   socials: SocialLink[];
   isLoading: boolean;
   isSaving: boolean;
+  hasUnsavedChanges: boolean;
+  isEditMode: boolean;
   error: string | null;
-  lastUpdated: Date | null;
   
+  setEditMode: (val: boolean) => void;
   reloadContent: () => Promise<void>;
   saveAllData: (commitMessage?: string) => Promise<void>;
+  discardChanges: () => void;
   
-  updateProject: (id: string, data: Partial<Project>) => Promise<void>;
   updateProjectInMemory: (id: string, data: Partial<Project>) => void;
-  addProject: (project: Project) => Promise<void>;
-  deleteProject: (id: string) => Promise<void>;
-  
-  updateExperience: (id: string, data: Partial<Experience>) => Promise<void>;
-  addExperience: (exp: Experience) => Promise<void>;
-  deleteExperience: (id: string) => Promise<void>;
-  
-  updateConfig: (data: Partial<GlobalConfig>) => Promise<void>;
-  updateSocials: (data: SocialLink[]) => Promise<void>;
+  updateConfigInMemory: (data: Partial<GlobalConfig>) => void;
+  updateExperienceInMemory: (id: string, data: Partial<Experience>) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -50,100 +45,72 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [currentSha, setCurrentSha] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleHash = () => setIsEditMode(window.location.hash === '#edit' || window.location.hash === '#admin');
+    handleHash();
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
 
   const fetchData = async () => {
     setIsLoading(true);
-    setError(null);
-    
     const owner = localStorage.getItem('github_owner');
     const repo = localStorage.getItem('github_repo');
     const token = localStorage.getItem('github_token');
 
     if (!owner || !repo || !token) {
-        console.log("GitHub credentials missing, using local data.");
         setIsLoading(false);
         return;
     }
 
-    // Set a timeout for the fetch request
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
     try {
         const res = await fetch(`/api/data?owner=${owner}&repo=${repo}&t=${Date.now()}`, {
-            headers: { 'Authorization': `Bearer ${token}` },
-            signal: controller.signal
+            headers: { 'Authorization': `Bearer ${token}` }
         });
-        
-        clearTimeout(timeoutId);
-
         if (res.ok) {
             const data = await res.json();
-            setProjects(data.projects || INITIAL_PROJECTS);
-            setExperience(data.experience || INITIAL_EXPERIENCE);
-            setClients(data.clients || INITIAL_CLIENTS);
-            setSkills(data.skills || INITIAL_SKILLS);
-            setConfig(data.config || INITIAL_CONFIG);
-            setSocials(data.socials || INITIAL_SOCIALS);
+            setProjects(data.projects);
+            setExperience(data.experience);
+            setClients(data.clients);
+            setSkills(data.skills);
+            setConfig(data.config);
+            setSocials(data.socials);
             setCurrentSha(data._sha);
-            setLastUpdated(new Date());
-        } else {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.error || `Server responded with ${res.status}`);
+            setHasUnsavedChanges(false);
         }
     } catch (e: any) {
-        console.error("Data fetch error:", e);
-        const errorMessage = e.name === 'AbortError' 
-            ? "Connection timed out. Check your internet or API proxy."
-            : e.message || "Failed to sync with GitHub.";
-        setError(errorMessage);
-        // Fallback to initial data is implicit as states are initialized with them
+        setError(e.message);
     } finally {
         setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
-  const saveAllData = async (commitMessage = "Update via CMS") => {
+  const saveAllData = async (commitMessage = "On-Page Update") => {
     setIsSaving(true);
     try {
         const owner = localStorage.getItem('github_owner');
         const repo = localStorage.getItem('github_repo');
         const token = localStorage.getItem('github_token');
 
-        if (!owner || !repo || !token) throw new Error("GitHub credentials missing in Settings.");
-
-        const payload = {
-            projects,
-            experience,
-            clients,
-            skills,
-            config,
-            socials,
-            _sha: currentSha,
-            _commitMessage: commitMessage
-        };
-
+        const payload = { projects, experience, clients, skills, config, socials, _sha: currentSha, _commitMessage: commitMessage };
         const res = await fetch(`/api/data?owner=${owner}&repo=${repo}`, {
             method: 'PUT',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify(payload)
         });
 
         const result = await res.json();
-        if (!res.ok) throw new Error(result.error || "GitHub sync failed");
+        if (!res.ok) throw new Error(result.error);
 
         setCurrentSha(result.newSha);
-        setLastUpdated(new Date());
+        setHasUnsavedChanges(false);
         setError(null);
     } catch (e: any) {
         setError(e.message);
@@ -153,51 +120,23 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const updateProjectInMemory = (id: string, data: Partial<Project>) => {
-    setProjects(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
-  };
-
-  const updateProject = async (id: string, data: Partial<Project>) => {
-      setProjects(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
-  };
-
-  const addProject = async (project: Project) => {
-      setProjects(prev => [project, ...prev]);
-  };
-
-  const deleteProject = async (id: string) => {
-      setProjects(prev => prev.filter(p => p.id !== id));
-  };
-
-  const updateExperience = async (id: string, data: Partial<Experience>) => {
-    setExperience(prev => prev.map(e => e.id === id ? { ...e, ...data } : e));
-  };
-
-  const addExperience = async (exp: Experience) => {
-    setExperience(prev => [...prev, exp]);
-  };
-
-  const deleteExperience = async (id: string) => {
-    setExperience(prev => prev.filter(e => e.id !== id));
-  };
-
-  const updateConfig = async (data: Partial<GlobalConfig>) => {
-      setConfig(prev => ({ ...prev, ...data }));
-  };
-
-  const updateSocials = async (data: SocialLink[]) => {
-      setSocials(data);
+  const discardChanges = () => {
+      if (window.confirm("Discard all pending visual edits?")) {
+          fetchData();
+      }
   };
 
   return (
     <DataContext.Provider value={{
         projects, experience, clients, skills, config, socials,
-        isLoading, isSaving, error, lastUpdated,
+        isLoading, isSaving, hasUnsavedChanges, isEditMode, error,
+        setEditMode: setIsEditMode,
         reloadContent: fetchData,
         saveAllData,
-        updateProject, updateProjectInMemory, addProject, deleteProject,
-        updateExperience, addExperience, deleteExperience,
-        updateConfig, updateSocials
+        discardChanges,
+        updateProjectInMemory: (id, data) => { setProjects(prev => prev.map(p => p.id === id ? {...p, ...data} : p)); setHasUnsavedChanges(true); },
+        updateConfigInMemory: (data) => { setConfig(prev => ({...prev, ...data})); setHasUnsavedChanges(true); },
+        updateExperienceInMemory: (id, data) => { setExperience(prev => prev.map(e => e.id === id ? {...e, ...data} : e)); setHasUnsavedChanges(true); }
     }}>
       {children}
     </DataContext.Provider>
