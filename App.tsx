@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './index.css';
 import { Project } from './types';
 import WorkSection from './components/WorkSection';
@@ -11,7 +10,8 @@ import NavBar from './components/NavBar';
 import SplitNavPanel from './components/SplitNavPanel';
 import CustomCursor from './components/CustomCursor';
 import ScrollToTop from './components/ScrollToTop';
-import { ArrowDown, Save, RotateCcw, Loader2, AlertTriangle, ShieldCheck } from 'lucide-react';
+import WaterRippleEffect, { WaterRippleRef } from './components/WaterRippleEffect';
+import { ArrowDown, Save, Loader2, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import { DataProvider, useData } from './contexts/DataContext';
 import { toast, Toaster } from 'sonner';
@@ -76,6 +76,7 @@ const AppContent: React.FC = () => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { config, updateConfigInMemory, isEditMode, socials } = useData();
+  const rippleRef = useRef<WaterRippleRef>(null);
   
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') return (localStorage.getItem('theme') as 'light' | 'dark') || 'dark';
@@ -91,8 +92,15 @@ const AppContent: React.FC = () => {
   const { scrollY } = useScroll();
   const heroTextY = useTransform(scrollY, [0, 500], [0, 100]);
 
+  const handleMouseMove = (e: React.MouseEvent) => {
+      rippleRef.current?.trigger(e.clientX, e.clientY);
+  };
+
   return (
-    <div className={`min-h-screen bg-background text-foreground font-mono selection:bg-primary selection:text-primary-foreground cursor-none ${isEditMode ? 'pt-16' : ''}`}>
+    <div 
+      className={`min-h-screen bg-background text-foreground font-mono selection:bg-primary selection:text-primary-foreground cursor-none ${isEditMode ? 'pt-16' : ''}`}
+      onMouseMove={handleMouseMove}
+    >
       <Toaster position="top-center" richColors />
       <CustomCursor />
       <ScrollToTop />
@@ -102,11 +110,19 @@ const AppContent: React.FC = () => {
       <SplitNavPanel isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onProjectClick={setSelectedProject} />
 
       <main className="relative z-10">
-        <section className="min-h-[90vh] flex flex-col justify-center px-4 md:px-6 max-w-screen-2xl mx-auto border-x border-border/50">
-          <motion.div style={{ y: heroTextY }}>
+        <section className="min-h-[90vh] flex flex-col justify-center px-4 md:px-6 max-w-screen-2xl mx-auto border-x border-border/30 relative">
+          
+          {/* Subtle Background Interaction */}
+          <div className="absolute inset-0 z-0 pointer-events-none opacity-20 dark:opacity-40">
+            <WaterRippleEffect ref={rippleRef} />
+          </div>
+
+          <motion.div style={{ y: heroTextY }} className="relative z-10">
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="mb-6 flex items-center gap-4">
                 <div className="h-px w-12 bg-primary"></div>
-                <span className="text-xs uppercase tracking-widest text-primary font-bold">On-Page Editor Active</span>
+                <span className="text-xs uppercase tracking-widest text-primary font-bold">
+                    {isEditMode ? 'On-Page Editor Active' : 'Product Design Studio'}
+                </span>
             </motion.div>
 
             <div className="relative group">
@@ -159,14 +175,15 @@ const AppContent: React.FC = () => {
         <div className="max-w-screen-2xl mx-auto px-4 md:px-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-24">
             <div>
-              <h2 className="text-4xl md:text-6xl font-bold text-foreground mb-8 tracking-tighter">Let's build<br/>something great.</h2>
+              <h2 className="text-4xl md:text-6xl font-bold text-foreground mb-8 tracking-tighter leading-none">Let's build<br/>something great.</h2>
               <a href={`mailto:${config.email}`} className="text-2xl md:text-3xl font-bold text-primary hover:text-foreground transition-colors underline decoration-2 underline-offset-8 decoration-border hover:decoration-primary">
                 {config.email}
               </a>
             </div>
           </div>
           <div className="flex flex-col md:flex-row justify-between items-center text-xs uppercase tracking-widest text-muted-foreground border-t border-border pt-8">
-            <p>&copy; {new Date().getFullYear()} Mukhi Anik. Site updated via On-Page Confirm.</p>
+            <p>&copy; {new Date().getFullYear()} Mukhi Anik. All rights reserved.</p>
+            <p className="font-mono">Built with New Genre Principles</p>
           </div>
         </div>
       </footer>

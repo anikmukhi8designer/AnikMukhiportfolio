@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Project, Experience, Client, SkillCategory, GlobalConfig, SocialLink } from '../types';
 import { 
@@ -43,7 +42,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [config, setConfig] = useState<GlobalConfig>(INITIAL_CONFIG);
   const [socials, setSocials] = useState<SocialLink[]>(INITIAL_SOCIALS);
   
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -58,28 +57,28 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const fetchData = async () => {
-    setIsLoading(true);
     const owner = localStorage.getItem('github_owner');
     const repo = localStorage.getItem('github_repo');
     const token = localStorage.getItem('github_token');
 
     if (!owner || !repo || !token) {
-        setIsLoading(false);
+        // Silently fail and use static data if not configured
         return;
     }
 
+    setIsLoading(true);
     try {
         const res = await fetch(`/api/data?owner=${owner}&repo=${repo}&t=${Date.now()}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
             const data = await res.json();
-            setProjects(data.projects);
-            setExperience(data.experience);
-            setClients(data.clients);
-            setSkills(data.skills);
-            setConfig(data.config);
-            setSocials(data.socials);
+            if (data.projects) setProjects(data.projects);
+            if (data.experience) setExperience(data.experience);
+            if (data.clients) setClients(data.clients);
+            if (data.skills) setSkills(data.skills);
+            if (data.config) setConfig(data.config);
+            if (data.socials) setSocials(data.socials);
             setCurrentSha(data._sha);
             setHasUnsavedChanges(false);
         }
@@ -93,12 +92,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => { fetchData(); }, []);
 
   const saveAllData = async (commitMessage = "On-Page Update") => {
+    const owner = localStorage.getItem('github_owner');
+    const repo = localStorage.getItem('github_repo');
+    const token = localStorage.getItem('github_token');
+
+    if (!owner || !repo || !token) {
+        throw new Error("GitHub credentials not configured in settings.");
+    }
+
     setIsSaving(true);
     try {
-        const owner = localStorage.getItem('github_owner');
-        const repo = localStorage.getItem('github_repo');
-        const token = localStorage.getItem('github_token');
-
         const payload = { projects, experience, clients, skills, config, socials, _sha: currentSha, _commitMessage: commitMessage };
         const res = await fetch(`/api/data?owner=${owner}&repo=${repo}`, {
             method: 'PUT',
@@ -123,6 +126,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const discardChanges = () => {
       if (window.confirm("Discard all pending visual edits?")) {
           fetchData();
+          setHasUnsavedChanges(false);
       }
   };
 
