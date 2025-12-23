@@ -56,21 +56,30 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const fetchData = async () => {
     setIsLoading(true);
+    setError(null);
+    
+    const owner = localStorage.getItem('github_owner');
+    const repo = localStorage.getItem('github_repo');
+    const token = localStorage.getItem('github_token');
+
+    if (!owner || !repo || !token) {
+        console.log("GitHub credentials missing, using local data.");
+        setIsLoading(false);
+        return;
+    }
+
+    // Set a timeout for the fetch request
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
     try {
-        const owner = localStorage.getItem('github_owner');
-        const repo = localStorage.getItem('github_repo');
-        const token = localStorage.getItem('github_token');
-
-        if (!owner || !repo || !token) {
-            console.log("GitHub credentials missing, using local data.");
-            setIsLoading(false);
-            return;
-        }
-
         const res = await fetch(`/api/data?owner=${owner}&repo=${repo}&t=${Date.now()}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers: { 'Authorization': `Bearer ${token}` },
+            signal: controller.signal
         });
         
+        clearTimeout(timeoutId);
+
         if (res.ok) {
             const data = await res.json();
             setProjects(data.projects || INITIAL_PROJECTS);
@@ -81,9 +90,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setSocials(data.socials || INITIAL_SOCIALS);
             setCurrentSha(data._sha);
             setLastUpdated(new Date());
+        } else {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `Server responded with ${res.status}`);
         }
     } catch (e: any) {
-        setError("Failed to sync with GitHub. Using bundled data.");
+        console.error("Data fetch error:", e);
+        const errorMessage = e.name === 'AbortError' 
+            ? "Connection timed out. Check your internet or API proxy."
+            : e.message || "Failed to sync with GitHub.";
+        setError(errorMessage);
+        // Fallback to initial data is implicit as states are initialized with them
     } finally {
         setIsLoading(false);
     }
