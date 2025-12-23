@@ -2,10 +2,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Project } from '../types';
-import { ArrowUpRight, Type, Image as ImageIcon, Edit3, Eye, EyeOff, Check, X, Save, RotateCcw, Loader2 } from 'lucide-react';
+import { ArrowUpRight, Type, Image as ImageIcon, Edit3, Eye, EyeOff, Check, X, Save, RotateCcw } from 'lucide-react';
 import { getOptimizedSrc, getOptimizedSrcSet } from '../utils/imageOptimizer';
 import { useData } from '../contexts/DataContext';
-import { toast } from 'sonner';
 
 interface ProjectCardProps {
   project: Project;
@@ -15,7 +14,7 @@ interface ProjectCardProps {
 }
 
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnter, onMouseLeave }) => {
-  const { updateProjectInMemory, updateProject, reloadContent, saveAllData, isSaving: globalSaving } = useData();
+  const { updateProjectInMemory, updateProject, reloadContent } = useData();
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [hasChanges, setHasChanges] = useState(false);
 
@@ -27,46 +26,16 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
     setHasChanges(true);
   };
 
-  const handleConfirmSave = async (e?: React.MouseEvent) => {
-    e?.stopPropagation();
+  const handleConfirmSave = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     setSaveStatus('saving');
     try {
-        // Since updateProject in DataContext updates state, 
-        // we call saveAllData to persist to GitHub
-        await saveAllData(`Update project: ${project.title}`);
+        await updateProject(project.id, project);
         setSaveStatus('saved');
         setHasChanges(false);
-        toast.success("Project updated and published");
         setTimeout(() => setSaveStatus('idle'), 2000);
-    } catch (e: any) {
+    } catch (e) {
         setSaveStatus('idle');
-        toast.error(e.message || "Failed to save changes");
-    }
-  };
-
-  const handleTogglePublish = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const newState = !project.published;
-    
-    // Update local state first for instant feedback
-    updateProjectInMemory(project.id, { published: newState });
-    
-    // Then persist immediately ("Update state directly")
-    try {
-        setSaveStatus('saving');
-        // We trigger the save workflow
-        // Because saveAllData relies on current state, and setProjects is async,
-        // we wait a tiny bit to ensure state batching is complete.
-        setTimeout(async () => {
-            await saveAllData(`${newState ? 'Publish' : 'Unpublish'} project: ${project.title}`);
-            setSaveStatus('idle');
-            toast.success(newState ? "Project is now Live" : "Project set to Draft");
-        }, 100);
-    } catch (err: any) {
-        setSaveStatus('idle');
-        // Rollback
-        updateProjectInMemory(project.id, { published: !newState });
-        toast.error("Failed to update visibility");
     }
   };
 
@@ -120,11 +89,11 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
                   <RotateCcw className="w-3 h-3" /> Discard
                </button>
                <button 
-                  onClick={() => handleConfirmSave()}
-                  disabled={saveStatus === 'saving' || globalSaving}
+                  onClick={handleConfirmSave}
+                  disabled={saveStatus === 'saving'}
                   className="px-4 py-1.5 rounded-full bg-white text-black hover:bg-neutral-200 text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 transition-colors disabled:opacity-50"
                 >
-                  {saveStatus === 'saving' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                  {saveStatus === 'saving' ? <span className="w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin" /> : <Save className="w-3 h-3" />}
                   Confirm Save
                </button>
             </div>
@@ -231,24 +200,22 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
 
             {/* Admin Controls - Visible only in Admin for editing */}
             {isAdmin && (
-                <div className="flex flex-wrap items-center gap-3" onClick={(e) => e.stopPropagation()}>
-                    {/* Dedicated Toggle Switch for Published State */}
-                    <div className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 rounded-full border border-border">
-                        <span className={`text-[9px] font-bold uppercase tracking-widest transition-colors ${project.published ? 'text-green-600' : 'text-neutral-400'}`}>
+                <div className="flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    {/* Visibility Toggle */}
+                    <button 
+                      onClick={() => handleFieldEdit({ published: !project.published })}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all ${
+                        project.published 
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 border-green-200 hover:bg-green-200' 
+                          : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 border-orange-200 hover:bg-orange-200'
+                      }`}
+                      title={project.published ? "Click to set as Draft" : "Click to Publish"}
+                    >
+                        {project.published ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                        <span className="text-[10px] font-bold uppercase tracking-widest">
                             {project.published ? 'Live' : 'Draft'}
                         </span>
-                        <button 
-                            onClick={handleTogglePublish}
-                            disabled={globalSaving}
-                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-all focus:outline-none ${
-                                project.published ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-neutral-300 dark:bg-neutral-600'
-                            }`}
-                        >
-                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${
-                                project.published ? 'translate-x-5' : 'translate-x-0.5'
-                            }`} />
-                        </button>
-                    </div>
+                    </button>
 
                     {/* Thumbnail URL Control */}
                     <div className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 rounded-full border border-border">
@@ -258,7 +225,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
                           value={project.thumb}
                           onChange={(e) => handleFieldEdit({ thumb: e.target.value })}
                           placeholder="Image URL..."
-                          className="w-20 md:w-28 bg-transparent border-none p-0 text-[9px] focus:ring-0 text-muted-foreground truncate font-mono"
+                          className="w-24 md:w-32 bg-transparent border-none p-0 text-[10px] focus:ring-0 text-muted-foreground truncate font-mono"
                         />
                     </div>
 
@@ -272,7 +239,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick, onMouseEnte
                           step="1"
                           value={project.titleSize || 40}
                           onChange={(e) => handleFieldEdit({ titleSize: parseInt(e.target.value) })}
-                          className="w-16 md:w-20 accent-primary cursor-ew-resize h-1"
+                          className="w-20 md:w-24 accent-primary cursor-ew-resize h-1"
                         />
                         <span className="text-[9px] font-mono text-muted-foreground w-4">
                           {project.titleSize || 40}
