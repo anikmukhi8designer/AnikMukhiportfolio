@@ -1,7 +1,7 @@
 
 import { Project, Experience, SocialLink, Client, SkillCategory, GlobalConfig } from './types';
 
-export const LAST_UPDATED = "2025-12-23T12:24:28.409Z";
+export const LAST_UPDATED = "2025-12-23T12:25:26.764Z";
 
 export const INITIAL_CONFIG: GlobalConfig = {
   "resumeUrl": "/resume.pdf",
